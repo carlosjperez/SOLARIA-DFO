@@ -173,14 +173,15 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insert default C-Suite users (password hash is SHA256 of 'bypass')
--- SHA256('bypass') = 'd9d2b4a9e4e2e3f56e0d3f2e1a9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c' (placeholder)
+-- Insert default C-Suite users
+-- Password: SolariaAdmin2024! -> SHA256 hash
+-- IMPORTANT: Change these passwords immediately after first login in production!
 INSERT INTO users (username, email, password_hash, name, role, is_active) VALUES
-('carlosjperez', 'carlos@solaria.agency', 'a1159e9df3670d549d04524532629f5477ceb7deec9b45e47e8c009506ecb2c8', 'Carlos J. Perez', 'ceo', TRUE),
-('cto_solaria', 'cto@solaria.agency', 'a1159e9df3670d549d04524532629f5477ceb7deec9b45e47e8c009506ecb2c8', 'CTO SOLARIA', 'cto', TRUE),
-('coo_solaria', 'coo@solaria.agency', 'a1159e9df3670d549d04524532629f5477ceb7deec9b45e47e8c009506ecb2c8', 'COO SOLARIA', 'coo', TRUE),
-('cfo_solaria', 'cfo@solaria.agency', 'a1159e9df3670d549d04524532629f5477ceb7deec9b45e47e8c009506ecb2c8', 'CFO SOLARIA', 'cfo', TRUE),
-('admin', 'admin@solaria.agency', 'a1159e9df3670d549d04524532629f5477ceb7deec9b45e47e8c009506ecb2c8', 'System Admin', 'admin', TRUE);
+('carlosjperez', 'carlos@solaria.agency', 'a8d3ca85c348198c863daaa1af3b13af4aba6bbf414c32a77efe02b447ad93b8', 'Carlos J. Perez', 'ceo', TRUE),
+('cto_solaria', 'cto@solaria.agency', 'a8d3ca85c348198c863daaa1af3b13af4aba6bbf414c32a77efe02b447ad93b8', 'CTO SOLARIA', 'cto', TRUE),
+('coo_solaria', 'coo@solaria.agency', 'a8d3ca85c348198c863daaa1af3b13af4aba6bbf414c32a77efe02b447ad93b8', 'COO SOLARIA', 'coo', TRUE),
+('cfo_solaria', 'cfo@solaria.agency', 'a8d3ca85c348198c863daaa1af3b13af4aba6bbf414c32a77efe02b447ad93b8', 'CFO SOLARIA', 'cfo', TRUE),
+('admin', 'admin@solaria.agency', 'a8d3ca85c348198c863daaa1af3b13af4aba6bbf414c32a77efe02b447ad93b8', 'System Admin', 'admin', TRUE);
 
 -- Insert AI Agents
 INSERT INTO ai_agents (name, role, status, capabilities, last_activity) VALUES

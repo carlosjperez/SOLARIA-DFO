@@ -704,6 +704,212 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- CEO Section -->
+                <section id="ceoSection" class="hidden">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-solaria to-solaria-dark flex items-center justify-center">
+                            <i class="fa-solid fa-crown text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-foreground">CEO Dashboard</h2>
+                            <p class="text-muted-foreground">Visión Estratégica Global</p>
+                        </div>
+                    </div>
+
+                    <!-- CEO KPIs -->
+                    <div class="grid grid-cols-4 gap-4 mb-6" id="ceoKpis">
+                        <div class="stat-card rounded-xl p-4"><p class="text-muted-foreground text-sm">Cargando...</p></div>
+                    </div>
+
+                    <!-- Project Overview & Strategic Info -->
+                    <div class="grid grid-cols-3 gap-6 mb-6">
+                        <div class="col-span-2 bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Resumen del Proyecto</h3>
+                            <div id="ceoProjectSummary" class="space-y-4">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Decisiones Estratégicas</h3>
+                            <div id="ceoDecisions" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alerts & Timeline -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Alertas Críticas</h3>
+                            <div id="ceoCriticalAlerts" class="space-y-3">
+                                <p class="text-green-500 text-sm">Sin alertas críticas</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Resumen Ejecutivo</h3>
+                            <div id="ceoExecutiveSummary" class="text-sm text-foreground">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CTO Section -->
+                <section id="ctoSection" class="hidden">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
+                            <i class="fa-solid fa-microchip text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-foreground">CTO Dashboard</h2>
+                            <p class="text-muted-foreground">Tecnología & Arquitectura</p>
+                        </div>
+                    </div>
+
+                    <!-- CTO KPIs -->
+                    <div class="grid grid-cols-4 gap-4 mb-6" id="ctoKpis">
+                        <div class="stat-card rounded-xl p-4"><p class="text-muted-foreground text-sm">Cargando...</p></div>
+                    </div>
+
+                    <!-- Tech Stack & Architecture -->
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Stack Tecnológico</h3>
+                            <div id="ctoTechStack" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Componentes de Arquitectura</h3>
+                            <div id="ctoArchitecture" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Code Quality & Tech Debt -->
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Calidad de Código</h3>
+                            <div id="ctoCodeQuality" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Deuda Técnica</h3>
+                            <div id="ctoTechDebt" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Rendimiento Agentes</h3>
+                            <div id="ctoAgentPerformance" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- COO Section -->
+                <section id="cooSection" class="hidden">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center">
+                            <i class="fa-solid fa-gears text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-foreground">COO Dashboard</h2>
+                            <p class="text-muted-foreground">Operaciones & Flujo de Trabajo</p>
+                        </div>
+                    </div>
+
+                    <!-- COO KPIs -->
+                    <div class="grid grid-cols-4 gap-4 mb-6" id="cooKpis">
+                        <div class="stat-card rounded-xl p-4"><p class="text-muted-foreground text-sm">Cargando...</p></div>
+                    </div>
+
+                    <!-- Tasks & Workflow -->
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Estado de Tareas</h3>
+                            <div id="cooTaskStatus" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Utilización de Agentes</h3>
+                            <div id="cooAgentUtilization" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottlenecks & Timeline -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Cuellos de Botella</h3>
+                            <div id="cooBottlenecks" class="space-y-3">
+                                <p class="text-green-500 text-sm">Sin bloqueos detectados</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Próximos Hitos</h3>
+                            <div id="cooMilestones" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CFO Section -->
+                <section id="cfoSection" class="hidden">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+                            <i class="fa-solid fa-chart-pie text-white text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-foreground">CFO Dashboard</h2>
+                            <p class="text-muted-foreground">Finanzas & Presupuesto</p>
+                        </div>
+                    </div>
+
+                    <!-- CFO KPIs -->
+                    <div class="grid grid-cols-4 gap-4 mb-6" id="cfoKpis">
+                        <div class="stat-card rounded-xl p-4"><p class="text-muted-foreground text-sm">Cargando...</p></div>
+                    </div>
+
+                    <!-- Budget & Costs -->
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Desglose de Presupuesto</h3>
+                            <div id="cfoBudgetBreakdown" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Costos por Proyecto</h3>
+                            <div id="cfoCostByProject" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Approvals & Projections -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Aprobaciones Pendientes</h3>
+                            <div id="cfoApprovals" class="space-y-3">
+                                <p class="text-muted-foreground">Cargando...</p>
+                            </div>
+                        </div>
+                        <div class="bg-card rounded-xl p-6 border border-border">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Alertas Financieras</h3>
+                            <div id="cfoFinancialAlerts" class="space-y-3">
+                                <p class="text-green-500 text-sm">Sin alertas financieras</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </main>
     </div>
@@ -764,136 +970,12 @@
             }
         });
 
-        // Role View Functions
-        async function showRoleView(role) {
-            const titles = {
-                ceo: { title: 'CEO Dashboard', subtitle: 'Visión estratégica y KPIs globales' },
-                cto: { title: 'CTO Dashboard', subtitle: 'Tecnología y arquitectura' },
-                coo: { title: 'COO Dashboard', subtitle: 'Operaciones y flujo de trabajo' },
-                cfo: { title: 'CFO Dashboard', subtitle: 'Finanzas y presupuesto' }
-            };
-            document.getElementById('pageTitle').textContent = titles[role].title;
-            document.getElementById('pageSubtitle').textContent = titles[role].subtitle;
-
-            const token = localStorage.getItem('solaria_token');
-            if (!token) return;
-
-            try {
-                const response = await fetch('/api/csuite/' + role, {
-                    headers: { 'Authorization': 'Bearer ' + token }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    showRoleModal(role, data);
-                }
-            } catch (error) {
-                console.error('Error loading role data:', error);
+        // Role View Functions - Navigate to full C-Suite sections
+        function showRoleView(role) {
+            // Use the dashboard's showSection method to navigate to full page view
+            if (typeof dashboard !== 'undefined' && dashboard.showSection) {
+                dashboard.showSection(role);
             }
-        }
-
-        function showRoleModal(role, data) {
-            const overlay = document.createElement('div');
-            overlay.id = 'roleModal';
-            overlay.className = 'fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4';
-
-            const modal = document.createElement('div');
-            modal.className = 'bg-card rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border';
-
-            // Header
-            const header = document.createElement('div');
-            header.className = 'flex items-center justify-between mb-6';
-
-            const titleDiv = document.createElement('div');
-            titleDiv.className = 'flex items-center gap-3';
-
-            const icon = document.createElement('div');
-            const colors = { ceo: 'from-solaria to-solaria-dark', cto: 'from-blue-500 to-blue-700', coo: 'from-green-500 to-green-700', cfo: 'from-purple-500 to-purple-700' };
-            icon.className = 'w-12 h-12 rounded-full bg-gradient-to-br ' + colors[role] + ' flex items-center justify-center';
-            const iconI = document.createElement('i');
-            iconI.className = 'fa-solid fa-crown text-white';
-            icon.appendChild(iconI);
-
-            const titleText = document.createElement('div');
-            const h2 = document.createElement('h2');
-            h2.className = 'text-xl font-bold text-foreground';
-            h2.textContent = data.title || role.toUpperCase() + ' Dashboard';
-            const subtitle = document.createElement('p');
-            subtitle.className = 'text-sm text-muted-foreground';
-            subtitle.textContent = role.toUpperCase() + ' View';
-            titleText.appendChild(h2);
-            titleText.appendChild(subtitle);
-
-            titleDiv.appendChild(icon);
-            titleDiv.appendChild(titleText);
-
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'w-8 h-8 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80';
-            closeBtn.onclick = closeRoleModal;
-            const closeIcon = document.createElement('i');
-            closeIcon.className = 'fa-solid fa-times text-muted-foreground';
-            closeBtn.appendChild(closeIcon);
-
-            header.appendChild(titleDiv);
-            header.appendChild(closeBtn);
-            modal.appendChild(header);
-
-            // KPIs
-            if (data.kpis) {
-                const kpiSection = document.createElement('div');
-                kpiSection.className = 'mb-6';
-                const kpiTitle = document.createElement('h3');
-                kpiTitle.className = 'text-sm font-semibold text-muted-foreground mb-3';
-                kpiTitle.textContent = 'KEY PERFORMANCE INDICATORS';
-                kpiSection.appendChild(kpiTitle);
-
-                const kpiGrid = document.createElement('div');
-                kpiGrid.className = 'grid grid-cols-3 gap-3';
-                for (const [key, value] of Object.entries(data.kpis)) {
-                    const kpiCard = document.createElement('div');
-                    kpiCard.className = 'bg-secondary/50 rounded-lg p-3';
-                    const label = document.createElement('p');
-                    label.className = 'text-xs text-muted-foreground';
-                    label.textContent = key.replace(/([A-Z])/g, ' $1').trim();
-                    const val = document.createElement('p');
-                    val.className = 'text-lg font-bold text-foreground';
-                    val.textContent = typeof value === 'number' && key.toLowerCase().includes('budget') ? '$' + Number(value).toLocaleString() : String(value);
-                    kpiCard.appendChild(label);
-                    kpiCard.appendChild(val);
-                    kpiGrid.appendChild(kpiCard);
-                }
-                kpiSection.appendChild(kpiGrid);
-                modal.appendChild(kpiSection);
-            }
-
-            // Summary
-            if (data.executiveSummary) {
-                const summary = document.createElement('div');
-                summary.className = 'bg-solaria/10 border border-solaria/20 rounded-lg p-4 mb-6';
-                const summaryText = document.createElement('p');
-                summaryText.className = 'text-sm text-foreground';
-                summaryText.textContent = data.executiveSummary;
-                summary.appendChild(summaryText);
-                modal.appendChild(summary);
-            }
-
-            // Close button
-            const footer = document.createElement('div');
-            footer.className = 'flex gap-2';
-            const closeFooterBtn = document.createElement('button');
-            closeFooterBtn.className = 'flex-1 py-2 rounded-lg bg-secondary text-foreground font-medium';
-            closeFooterBtn.textContent = 'Cerrar';
-            closeFooterBtn.onclick = closeRoleModal;
-            footer.appendChild(closeFooterBtn);
-            modal.appendChild(footer);
-
-            overlay.appendChild(modal);
-            overlay.addEventListener('click', function(e) { if (e.target === overlay) closeRoleModal(); });
-            document.body.appendChild(overlay);
-        }
-
-        function closeRoleModal() {
-            const modal = document.getElementById('roleModal');
-            if (modal) modal.remove();
         }
     </script>
 </body>

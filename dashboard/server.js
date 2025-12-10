@@ -71,9 +71,10 @@ class SolariaDashboardServer {
                 database: process.env.DB_NAME || 'solaria_construction',
                 charset: 'utf8mb4',
                 timezone: '+00:00',
-                acquireTimeout: 60000,
-                timeout: 60000,
-                reconnect: true
+                connectTimeout: 60000,
+                waitForConnections: true,
+                connectionLimit: 10,
+                queueLimit: 0
             });
 
             console.log('✅ Database connected successfully');
@@ -275,12 +276,12 @@ class SolariaDashboardServer {
 
             const user = users[0];
 
-            // DEV BYPASS: Allow 'dev' password for quick access
-            const isDevelopmentBypass = password === 'dev' || password === 'bypass';
-
-            // Verificar password hash
+            // Verificar password hash (bcrypt for production, SHA256 for legacy)
             const passwordHash = require('crypto').createHash('sha256').update(password).digest('hex');
-            if (!isDevelopmentBypass && user.password_hash !== passwordHash) {
+            const isValidPassword = user.password_hash === passwordHash ||
+                                    await bcrypt.compare(password, user.password_hash);
+
+            if (!isValidPassword) {
                 return res.status(401).json({ error: 'Invalid credentials' });
             }
             

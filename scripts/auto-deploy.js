@@ -20,15 +20,29 @@ const yaml = require('yaml');
 const { execSync } = require('child_process');
 
 class SolariaAutoDeployer {
-    constructor() {
+    constructor(options = {}) {
         this.projectConfig = {};
         this.repoInfo = {};
         this.deploymentPath = '';
+        // Support non-interactive mode via options or environment variables
+        this.ciMode = options.ciMode || process.env.CI_MODE === 'true';
+        this.envConfig = {
+            repoPath: options.repoPath || process.env.REPO_PATH,
+            projectName: options.projectName || process.env.PROJECT_NAME,
+            projectType: options.projectType || process.env.PROJECT_TYPE || 'software',
+            budget: options.budget || process.env.PROJECT_BUDGET || '100000',
+            timeline: options.timeline || process.env.PROJECT_TIMELINE || '6',
+            deploymentPath: options.deploymentPath || process.env.DEPLOYMENT_PATH || process.cwd()
+        };
     }
 
     async start() {
         console.log(chalk.blue.bold('\n🏗️  SOLARIA Digital Field Operations - Auto-Deployment System'));
         console.log(chalk.gray('Construction Intelligence, Field First\n'));
+
+        if (this.ciMode) {
+            console.log(chalk.yellow('📦 Running in CI/Non-Interactive Mode'));
+        }
 
         try {
             await this.gatherProjectInfo();
@@ -41,7 +55,7 @@ class SolariaAutoDeployer {
 
             console.log(chalk.green.bold('\n✅ Auto-Deployment Complete!'));
             console.log(chalk.cyan('🚀 SOLARIA Field Operations is ready for use\n'));
-            
+
             await this.showNextSteps();
 
         } catch (error) {
@@ -53,79 +67,105 @@ class SolariaAutoDeployer {
     async gatherProjectInfo() {
         console.log(chalk.yellow('📋 Step 1: Project Information Gathering'));
 
-        const answers = await inquirer.prompt([
-            {
-                type: 'input',
-                name: 'repoUrl',
-                message: 'Construction Project Repository URL:',
-                validate: (input) => {
-                    if (!input.trim()) return 'Repository URL is required';
-                    if (!input.includes('github.com') && !input.includes('gitlab.com')) {
-                        return 'Please provide a valid Git repository URL';
-                    }
-                    return true;
-                }
-            },
-            {
-                type: 'input',
-                name: 'projectName',
-                message: 'Project Name:',
-                default: (answers) => this.extractProjectName(answers.repoUrl)
-            },
-            {
-                type: 'list',
-                name: 'projectType',
-                message: 'Project Type:',
-                choices: [
-                    { name: '🏢 Residential Building', value: 'residential' },
-                    { name: '🏭 Commercial Building', value: 'commercial' },
-                    { name: '🌉 Infrastructure', value: 'infrastructure' },
-                    { name: '🏗️ Industrial', value: 'industrial' }
-                ]
-            },
-            {
-                type: 'list',
-                name: 'currentPhase',
-                message: 'Current Construction Phase:',
-                choices: [
-                    { name: '📝 Planning & Design', value: 'planning' },
-                    { name: '⚒️ Development & Permits', value: 'development' },
-                    { name: '🏗️ Construction', value: 'construction' },
-                    { name: '✅ Testing & Commissioning', value: 'testing' },
-                    { name: '🚀 Delivery & Handover', value: 'delivery' }
-                ]
-            },
-            {
-                type: 'input',
-                name: 'deploymentPath',
-                message: 'Local Installation Path:',
-                default: () => path.join(process.cwd(), 'solaria-projects'),
-                validate: (input) => {
-                    if (!input.trim()) return 'Installation path is required';
-                    return true;
-                }
-            },
-            {
-                type: 'input',
-                name: 'budget',
-                message: 'Project Budget ($):',
-                validate: (input) => {
-                    if (!input.trim()) return 'Budget is required';
-                    if (isNaN(input)) return 'Budget must be a number';
-                    return true;
-                }
-            },
-            {
-                type: 'input',
-                name: 'timeline',
-                message: 'Project Timeline (months):',
-                validate: (input) => {
-                    if (!input.trim()) return 'Timeline is required';
-                    if (isNaN(input)) return 'Timeline must be a number';
-                    return true;
-                }
+        let answers;
+
+        // CI/Non-interactive mode: use environment variables
+        if (this.ciMode) {
+            if (!this.envConfig.repoPath) {
+                throw new Error('REPO_PATH environment variable is required in CI mode');
             }
-        ]);
+            if (!this.envConfig.projectName) {
+                throw new Error('PROJECT_NAME environment variable is required in CI mode');
+            }
+
+            answers = {
+                repoUrl: this.envConfig.repoPath,
+                projectName: this.envConfig.projectName,
+                projectType: this.envConfig.projectType,
+                currentPhase: 'development',
+                deploymentPath: this.envConfig.deploymentPath,
+                budget: this.envConfig.budget,
+                timeline: this.envConfig.timeline
+            };
+
+            console.log(chalk.blue(`📦 Using CI configuration:`));
+            console.log(chalk.gray(`   Repository: ${answers.repoUrl}`));
+            console.log(chalk.gray(`   Project: ${answers.projectName}`));
+            console.log(chalk.gray(`   Type: ${answers.projectType}`));
+        } else {
+            // Interactive mode: prompt user
+            answers = await inquirer.prompt([
+                {
+                    type: 'input',
+                    name: 'repoUrl',
+                    message: 'Project Repository Path or URL:',
+                    validate: (input) => {
+                        if (!input.trim()) return 'Repository path is required';
+                        return true;
+                    }
+                },
+                {
+                    type: 'input',
+                    name: 'projectName',
+                    message: 'Project Name:',
+                    default: (answers) => this.extractProjectName(answers.repoUrl)
+                },
+                {
+                    type: 'list',
+                    name: 'projectType',
+                    message: 'Project Type:',
+                    choices: [
+                        { name: '💻 Software Project', value: 'software' },
+                        { name: '🏢 Residential Building', value: 'residential' },
+                        { name: '🏭 Commercial Building', value: 'commercial' },
+                        { name: '🌉 Infrastructure', value: 'infrastructure' },
+                        { name: '🏗️ Industrial', value: 'industrial' }
+                    ]
+                },
+                {
+                    type: 'list',
+                    name: 'currentPhase',
+                    message: 'Current Phase:',
+                    choices: [
+                        { name: '📝 Planning & Design', value: 'planning' },
+                        { name: '⚒️ Development', value: 'development' },
+                        { name: '🧪 Testing', value: 'testing' },
+                        { name: '🚀 Deployment', value: 'deployment' },
+                        { name: '✅ Completed', value: 'completed' }
+                    ]
+                },
+                {
+                    type: 'input',
+                    name: 'deploymentPath',
+                    message: 'Local Installation Path:',
+                    default: () => path.join(process.cwd(), 'solaria-projects'),
+                    validate: (input) => {
+                        if (!input.trim()) return 'Installation path is required';
+                        return true;
+                    }
+                },
+                {
+                    type: 'input',
+                    name: 'budget',
+                    message: 'Project Budget ($):',
+                    default: '100000',
+                    validate: (input) => {
+                        if (isNaN(input)) return 'Budget must be a number';
+                        return true;
+                    }
+                },
+                {
+                    type: 'input',
+                    name: 'timeline',
+                    message: 'Project Timeline (months):',
+                    default: '6',
+                    validate: (input) => {
+                        if (isNaN(input)) return 'Timeline must be a number';
+                        return true;
+                    }
+                }
+            ]);
+        }
 
         this.projectConfig = answers;
         this.deploymentPath = path.join(answers.deploymentPath, answers.projectName);
@@ -136,35 +176,117 @@ class SolariaAutoDeployer {
     async analyzeRepository() {
         console.log(chalk.yellow('\n📊 Step 2: Repository Analysis'));
 
-        const tempDir = path.join(process.cwd(), 'temp-repo');
-        
+        const repoPath = this.projectConfig.repoUrl;
+        let analysisPath;
+        let isLocalPath = false;
+
         try {
-            // Clone repository
-            console.log(chalk.blue('📥 Cloning repository...'));
-            await fs.ensureDir(tempDir);
-            await simpleGit().clone(this.projectConfig.repoUrl, tempDir);
+            // Check if it's a local path or a Git URL
+            if (await fs.pathExists(repoPath)) {
+                // Local path - analyze directly
+                console.log(chalk.blue('📁 Analyzing local repository...'));
+                analysisPath = repoPath;
+                isLocalPath = true;
+            } else if (repoPath.includes('github.com') || repoPath.includes('gitlab.com') || repoPath.startsWith('git@')) {
+                // Git URL - clone to temp directory
+                const tempDir = path.join(process.cwd(), 'temp-repo');
+                console.log(chalk.blue('📥 Cloning repository...'));
+                await fs.ensureDir(tempDir);
+                await simpleGit().clone(repoPath, tempDir);
+                analysisPath = tempDir;
+            } else {
+                throw new Error(`Invalid repository path or URL: ${repoPath}`);
+            }
 
             // Analyze repository structure
             console.log(chalk.blue('🔍 Analyzing project structure...'));
-            this.repoInfo = await this.analyzeProjectStructure(tempDir);
+            this.repoInfo = await this.analyzeProjectStructure(analysisPath);
 
-            // Extract construction documents
-            console.log(chalk.blue('📄 Processing construction documents...'));
-            this.repoInfo.documents = await this.extractDocuments(tempDir);
+            // Extract documents (PDFs, specs, etc.)
+            console.log(chalk.blue('📄 Processing project documents...'));
+            this.repoInfo.documents = await this.extractDocuments(analysisPath);
 
-            // Identify project specifications
+            // Identify project specifications and milestones
             console.log(chalk.blue('📋 Extracting project specifications...'));
-            this.repoInfo.specifications = await this.extractSpecifications(tempDir);
+            this.repoInfo.specifications = await this.extractSpecifications(analysisPath);
 
-            // Clean up temp directory
-            await fs.remove(tempDir);
+            // Extract milestones from PROJECT_MILESTONES.md if exists
+            console.log(chalk.blue('🎯 Extracting milestones...'));
+            this.repoInfo.milestones = await this.extractMilestones(analysisPath);
 
-            console.log(chalk.green(`✅ Analysis complete: ${this.repoInfo.documentCount} documents found`));
+            // Clean up temp directory if we cloned
+            if (!isLocalPath) {
+                await fs.remove(analysisPath);
+            }
+
+            console.log(chalk.green(`✅ Analysis complete: ${this.repoInfo.documentCount} files found`));
 
         } catch (error) {
-            await fs.remove(tempDir);
             throw new Error(`Repository analysis failed: ${error.message}`);
         }
+    }
+
+    async extractMilestones(repoPath) {
+        const milestones = [];
+        const milestonesFile = path.join(repoPath, 'docs', 'PROJECT_MILESTONES.md');
+        const altMilestonesFile = path.join(repoPath, 'PROJECT_MILESTONES.md');
+
+        let content = '';
+        if (await fs.pathExists(milestonesFile)) {
+            content = await fs.readFile(milestonesFile, 'utf-8');
+        } else if (await fs.pathExists(altMilestonesFile)) {
+            content = await fs.readFile(altMilestonesFile, 'utf-8');
+        }
+
+        if (content) {
+            // Parse markdown milestones (## headers or - [ ] items)
+            const lines = content.split('\n');
+            let currentMilestone = null;
+
+            for (const line of lines) {
+                // Match ## Milestone headers
+                const headerMatch = line.match(/^##\s+(.+)/);
+                if (headerMatch) {
+                    if (currentMilestone) {
+                        milestones.push(currentMilestone);
+                    }
+                    currentMilestone = {
+                        name: headerMatch[1],
+                        tasks: [],
+                        status: 'pending'
+                    };
+                }
+
+                // Match - [ ] or - [x] task items
+                const taskMatch = line.match(/^-\s+\[([ x])\]\s+(.+)/i);
+                if (taskMatch && currentMilestone) {
+                    currentMilestone.tasks.push({
+                        title: taskMatch[2],
+                        completed: taskMatch[1].toLowerCase() === 'x'
+                    });
+                }
+            }
+
+            if (currentMilestone) {
+                milestones.push(currentMilestone);
+            }
+
+            // Calculate milestone status
+            for (const milestone of milestones) {
+                const completedTasks = milestone.tasks.filter(t => t.completed).length;
+                const totalTasks = milestone.tasks.length;
+                if (totalTasks === 0) {
+                    milestone.status = 'pending';
+                } else if (completedTasks === totalTasks) {
+                    milestone.status = 'completed';
+                } else if (completedTasks > 0) {
+                    milestone.status = 'in_progress';
+                }
+                milestone.progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            }
+        }
+
+        return milestones;
     }
 
     async analyzeProjectStructure(repoPath) {

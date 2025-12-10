@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const compression = require('compression');
 const http = require('http');
 const socketIo = require('socket.io');
 const sqlite3 = require('sqlite3').verbose();

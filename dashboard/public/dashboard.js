@@ -104,8 +104,8 @@ class SolariaDashboard {
     }
 
     showSection(sectionName) {
-        // Hide all sections
-        const sections = ['overview', 'projects', 'agents', 'tasks', 'alerts', 'analytics', 'logs', 'settings'];
+        // Hide all sections including C-Suite sections
+        const sections = ['overview', 'projects', 'agents', 'tasks', 'alerts', 'analytics', 'logs', 'settings', 'ceo', 'cto', 'coo', 'cfo'];
         sections.forEach(section => {
             const el = document.getElementById(`${section}Section`);
             if (el) el.classList.add('hidden');
@@ -138,7 +138,11 @@ class SolariaDashboard {
             alerts: { title: 'Alerts', subtitle: 'System alerts and notifications' },
             analytics: { title: 'Analytics', subtitle: 'Detailed reports and insights' },
             logs: { title: 'Activity Logs', subtitle: 'System activity and audit trail' },
-            settings: { title: 'Settings', subtitle: 'Configure your dashboard preferences' }
+            settings: { title: 'Settings', subtitle: 'Configure your dashboard preferences' },
+            ceo: { title: 'CEO Dashboard', subtitle: 'Visión estratégica global y KPIs ejecutivos' },
+            cto: { title: 'CTO Dashboard', subtitle: 'Tecnología, arquitectura y rendimiento técnico' },
+            coo: { title: 'COO Dashboard', subtitle: 'Operaciones, flujo de trabajo y eficiencia' },
+            cfo: { title: 'CFO Dashboard', subtitle: 'Finanzas, presupuesto y proyecciones' }
         };
 
         const pageInfo = titles[sectionName] || { title: sectionName, subtitle: '' };
@@ -255,6 +259,18 @@ class SolariaDashboard {
                 break;
             case 'logs':
                 await this.loadActivityLogs();
+                break;
+            case 'ceo':
+                await this.loadCEODashboard();
+                break;
+            case 'cto':
+                await this.loadCTODashboard();
+                break;
+            case 'coo':
+                await this.loadCOODashboard();
+                break;
+            case 'cfo':
+                await this.loadCFODashboard();
                 break;
         }
     }
@@ -889,17 +905,499 @@ class SolariaDashboard {
         try {
             const response = await fetch(`${this.apiBase}/alerts/${alertId}/resolve`, {
                 method: 'PUT',
-                headers: { 
+                headers: {
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             if (response.ok) {
                 this.loadAllAlerts();
             }
         } catch (error) {
             console.error('Failed to resolve alert:', error);
+        }
+    }
+
+    // ============================================
+    // C-SUITE DASHBOARD METHODS
+    // ============================================
+
+    async loadCEODashboard() {
+        try {
+            this.showLoading(true);
+            const response = await fetch(`${this.apiBase}/csuite/ceo`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.renderCEODashboard(data);
+            }
+        } catch (error) {
+            console.error('Failed to load CEO dashboard:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    renderCEODashboard(data) {
+        // Render KPIs
+        const kpisContainer = document.getElementById('ceoKpis');
+        if (kpisContainer && data.kpis) {
+            kpisContainer.innerHTML = `
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-dollar-sign text-solaria"></i>
+                        <span class="text-xs text-green-500">+${data.kpis.roiProjected || 24}%</span>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">$${(data.kpis.totalBudget || 2400000).toLocaleString()}</p>
+                    <p class="text-sm text-muted-foreground">Presupuesto Total</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-chart-line text-green-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.roiProjected || 24}%</p>
+                    <p class="text-sm text-muted-foreground">ROI Proyectado</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-folder text-blue-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.activeProjects || 0}</p>
+                    <p class="text-sm text-muted-foreground">Proyectos Activos</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-clock text-purple-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.onTimeDelivery || 92}%</p>
+                    <p class="text-sm text-muted-foreground">Entregas a Tiempo</p>
+                </div>
+            `;
+        }
+
+        // Render Project Summary
+        const projectSummary = document.getElementById('ceoProjectSummary');
+        if (projectSummary && data.projects) {
+            projectSummary.innerHTML = data.projects.map(p => `
+                <div class="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <div>
+                        <p class="font-medium text-foreground">${this.escapeHtml(p.name)}</p>
+                        <p class="text-sm text-muted-foreground">${p.status || 'En progreso'}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-solaria">${p.completion_percentage || 0}%</p>
+                        <p class="text-xs text-muted-foreground">$${(p.budget || 0).toLocaleString()}</p>
+                    </div>
+                </div>
+            `).join('') || '<p class="text-muted-foreground">Sin proyectos</p>';
+        }
+
+        // Render Strategic Decisions
+        const decisions = document.getElementById('ceoDecisions');
+        if (decisions && data.strategicDecisions) {
+            decisions.innerHTML = data.strategicDecisions.map(d => `
+                <div class="p-3 bg-solaria/10 border border-solaria/20 rounded-lg">
+                    <p class="font-medium text-foreground">${this.escapeHtml(d.title)}</p>
+                    <p class="text-sm text-muted-foreground">${this.escapeHtml(d.description)}</p>
+                    <span class="text-xs text-solaria">${d.priority || 'Normal'}</span>
+                </div>
+            `).join('') || '<p class="text-muted-foreground">Sin decisiones pendientes</p>';
+        }
+
+        // Render Executive Summary
+        const execSummary = document.getElementById('ceoExecutiveSummary');
+        if (execSummary) {
+            execSummary.innerHTML = `
+                <p class="mb-3">${data.executiveSummary || 'El proyecto avanza según lo planificado con todos los indicadores en verde.'}</p>
+                <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div class="p-3 bg-green-500/10 rounded-lg">
+                        <p class="text-xs text-muted-foreground">Estado General</p>
+                        <p class="font-bold text-green-500">Saludable</p>
+                    </div>
+                    <div class="p-3 bg-blue-500/10 rounded-lg">
+                        <p class="text-xs text-muted-foreground">Riesgo</p>
+                        <p class="font-bold text-blue-500">Bajo</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Critical Alerts
+        const alerts = document.getElementById('ceoCriticalAlerts');
+        if (alerts && data.criticalAlerts && data.criticalAlerts.length > 0) {
+            alerts.innerHTML = data.criticalAlerts.map(a => `
+                <div class="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <p class="font-medium text-red-400">${this.escapeHtml(a.title)}</p>
+                    <p class="text-sm text-muted-foreground">${this.escapeHtml(a.message)}</p>
+                </div>
+            `).join('');
+        }
+    }
+
+    async loadCTODashboard() {
+        try {
+            this.showLoading(true);
+            const response = await fetch(`${this.apiBase}/csuite/cto`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.renderCTODashboard(data);
+            }
+        } catch (error) {
+            console.error('Failed to load CTO dashboard:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    renderCTODashboard(data) {
+        // Render KPIs
+        const kpisContainer = document.getElementById('ctoKpis');
+        if (kpisContainer && data.kpis) {
+            kpisContainer.innerHTML = `
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-vial text-green-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.testCoverage || 87}%</p>
+                    <p class="text-sm text-muted-foreground">Cobertura de Tests</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-code text-blue-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.codeQuality || 'A'}</p>
+                    <p class="text-sm text-muted-foreground">Calidad de Código</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-bug text-yellow-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.techDebtLevel || 'Media'}</p>
+                    <p class="text-sm text-muted-foreground">Deuda Técnica</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-server text-purple-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.uptime || '99.9'}%</p>
+                    <p class="text-sm text-muted-foreground">Uptime</p>
+                </div>
+            `;
+        }
+
+        // Render Tech Stack
+        const techStack = document.getElementById('ctoTechStack');
+        if (techStack && data.techStack) {
+            techStack.innerHTML = data.techStack.map(t => `
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded">
+                    <span class="text-foreground">${this.escapeHtml(t.name)}</span>
+                    <span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded">${t.version || 'latest'}</span>
+                </div>
+            `).join('') || `
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded"><span class="text-foreground">Node.js</span><span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded">22.x</span></div>
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded"><span class="text-foreground">React</span><span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded">19.x</span></div>
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded"><span class="text-foreground">MySQL</span><span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded">8.0</span></div>
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded"><span class="text-foreground">Docker</span><span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded">24.x</span></div>
+            `;
+        }
+
+        // Render Architecture
+        const architecture = document.getElementById('ctoArchitecture');
+        if (architecture && data.architecture) {
+            architecture.innerHTML = data.architecture.map(a => `
+                <div class="p-2 border-l-2 border-blue-500 pl-3">
+                    <p class="font-medium text-foreground">${this.escapeHtml(a.component)}</p>
+                    <p class="text-sm text-muted-foreground">${this.escapeHtml(a.description)}</p>
+                </div>
+            `).join('') || `
+                <div class="p-2 border-l-2 border-blue-500 pl-3"><p class="font-medium text-foreground">Frontend</p><p class="text-sm text-muted-foreground">React SPA con TailwindCSS</p></div>
+                <div class="p-2 border-l-2 border-green-500 pl-3"><p class="font-medium text-foreground">Backend</p><p class="text-sm text-muted-foreground">Node.js + Express API REST</p></div>
+                <div class="p-2 border-l-2 border-purple-500 pl-3"><p class="font-medium text-foreground">Database</p><p class="text-sm text-muted-foreground">MySQL 8.0 con ORM</p></div>
+            `;
+        }
+
+        // Render Code Quality
+        const codeQuality = document.getElementById('ctoCodeQuality');
+        if (codeQuality) {
+            codeQuality.innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex justify-between"><span class="text-muted-foreground">Maintainability</span><span class="text-green-500 font-medium">A</span></div>
+                    <div class="flex justify-between"><span class="text-muted-foreground">Reliability</span><span class="text-green-500 font-medium">A</span></div>
+                    <div class="flex justify-between"><span class="text-muted-foreground">Security</span><span class="text-green-500 font-medium">A</span></div>
+                    <div class="flex justify-between"><span class="text-muted-foreground">Duplications</span><span class="text-yellow-500 font-medium">2.3%</span></div>
+                </div>
+            `;
+        }
+
+        // Render Tech Debt
+        const techDebt = document.getElementById('ctoTechDebt');
+        if (techDebt) {
+            techDebt.innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex justify-between"><span class="text-muted-foreground">Total</span><span class="text-yellow-500 font-medium">2d 4h</span></div>
+                    <div class="flex justify-between"><span class="text-muted-foreground">Code Smells</span><span class="text-foreground">23</span></div>
+                    <div class="flex justify-between"><span class="text-muted-foreground">Bugs</span><span class="text-foreground">0</span></div>
+                    <div class="flex justify-between"><span class="text-muted-foreground">Vulnerabilities</span><span class="text-green-500 font-medium">0</span></div>
+                </div>
+            `;
+        }
+
+        // Render Agent Performance
+        const agentPerf = document.getElementById('ctoAgentPerformance');
+        if (agentPerf && data.agentMetrics) {
+            agentPerf.innerHTML = data.agentMetrics.map(a => `
+                <div class="flex justify-between items-center">
+                    <span class="text-foreground">${this.escapeHtml(a.name)}</span>
+                    <span class="text-sm text-green-500">${a.tasksCompleted} tasks</span>
+                </div>
+            `).join('') || '<p class="text-muted-foreground">Sin datos de agentes</p>';
+        }
+    }
+
+    async loadCOODashboard() {
+        try {
+            this.showLoading(true);
+            const response = await fetch(`${this.apiBase}/csuite/coo`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.renderCOODashboard(data);
+            }
+        } catch (error) {
+            console.error('Failed to load COO dashboard:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    renderCOODashboard(data) {
+        // Render KPIs
+        const kpisContainer = document.getElementById('cooKpis');
+        if (kpisContainer && data.kpis) {
+            kpisContainer.innerHTML = `
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-bolt text-green-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.velocity || 42}</p>
+                    <p class="text-sm text-muted-foreground">Velocidad (pts/sprint)</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-gauge-high text-blue-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.utilization || 94}%</p>
+                    <p class="text-sm text-muted-foreground">Utilización</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-check-double text-solaria"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.throughput || 156}</p>
+                    <p class="text-sm text-muted-foreground">Tareas/Semana</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-clock text-purple-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.avgCycleTime || '2.3'}d</p>
+                    <p class="text-sm text-muted-foreground">Ciclo Promedio</p>
+                </div>
+            `;
+        }
+
+        // Render Task Status
+        const taskStatus = document.getElementById('cooTaskStatus');
+        if (taskStatus && data.taskBreakdown) {
+            const total = Object.values(data.taskBreakdown).reduce((a, b) => a + b, 0) || 1;
+            taskStatus.innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-muted-foreground">Completadas</span>
+                        <span class="text-green-500 font-medium">${data.taskBreakdown.completed || 0}</span>
+                    </div>
+                    <div class="w-full bg-secondary rounded-full h-2"><div class="bg-green-500 h-2 rounded-full" style="width: ${((data.taskBreakdown.completed || 0) / total) * 100}%"></div></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-muted-foreground">En Progreso</span>
+                        <span class="text-blue-500 font-medium">${data.taskBreakdown.in_progress || 0}</span>
+                    </div>
+                    <div class="w-full bg-secondary rounded-full h-2"><div class="bg-blue-500 h-2 rounded-full" style="width: ${((data.taskBreakdown.in_progress || 0) / total) * 100}%"></div></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-muted-foreground">Pendientes</span>
+                        <span class="text-yellow-500 font-medium">${data.taskBreakdown.pending || 0}</span>
+                    </div>
+                    <div class="w-full bg-secondary rounded-full h-2"><div class="bg-yellow-500 h-2 rounded-full" style="width: ${((data.taskBreakdown.pending || 0) / total) * 100}%"></div></div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-muted-foreground">Bloqueadas</span>
+                        <span class="text-red-500 font-medium">${data.taskBreakdown.blocked || 0}</span>
+                    </div>
+                    <div class="w-full bg-secondary rounded-full h-2"><div class="bg-red-500 h-2 rounded-full" style="width: ${((data.taskBreakdown.blocked || 0) / total) * 100}%"></div></div>
+                </div>
+            `;
+        }
+
+        // Render Agent Utilization
+        const agentUtil = document.getElementById('cooAgentUtilization');
+        if (agentUtil && data.agentUtilization) {
+            agentUtil.innerHTML = data.agentUtilization.map(a => `
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded">
+                    <span class="text-foreground">${this.escapeHtml(a.name)}</span>
+                    <div class="flex items-center gap-2">
+                        <div class="w-20 bg-secondary rounded-full h-2">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: ${a.utilization || 0}%"></div>
+                        </div>
+                        <span class="text-sm text-muted-foreground">${a.utilization || 0}%</span>
+                    </div>
+                </div>
+            `).join('') || '<p class="text-muted-foreground">Sin datos de agentes</p>';
+        }
+
+        // Render Bottlenecks
+        const bottlenecks = document.getElementById('cooBottlenecks');
+        if (bottlenecks && data.bottlenecks && data.bottlenecks.length > 0) {
+            bottlenecks.innerHTML = data.bottlenecks.map(b => `
+                <div class="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                    <p class="font-medium text-yellow-400">${this.escapeHtml(b.area)}</p>
+                    <p class="text-sm text-muted-foreground">${this.escapeHtml(b.description)}</p>
+                </div>
+            `).join('');
+        }
+
+        // Render Milestones
+        const milestones = document.getElementById('cooMilestones');
+        if (milestones && data.milestones) {
+            milestones.innerHTML = data.milestones.map(m => `
+                <div class="flex items-center justify-between p-2 border-l-2 ${m.status === 'completed' ? 'border-green-500' : 'border-blue-500'} pl-3">
+                    <div>
+                        <p class="font-medium text-foreground">${this.escapeHtml(m.name)}</p>
+                        <p class="text-xs text-muted-foreground">${m.dueDate || 'Sin fecha'}</p>
+                    </div>
+                    <span class="text-xs px-2 py-1 rounded ${m.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}">${m.status || 'pending'}</span>
+                </div>
+            `).join('') || '<p class="text-muted-foreground">Sin hitos definidos</p>';
+        }
+    }
+
+    async loadCFODashboard() {
+        try {
+            this.showLoading(true);
+            const response = await fetch(`${this.apiBase}/csuite/cfo`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.renderCFODashboard(data);
+            }
+        } catch (error) {
+            console.error('Failed to load CFO dashboard:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    renderCFODashboard(data) {
+        // Render KPIs
+        const kpisContainer = document.getElementById('cfoKpis');
+        if (kpisContainer && data.kpis) {
+            kpisContainer.innerHTML = `
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-fire text-red-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">$${(data.kpis.burnRate || 45000).toLocaleString()}</p>
+                    <p class="text-sm text-muted-foreground">Burn Rate/Mes</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-road text-green-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.runway || 18} meses</p>
+                    <p class="text-sm text-muted-foreground">Runway</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-piggy-bank text-purple-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">$${(data.kpis.totalBudget || 2400000).toLocaleString()}</p>
+                    <p class="text-sm text-muted-foreground">Presupuesto Total</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <i class="fa-solid fa-percent text-blue-500"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-foreground">${data.kpis.budgetUsed || 45}%</p>
+                    <p class="text-sm text-muted-foreground">Presupuesto Usado</p>
+                </div>
+            `;
+        }
+
+        // Render Budget Breakdown
+        const budgetBreakdown = document.getElementById('cfoBudgetBreakdown');
+        if (budgetBreakdown && data.budgetBreakdown) {
+            budgetBreakdown.innerHTML = data.budgetBreakdown.map(b => `
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded">
+                    <span class="text-foreground">${this.escapeHtml(b.category)}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted-foreground">$${(b.amount || 0).toLocaleString()}</span>
+                        <span class="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded">${b.percentage || 0}%</span>
+                    </div>
+                </div>
+            `).join('') || `
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded"><span class="text-foreground">Personal</span><span class="text-sm text-muted-foreground">$850,000</span></div>
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded"><span class="text-foreground">Infraestructura</span><span class="text-sm text-muted-foreground">$350,000</span></div>
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded"><span class="text-foreground">Licencias</span><span class="text-sm text-muted-foreground">$120,000</span></div>
+                <div class="flex items-center justify-between p-2 bg-secondary/30 rounded"><span class="text-foreground">Operaciones</span><span class="text-sm text-muted-foreground">$280,000</span></div>
+            `;
+        }
+
+        // Render Cost by Project
+        const costByProject = document.getElementById('cfoCostByProject');
+        if (costByProject && data.projectCosts) {
+            costByProject.innerHTML = data.projectCosts.map(p => `
+                <div class="flex items-center justify-between p-2 border-l-2 border-purple-500 pl-3">
+                    <div>
+                        <p class="font-medium text-foreground">${this.escapeHtml(p.name)}</p>
+                        <p class="text-xs text-muted-foreground">${p.budgetUsed || 0}% usado</p>
+                    </div>
+                    <span class="text-sm text-foreground">$${(p.cost || 0).toLocaleString()}</span>
+                </div>
+            `).join('') || '<p class="text-muted-foreground">Sin datos de proyectos</p>';
+        }
+
+        // Render Pending Approvals
+        const approvals = document.getElementById('cfoApprovals');
+        if (approvals && data.pendingApprovals && data.pendingApprovals.length > 0) {
+            approvals.innerHTML = data.pendingApprovals.map(a => `
+                <div class="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg flex items-center justify-between">
+                    <div>
+                        <p class="font-medium text-foreground">${this.escapeHtml(a.title)}</p>
+                        <p class="text-sm text-muted-foreground">$${(a.amount || 0).toLocaleString()}</p>
+                    </div>
+                    <button class="px-3 py-1 bg-purple-500 text-white rounded text-sm">Aprobar</button>
+                </div>
+            `).join('');
+        } else if (approvals) {
+            approvals.innerHTML = '<p class="text-green-500 text-sm">Sin aprobaciones pendientes</p>';
+        }
+
+        // Render Financial Alerts
+        const finAlerts = document.getElementById('cfoFinancialAlerts');
+        if (finAlerts && data.financialAlerts && data.financialAlerts.length > 0) {
+            finAlerts.innerHTML = data.financialAlerts.map(a => `
+                <div class="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <p class="font-medium text-red-400">${this.escapeHtml(a.title)}</p>
+                    <p class="text-sm text-muted-foreground">${this.escapeHtml(a.message)}</p>
+                </div>
+            `).join('');
         }
     }
 }
