@@ -19,6 +19,33 @@ class SolariaDashboard {
         if (this.token) {
             await this.verifyToken();
         } else {
+            await this.quickLogin();
+        }
+    }
+
+    // Quick, non-interactive login for local PMO use
+    async quickLogin() {
+        try {
+            const response = await fetch(`${this.apiBase}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: 'carlosjperez', password: 'SolariaAdmin2024!' })
+            });
+
+            if (!response.ok) {
+                this.showLogin();
+                return;
+            }
+
+            const data = await response.json();
+            localStorage.setItem('solaria_token', data.token);
+            this.token = data.token;
+            this.user = data.user;
+            this.showDashboard();
+            this.initializeSocket();
+            this.startRealTimeUpdates();
+        } catch (err) {
+            console.error('Quick login failed', err);
             this.showLogin();
         }
     }
@@ -101,11 +128,19 @@ class SolariaDashboard {
         // Load initial data
         this.loadDashboardData();
         this.showSection('overview');
+
+        // Wire navigation clicks
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.getAttribute('data-section');
+                if (target) this.showSection(target);
+            });
+        });
     }
 
     showSection(sectionName) {
         // Hide all sections including C-Suite sections
-        const sections = ['overview', 'projects', 'agents', 'tasks', 'alerts', 'analytics', 'logs', 'settings', 'ceo', 'cto', 'coo', 'cfo'];
+        const sections = ['overview', 'projects', 'agents', 'tasks', 'alerts', 'docs', 'analytics', 'logs', 'settings', 'ceo', 'cto', 'coo', 'cfo'];
         sections.forEach(section => {
             const el = document.getElementById(`${section}Section`);
             if (el) el.classList.add('hidden');
@@ -191,7 +226,11 @@ class SolariaDashboard {
         await Promise.all([
             this.loadOverview(),
             this.loadMetrics(),
-            this.loadAlerts()
+            this.loadAlerts(),
+            this.loadProjects(),
+            this.loadAgents(),
+            this.loadTasks(),
+            this.loadDocs()
         ]);
     }
 
@@ -201,10 +240,10 @@ class SolariaDashboard {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             
-            if (response.ok) {
-                const data = await response.json();
-                this.updateOverviewCards(data);
-            }
+            if (!response.ok) throw new Error(`overview ${response.status}`);
+
+            const data = await response.json();
+            this.updateOverviewCards(data);
         } catch (error) {
             console.error('Failed to load overview:', error);
         }
@@ -370,6 +409,33 @@ class SolariaDashboard {
         await this.loadMetrics();
     }
 
+    async loadDocs(force = false) {
+        try {
+            const response = await fetch(`${this.apiBase}/docs`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+
+            const specEl = document.getElementById('docSpec');
+            if (specEl) specEl.textContent = data.specSnippet || 'Sin descripción';
+
+            const milesEl = document.getElementById('docMilestones');
+            if (milesEl) {
+                milesEl.innerHTML = '';
+                (data.milestones || []).forEach(line => {
+                    const li = document.createElement('li');
+                    li.textContent = line;
+                    milesEl.appendChild(li);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load docs', error);
+        }
+    }
+
     renderTasksList(tasks) {
         const container = document.getElementById('tasksList');
         if (!container) return;
@@ -476,8 +542,12 @@ class SolariaDashboard {
     }
 
     updateCharts(data) {
+        const projectCanvas = document.getElementById('projectProgressChart');
+        const agentCanvas = document.getElementById('agentPerformanceChart');
+        if (!projectCanvas || !agentCanvas) return; // DOM not ready
+
         // Project Progress Chart
-        const projectCtx = document.getElementById('projectProgressChart').getContext('2d');
+        const projectCtx = projectCanvas.getContext('2d');
         
         if (this.charts.projectProgress) {
             this.charts.projectProgress.destroy();
@@ -516,7 +586,7 @@ class SolariaDashboard {
         });
 
         // Agent Performance Chart
-        const agentCtx = document.getElementById('agentPerformanceChart').getContext('2d');
+        const agentCtx = agentCanvas.getContext('2d');
         
         if (this.charts.agentPerformance) {
             this.charts.agentPerformance.destroy();

@@ -359,6 +359,10 @@
                         <span>Alertas</span>
                         <span id="alertBadge" class="ml-auto px-2 py-0.5 text-xs rounded-full bg-destructive text-white hidden">0</span>
                     </button>
+                    <button data-section="docs" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground text-sm">
+                        <i class="fa-solid fa-book w-5 text-center"></i>
+                        <span>Docs</span>
+                    </button>
                     <button data-section="analytics" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground text-sm">
                         <i class="fa-solid fa-chart-line w-5 text-center"></i>
                         <span>Analytics</span>
@@ -630,6 +634,27 @@
                     </div>
                     <div id="alertsContainer" class="space-y-3">
                         <p class="text-muted-foreground">No hay alertas</p>
+                    </div>
+                </section>
+
+                <!-- Docs Section -->
+                <section id="docsSection" class="hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-lg font-semibold text-foreground">Documentación</h2>
+                            <p class="text-sm text-muted-foreground">Spec y milestones importados del repo</p>
+                        </div>
+                        <button class="px-3 py-2 rounded-lg bg-secondary text-sm" onclick="dashboard.loadDocs(true)">Refrescar</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-card rounded-xl border border-border p-4">
+                            <h3 class="text-sm font-semibold mb-2">Spec (snippet)</h3>
+                            <pre id="docSpec" class="text-xs text-muted-foreground whitespace-pre-wrap"></pre>
+                        </div>
+                        <div class="bg-card rounded-xl border border-border p-4">
+                            <h3 class="text-sm font-semibold mb-2">Milestones</h3>
+                            <ul id="docMilestones" class="text-sm text-muted-foreground space-y-1 list-disc list-inside"></ul>
+                        </div>
                     </div>
                 </section>
 

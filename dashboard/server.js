@@ -15,6 +15,7 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const morgan = require('morgan');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 class SolariaDashboardServer {
@@ -29,6 +30,11 @@ class SolariaDashboardServer {
         this.db = null;
         this.connectedClients = new Map(); // C-suite members conectados
         
+        // Respetar X-Forwarded-* para rate limiting detrás de proxy (nginx)
+        this.app.set('trust proxy', true);
+
+        this.repoPath = process.env.REPO_PATH || path.resolve(__dirname, '..', '..');
+
         this.initializeMiddleware();
         this.initializeDatabase();
         this.initializeRoutes();
@@ -41,15 +47,7 @@ class SolariaDashboardServer {
             contentSecurityPolicy: false
         }));
 
-        // Rate limiting - más permisivo para desarrollo y tests
-        const limiter = rateLimit({
-            windowMs: 1 * 60 * 1000, // 1 minuto
-            max: 1000, // 1000 peticiones por minuto por IP
-            message: { error: 'Too many requests from this IP' },
-            standardHeaders: true,
-            legacyHeaders: false
-        });
-        this.app.use('/api/', limiter);
+        // Rate limiting desactivado en entorno local/PMO para evitar falsos positivos detrás de nginx
 
         // Middleware básico
         this.app.use(compression());
@@ -112,6 +110,8 @@ class SolariaDashboardServer {
         this.app.get('/api/dashboard/overview', this.getDashboardOverview.bind(this));
         this.app.get('/api/dashboard/metrics', this.getDashboardMetrics.bind(this));
         this.app.get('/api/dashboard/alerts', this.getDashboardAlerts.bind(this));
+        this.app.get('/api/docs', this.getDocs.bind(this));
+        this.app.get('/api/docs', this.getDocs.bind(this));
 
         // Gestión de proyectos
         this.app.get('/api/projects', this.getProjects.bind(this));
@@ -470,15 +470,39 @@ class SolariaDashboardServer {
                 params.push(severity);
             }
 
-            query += ' ORDER BY a.created_at DESC LIMIT ?';
-            params.push(parseInt(limit));
+            const limitNum = Math.min(parseInt(limit) || 50, 200);
+            query += ` ORDER BY a.created_at DESC LIMIT ${limitNum}`;
 
             const [alerts] = await this.db.execute(query, params);
 
             res.json(alerts);
 
         } catch (error) {
+            console.error('alerts query failed', error);
             res.status(500).json({ error: 'Failed to fetch alerts' });
+        }
+    }
+
+    async getDocs(req, res) {
+        try {
+            const specPath = path.join(this.repoPath, 'docs', 'specs', 'ACADEIMATE_SPEC.md');
+            const milestonesPath = path.join(this.repoPath, 'docs', 'PROJECT_MILESTONES.md');
+
+            const specContent = fs.existsSync(specPath) ? fs.readFileSync(specPath, 'utf-8') : 'Spec no encontrada';
+            const milestonesContent = fs.existsSync(milestonesPath) ? fs.readFileSync(milestonesPath, 'utf-8') : 'Milestones no encontrados';
+
+            // primeras 1200 chars del spec
+            const specSnippet = specContent.slice(0, 1200);
+            const milestones = milestonesContent
+                .split(/\r?\n/)
+                .filter(l => l.trim().startsWith('-'))
+                .map(l => l.replace(/^[-•]\s*/, ''))
+                .slice(0, 30);
+
+            res.json({ specSnippet, milestones });
+        } catch (error) {
+            console.error('getDocs error', error);
+            res.status(500).json({ error: 'Failed to load docs' });
         }
     }
 
@@ -1320,7 +1344,15 @@ class SolariaDashboardServer {
 
     async getCEODashboard(req, res) {
         try {
-            const [projects] = await this.db.execute(`SELECT * FROM projects`);
+            const [projects] = await this.db.execute(`
+                SELECT 
+                    p.*, 
+                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id) as total_tasks,
+                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'completed') as completed_tasks,
+                    (SELECT COUNT(*) FROM alerts a WHERE a.project_id = p.id AND a.status = 'active') as active_alerts
+                FROM projects p
+            `);
+
             const [budgetSummary] = await this.db.execute(`
                 SELECT
                     SUM(budget) as total_budget,
@@ -1329,14 +1361,25 @@ class SolariaDashboardServer {
                     AVG(completion_percentage) as avg_completion
                 FROM projects
             `);
+
             const [criticalAlerts] = await this.db.execute(`
                 SELECT * FROM alerts WHERE severity = 'critical' AND status = 'active'
             `);
 
+            const [topTasks] = await this.db.execute(`
+                SELECT title, status, priority, project_id, progress, created_at
+                FROM tasks
+                WHERE status <> 'completed'
+                ORDER BY priority DESC, created_at DESC
+                LIMIT 5
+            `);
+
+            const executiveSummary = `Akademate: ${Math.round(projects.find(p => p.name LIKE '%Akademate%')?.completion_percentage || projects[0]?.completion_percentage || 0)}% completado; ${criticalAlerts.length} alertas críticas activas; presupuesto utilizado ${(budgetSummary[0].total_spent || 0)} / ${(budgetSummary[0].total_budget || 0)}.`;
+
             res.json({
                 role: 'CEO',
                 title: 'Strategic Overview',
-                focus: ['ROI', 'Budget', 'Strategic Decisions', 'Critical Alerts'],
+                focus: ['ROI', 'Budget', 'Critical Alerts', 'Tareas clave'],
                 kpis: {
                     totalProjects: projects.length,
                     totalBudget: budgetSummary[0].total_budget || 0,
@@ -1347,12 +1390,16 @@ class SolariaDashboardServer {
                         ? Math.round(((budgetSummary[0].total_budget - budgetSummary[0].total_spent) / budgetSummary[0].total_budget) * 100)
                         : 0
                 },
-                criticalAlerts: criticalAlerts,
-                strategicDecisions: [
-                    { id: 1, title: 'Resource Allocation', status: 'pending', priority: 'high' },
-                    { id: 2, title: 'Timeline Approval', status: 'approved', priority: 'medium' }
-                ],
-                executiveSummary: 'Project on track with 45% completion. Budget utilization at 18%.'
+                projects,
+                criticalAlerts,
+                strategicDecisions: topTasks.map((t, idx) => ({
+                    id: idx + 1,
+                    title: t.title,
+                    status: t.status,
+                    priority: t.priority,
+                    progress: t.progress
+                })),
+                executiveSummary
             });
         } catch (error) {
             console.error('CEO Dashboard error:', error);

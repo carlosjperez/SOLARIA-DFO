@@ -16,7 +16,8 @@
     "setup": "node scripts/setup-project.js",
     "analyze": "node scripts/project-analyzer.js",
     "agents": "node scripts/agent-setup.js",
-    "import": "node scripts/data-importer.js"
+    "import": "node scripts/data-importer.js",
+    "ingest-akademate": "node scripts/ingest-akademate.js"
   },
   "keywords": [
     "construction",
@@ -38,7 +39,9 @@
     "openai": "^4.20.0",
     "pdf-parse": "^1.1.1",
     "simple-git": "^3.20.0",
-    "yaml": "^2.3.4"
+    "yaml": "^2.3.4",
+    "mysql2": "^3.11.0",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
