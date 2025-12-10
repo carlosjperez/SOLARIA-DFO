@@ -244,11 +244,17 @@ class SolariaDashboard {
             case 'agents':
                 await this.loadAgents();
                 break;
+            case 'tasks':
+                await this.loadTasks();
+                break;
             case 'alerts':
                 await this.loadAllAlerts();
                 break;
             case 'analytics':
                 await this.loadAnalytics();
+                break;
+            case 'logs':
+                await this.loadActivityLogs();
                 break;
         }
     }
@@ -307,12 +313,140 @@ class SolariaDashboard {
         }
     }
 
+    async loadTasks() {
+        try {
+            this.showLoading(true);
+            const response = await fetch(`${this.apiBase}/tasks`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const tasks = await response.json();
+                this.renderTasksList(tasks);
+            }
+        } catch (error) {
+            console.error('Failed to load tasks:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async loadActivityLogs() {
+        try {
+            this.showLoading(true);
+            const response = await fetch(`${this.apiBase}/logs`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+
+            if (response.ok) {
+                const logs = await response.json();
+                this.renderLogs(logs);
+            }
+        } catch (error) {
+            console.error('Failed to load logs:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async loadAnalytics() {
+        // Analytics charts are loaded with initial metrics
+        await this.loadMetrics();
+    }
+
+    renderTasksList(tasks) {
+        const container = document.getElementById('tasksList');
+        if (!container) return;
+
+        if (tasks.length === 0) {
+            container.textContent = 'No hay tareas';
+            return;
+        }
+
+        container.textContent = '';
+        tasks.forEach(task => {
+            const statusColors = {
+                pending: 'bg-gray-500',
+                in_progress: 'bg-blue-500',
+                review: 'bg-yellow-500',
+                completed: 'bg-green-500',
+                blocked: 'bg-red-500'
+            };
+            const priorityColors = {
+                low: 'text-gray-400',
+                medium: 'text-yellow-400',
+                high: 'text-orange-400',
+                critical: 'text-red-400'
+            };
+
+            const taskEl = document.createElement('div');
+            taskEl.className = 'bg-card rounded-lg p-4 border border-border flex items-center justify-between';
+            taskEl.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <div class="w-3 h-3 rounded-full ${statusColors[task.status] || 'bg-gray-500'}"></div>
+                    <div>
+                        <p class="font-medium text-foreground">${this.escapeHtml(task.title)}</p>
+                        <p class="text-sm text-muted-foreground">${this.escapeHtml(task.project_name || 'Sin proyecto')} | ${this.escapeHtml(task.agent_name || 'Sin asignar')}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm ${priorityColors[task.priority] || ''}">${(task.priority || 'medium').toUpperCase()}</span>
+                    <span class="px-2 py-1 rounded text-xs bg-secondary text-foreground">${(task.status || 'pending').replace('_', ' ')}</span>
+                    <span class="text-sm text-muted-foreground">${task.progress || 0}%</span>
+                </div>
+            `;
+            container.appendChild(taskEl);
+        });
+    }
+
+    renderLogs(logs) {
+        const container = document.getElementById('logsContainer');
+        if (!container) return;
+
+        if (logs.length === 0) {
+            container.textContent = 'No hay logs';
+            return;
+        }
+
+        container.textContent = '';
+        logs.forEach(log => {
+            const levelColors = {
+                debug: 'text-gray-400',
+                info: 'text-blue-400',
+                warning: 'text-yellow-400',
+                error: 'text-red-400',
+                critical: 'text-red-600'
+            };
+
+            const logEl = document.createElement('div');
+            logEl.className = 'p-4 flex items-center justify-between border-b border-border last:border-0';
+            logEl.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <span class="w-16 text-xs font-mono ${levelColors[log.level] || ''}">${(log.level || 'info').toUpperCase()}</span>
+                    <div>
+                        <p class="font-medium text-foreground">${this.escapeHtml(log.action)}</p>
+                        <p class="text-sm text-muted-foreground">${this.escapeHtml(log.details || '')}</p>
+                    </div>
+                </div>
+                <div class="text-sm text-muted-foreground">
+                    ${new Date(log.created_at).toLocaleString()}
+                </div>
+            `;
+            container.appendChild(logEl);
+        });
+    }
+
     // UI Updates
     updateOverviewCards(data) {
-        document.getElementById('totalProjects').textContent = data.projects.total_projects;
-        document.getElementById('activeAgents').textContent = data.agents.active_agents;
-        document.getElementById('activeTasks').textContent = data.tasks.in_progress_tasks;
-        document.getElementById('criticalAlerts').textContent = data.alerts.critical_alerts;
+        const totalProjects = document.getElementById('totalProjects');
+        const activeAgents = document.getElementById('activeAgents');
+        const completedTasks = document.getElementById('completedTasks');
+        const criticalAlerts = document.getElementById('criticalAlerts');
+
+        if (totalProjects) totalProjects.textContent = data.projects.total_projects || 0;
+        if (activeAgents) activeAgents.textContent = data.agents.active_agents || 0;
+        if (completedTasks) completedTasks.textContent = data.tasks.completed_tasks || 0;
+        if (criticalAlerts) criticalAlerts.textContent = data.alerts.critical_alerts || 0;
         
         // Update alert indicator
         const indicator = document.getElementById('alertIndicator');
@@ -433,51 +567,60 @@ class SolariaDashboard {
     }
 
     renderProjectsTable(projects) {
-        const tbody = document.getElementById('projectsTableBody');
+        const grid = document.getElementById('projectsGrid');
+        if (!grid) return;
         
         if (projects.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-muted-foreground">No projects found</td></tr>';
+            grid.textContent = 'No hay proyectos';
             return;
         }
-        
-        tbody.innerHTML = projects.map(project => `
-            <tr class="border-t hover:bg-muted/50">
-                <td class="px-6 py-4">
-                    <div class="font-medium text-foreground">${project.name}</div>
-                    <div class="text-sm text-muted-foreground">ID: ${project.id}</div>
-                </td>
-                <td class="px-6 py-4 text-foreground">${project.client}</td>
-                <td class="px-6 py-4">
-                    <span class="px-2 py-1 rounded text-xs ${this.getStatusBadgeClass(project.status)}">
-                        ${project.status.replace('_', ' ').toUpperCase()}
-                    </span>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="flex items-center space-x-2">
-                        <div class="w-24 bg-muted rounded-full h-2">
-                            <div class="bg-primary h-2 rounded-full" style="width: ${project.completion_percentage || 0}%"></div>
+
+        // Clear existing content
+        grid.textContent = '';
+
+        projects.forEach(project => {
+            const card = document.createElement('div');
+            card.className = 'bg-card rounded-xl p-6 border border-border hover:border-solaria/30 transition-all cursor-pointer';
+            card.onclick = () => viewProject(project.id);
+
+            const statusClass = this.getStatusBadgeClass(project.status || 'planning');
+            const statusText = (project.status || 'planning').replace('_', ' ').toUpperCase();
+            const progress = project.completion_percentage || 0;
+            const budget = (project.budget || 0).toLocaleString();
+            const alertClass = (project.active_alerts || 0) > 0 ? 'text-red-500' : 'text-green-500';
+
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-solaria/10 flex items-center justify-center">
+                            <i class="fa-solid fa-folder text-solaria"></i>
                         </div>
-                        <span class="text-sm text-foreground">${project.completion_percentage || 0}%</span>
+                        <div>
+                            <h3 class="font-semibold text-foreground">${this.escapeHtml(project.name)}</h3>
+                            <p class="text-xs text-muted-foreground">${this.escapeHtml(project.client || 'SOLARIA')}</p>
+                        </div>
                     </div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-foreground">$${(project.budget || 0).toLocaleString()}</div>
-                    <div class="text-sm text-muted-foreground">$${(project.actual_cost || 0).toLocaleString()} used</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-sm text-foreground">${new Date(project.deadline).toLocaleDateString()}</div>
-                    <div class="text-xs text-muted-foreground">${project.days_remaining} days</div>
-                </td>
-                <td class="px-6 py-4">
-                    <button onclick="viewProject(${project.id})" class="text-primary hover:text-primary/80 mr-3">
-                        View
-                    </button>
-                    <button onclick="editProject(${project.id})" class="text-green-600 hover:text-green-500">
-                        Edit
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+                    <span class="px-2 py-1 rounded text-xs ${statusClass}">${statusText}</span>
+                </div>
+                <div class="mb-4">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-muted-foreground">Progreso</span>
+                        <span class="text-foreground">${progress}%</span>
+                    </div>
+                    <div class="w-full bg-secondary rounded-full h-2">
+                        <div class="bg-solaria h-2 rounded-full" style="width: ${progress}%"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div><p class="text-muted-foreground">Presupuesto</p><p class="text-foreground font-medium">$${budget}</p></div>
+                    <div><p class="text-muted-foreground">Tareas</p><p class="text-foreground font-medium">${project.completed_tasks || 0}/${project.total_tasks || 0}</p></div>
+                    <div><p class="text-muted-foreground">Agentes</p><p class="text-foreground font-medium">${project.agents_assigned || 0}</p></div>
+                    <div><p class="text-muted-foreground">Alertas</p><p class="${alertClass} font-medium">${project.active_alerts || 0}</p></div>
+                </div>
+            `;
+
+            grid.appendChild(card);
+        });
     }
 
     renderAgentsGrid(agents) {
@@ -567,6 +710,13 @@ class SolariaDashboard {
     }
 
     // Utility Methods
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     getSeverityColor(severity) {
         const colors = {
             low: 'bg-green-500',

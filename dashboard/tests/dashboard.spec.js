@@ -422,3 +422,339 @@ test.describe('Loading States', () => {
     await expect(loadingOverlay).toBeHidden();
   });
 });
+
+// ========== NEW EXHAUSTIVE TESTS - API & DATA LOADING ==========
+
+test.describe('Projects API', () => {
+  let authToken;
+
+  test.beforeAll(async ({ request }) => {
+    const loginResponse = await request.post('http://localhost:3000/api/auth/login', {
+      data: { userId: 'carlosjperez', password: 'bypass' }
+    });
+    const loginData = await loginResponse.json();
+    authToken = loginData.token;
+  });
+
+  test('should return projects list with correct structure', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/projects', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(data.projects).toBeDefined();
+    expect(Array.isArray(data.projects)).toBeTruthy();
+    expect(data.pagination).toBeDefined();
+  });
+
+  test('should return project with all required fields', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/projects', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const data = await response.json();
+
+    if (data.projects.length > 0) {
+      const project = data.projects[0];
+      expect(project.id).toBeDefined();
+      expect(project.name).toBeDefined();
+      expect(project.status).toBeDefined();
+      expect(project.total_tasks).toBeDefined();
+      expect(project.completed_tasks).toBeDefined();
+    }
+  });
+});
+
+test.describe('Agents API', () => {
+  let authToken;
+
+  test.beforeAll(async ({ request }) => {
+    const loginResponse = await request.post('http://localhost:3000/api/auth/login', {
+      data: { userId: 'carlosjperez', password: 'bypass' }
+    });
+    const loginData = await loginResponse.json();
+    authToken = loginData.token;
+  });
+
+  test('should return agents list', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/agents', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(Array.isArray(data)).toBeTruthy();
+  });
+
+  test('should return agents with role and status', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/agents', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const agents = await response.json();
+
+    if (agents.length > 0) {
+      const agent = agents[0];
+      expect(agent.name).toBeDefined();
+      expect(agent.role).toBeDefined();
+      expect(agent.status).toBeDefined();
+    }
+  });
+});
+
+test.describe('Tasks API', () => {
+  let authToken;
+
+  test.beforeAll(async ({ request }) => {
+    const loginResponse = await request.post('http://localhost:3000/api/auth/login', {
+      data: { userId: 'carlosjperez', password: 'bypass' }
+    });
+    const loginData = await loginResponse.json();
+    authToken = loginData.token;
+  });
+
+  test('should return tasks list', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/tasks', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(Array.isArray(data)).toBeTruthy();
+  });
+
+  test('should return tasks with required fields', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/tasks', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const tasks = await response.json();
+
+    if (tasks.length > 0) {
+      const task = tasks[0];
+      expect(task.title).toBeDefined();
+      expect(task.status).toBeDefined();
+      expect(task.priority).toBeDefined();
+    }
+  });
+});
+
+test.describe('C-Suite Dashboards API', () => {
+  let authToken;
+
+  test.beforeAll(async ({ request }) => {
+    const loginResponse = await request.post('http://localhost:3000/api/auth/login', {
+      data: { userId: 'carlosjperez', password: 'bypass' }
+    });
+    const loginData = await loginResponse.json();
+    authToken = loginData.token;
+  });
+
+  test('should return CEO dashboard data', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/csuite/ceo', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(data.role).toBe('CEO');
+    expect(data.kpis).toBeDefined();
+  });
+
+  test('should return CTO dashboard data', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/csuite/cto', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(data.role).toBe('CTO');
+    expect(data.kpis).toBeDefined();
+  });
+
+  test('should return COO dashboard data', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/csuite/coo', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(data.role).toBe('COO');
+    expect(data.kpis).toBeDefined();
+  });
+
+  test('should return CFO dashboard data', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/csuite/cfo', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(data.role).toBe('CFO');
+    expect(data.kpis).toBeDefined();
+  });
+});
+
+test.describe('Agent Automation API', () => {
+  test('should return agent instructions', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/agent/instructions');
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(data.project).toBeDefined();
+    expect(data.instructions).toBeDefined();
+    expect(data.instructions.endpoints).toBeDefined();
+  });
+});
+
+test.describe('Activity Logs API', () => {
+  let authToken;
+
+  test.beforeAll(async ({ request }) => {
+    const loginResponse = await request.post('http://localhost:3000/api/auth/login', {
+      data: { userId: 'carlosjperez', password: 'bypass' }
+    });
+    const loginData = await loginResponse.json();
+    authToken = loginData.token;
+  });
+
+  test('should return activity logs', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/logs', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(Array.isArray(data)).toBeTruthy();
+  });
+});
+
+test.describe('Dashboard Data Loading', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+  });
+
+  test('should load and display projects in Projects section', async ({ page }) => {
+    await page.locator('[data-section="projects"]').click();
+    await page.waitForTimeout(2000);
+
+    const projectsGrid = page.locator('#projectsGrid');
+    await expect(projectsGrid).toBeVisible();
+
+    // Should have at least one project card or empty message
+    const content = await projectsGrid.textContent();
+    expect(content.length).toBeGreaterThan(0);
+  });
+
+  test('should load and display agents in Agents section', async ({ page }) => {
+    await page.locator('[data-section="agents"]').click();
+    await page.waitForTimeout(2000);
+
+    const agentsGrid = page.locator('#agentsGrid');
+    await expect(agentsGrid).toBeVisible();
+
+    const content = await agentsGrid.textContent();
+    expect(content.length).toBeGreaterThan(0);
+  });
+
+  test('should load and display tasks in Tasks section', async ({ page }) => {
+    await page.locator('[data-section="tasks"]').click();
+    await page.waitForTimeout(2000);
+
+    const tasksList = page.locator('#tasksList');
+    await expect(tasksList).toBeVisible();
+
+    const content = await tasksList.textContent();
+    expect(content.length).toBeGreaterThan(0);
+  });
+
+  test('should load and display logs in Logs section', async ({ page }) => {
+    await page.locator('[data-section="logs"]').click();
+    await page.waitForTimeout(2000);
+
+    const logsContainer = page.locator('#logsContainer');
+    await expect(logsContainer).toBeVisible();
+  });
+});
+
+test.describe('C-Suite Role Modal', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+  });
+
+  test('should open CEO modal with KPIs', async ({ page }) => {
+    await page.getByText('CEO View').first().click();
+    await page.waitForTimeout(1500);
+
+    // Modal should appear
+    const modal = page.locator('#roleModal');
+    await expect(modal).toBeVisible();
+
+    // Should display KPIs
+    await expect(page.getByText('KEY PERFORMANCE INDICATORS')).toBeVisible();
+  });
+
+  test('should close modal on close button click', async ({ page }) => {
+    await page.getByText('CEO View').first().click();
+    await page.waitForTimeout(1500);
+
+    // Close the modal
+    await page.locator('#roleModal button').first().click();
+    await page.waitForTimeout(500);
+
+    // Modal should be gone
+    await expect(page.locator('#roleModal')).toHaveCount(0);
+  });
+});
+
+test.describe('Settings Section', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+  });
+
+  test('should display settings with notification preferences', async ({ page }) => {
+    await page.locator('[data-section="settings"]').click();
+    await page.waitForTimeout(500);
+
+    await expect(page.locator('#settingsSection')).toBeVisible();
+    await expect(page.getByText('Preferencias de Notificaciones')).toBeVisible();
+  });
+
+  test('should display system information', async ({ page }) => {
+    await page.locator('[data-section="settings"]').click();
+    await page.waitForTimeout(500);
+
+    await expect(page.getByText('Información del Sistema')).toBeVisible();
+    await expect(page.getByText('2.0.0')).toBeVisible();
+  });
+});
+
+test.describe('Dashboard Overview Stats', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+  });
+
+  test('should display project count', async ({ page }) => {
+    await page.waitForTimeout(2000);
+    const projectsCount = page.locator('#totalProjects');
+    await expect(projectsCount).toBeVisible();
+
+    const count = await projectsCount.textContent();
+    expect(parseInt(count)).toBeGreaterThanOrEqual(0);
+  });
+
+  test('should display active agents count', async ({ page }) => {
+    await page.waitForTimeout(2000);
+    const agentsCount = page.locator('#activeAgents');
+    await expect(agentsCount).toBeVisible();
+
+    const count = await agentsCount.textContent();
+    expect(parseInt(count)).toBeGreaterThanOrEqual(0);
+  });
+});

@@ -765,7 +765,7 @@
         });
 
         // Role View Functions
-        function showRoleView(role) {
+        async function showRoleView(role) {
             const titles = {
                 ceo: { title: 'CEO Dashboard', subtitle: 'Visión estratégica y KPIs globales' },
                 cto: { title: 'CTO Dashboard', subtitle: 'Tecnología y arquitectura' },
@@ -774,7 +774,126 @@
             };
             document.getElementById('pageTitle').textContent = titles[role].title;
             document.getElementById('pageSubtitle').textContent = titles[role].subtitle;
-            // TODO: Load role-specific data
+
+            const token = localStorage.getItem('solaria_token');
+            if (!token) return;
+
+            try {
+                const response = await fetch('/api/csuite/' + role, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    showRoleModal(role, data);
+                }
+            } catch (error) {
+                console.error('Error loading role data:', error);
+            }
+        }
+
+        function showRoleModal(role, data) {
+            const overlay = document.createElement('div');
+            overlay.id = 'roleModal';
+            overlay.className = 'fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+
+            const modal = document.createElement('div');
+            modal.className = 'bg-card rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-border';
+
+            // Header
+            const header = document.createElement('div');
+            header.className = 'flex items-center justify-between mb-6';
+
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'flex items-center gap-3';
+
+            const icon = document.createElement('div');
+            const colors = { ceo: 'from-solaria to-solaria-dark', cto: 'from-blue-500 to-blue-700', coo: 'from-green-500 to-green-700', cfo: 'from-purple-500 to-purple-700' };
+            icon.className = 'w-12 h-12 rounded-full bg-gradient-to-br ' + colors[role] + ' flex items-center justify-center';
+            const iconI = document.createElement('i');
+            iconI.className = 'fa-solid fa-crown text-white';
+            icon.appendChild(iconI);
+
+            const titleText = document.createElement('div');
+            const h2 = document.createElement('h2');
+            h2.className = 'text-xl font-bold text-foreground';
+            h2.textContent = data.title || role.toUpperCase() + ' Dashboard';
+            const subtitle = document.createElement('p');
+            subtitle.className = 'text-sm text-muted-foreground';
+            subtitle.textContent = role.toUpperCase() + ' View';
+            titleText.appendChild(h2);
+            titleText.appendChild(subtitle);
+
+            titleDiv.appendChild(icon);
+            titleDiv.appendChild(titleText);
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'w-8 h-8 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80';
+            closeBtn.onclick = closeRoleModal;
+            const closeIcon = document.createElement('i');
+            closeIcon.className = 'fa-solid fa-times text-muted-foreground';
+            closeBtn.appendChild(closeIcon);
+
+            header.appendChild(titleDiv);
+            header.appendChild(closeBtn);
+            modal.appendChild(header);
+
+            // KPIs
+            if (data.kpis) {
+                const kpiSection = document.createElement('div');
+                kpiSection.className = 'mb-6';
+                const kpiTitle = document.createElement('h3');
+                kpiTitle.className = 'text-sm font-semibold text-muted-foreground mb-3';
+                kpiTitle.textContent = 'KEY PERFORMANCE INDICATORS';
+                kpiSection.appendChild(kpiTitle);
+
+                const kpiGrid = document.createElement('div');
+                kpiGrid.className = 'grid grid-cols-3 gap-3';
+                for (const [key, value] of Object.entries(data.kpis)) {
+                    const kpiCard = document.createElement('div');
+                    kpiCard.className = 'bg-secondary/50 rounded-lg p-3';
+                    const label = document.createElement('p');
+                    label.className = 'text-xs text-muted-foreground';
+                    label.textContent = key.replace(/([A-Z])/g, ' $1').trim();
+                    const val = document.createElement('p');
+                    val.className = 'text-lg font-bold text-foreground';
+                    val.textContent = typeof value === 'number' && key.toLowerCase().includes('budget') ? '$' + Number(value).toLocaleString() : String(value);
+                    kpiCard.appendChild(label);
+                    kpiCard.appendChild(val);
+                    kpiGrid.appendChild(kpiCard);
+                }
+                kpiSection.appendChild(kpiGrid);
+                modal.appendChild(kpiSection);
+            }
+
+            // Summary
+            if (data.executiveSummary) {
+                const summary = document.createElement('div');
+                summary.className = 'bg-solaria/10 border border-solaria/20 rounded-lg p-4 mb-6';
+                const summaryText = document.createElement('p');
+                summaryText.className = 'text-sm text-foreground';
+                summaryText.textContent = data.executiveSummary;
+                summary.appendChild(summaryText);
+                modal.appendChild(summary);
+            }
+
+            // Close button
+            const footer = document.createElement('div');
+            footer.className = 'flex gap-2';
+            const closeFooterBtn = document.createElement('button');
+            closeFooterBtn.className = 'flex-1 py-2 rounded-lg bg-secondary text-foreground font-medium';
+            closeFooterBtn.textContent = 'Cerrar';
+            closeFooterBtn.onclick = closeRoleModal;
+            footer.appendChild(closeFooterBtn);
+            modal.appendChild(footer);
+
+            overlay.appendChild(modal);
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) closeRoleModal(); });
+            document.body.appendChild(overlay);
+        }
+
+        function closeRoleModal() {
+            const modal = document.getElementById('roleModal');
+            if (modal) modal.remove();
         }
     </script>
 </body>
