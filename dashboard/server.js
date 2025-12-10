@@ -41,11 +41,13 @@ class SolariaDashboardServer {
             contentSecurityPolicy: false
         }));
 
-        // Rate limiting
+        // Rate limiting - más permisivo para desarrollo y tests
         const limiter = rateLimit({
-            windowMs: 15 * 60 * 1000, // 15 minutos
-            max: 100, // límite por IP
-            message: { error: 'Too many requests from this IP' }
+            windowMs: 1 * 60 * 1000, // 1 minuto
+            max: 1000, // 1000 peticiones por minuto por IP
+            message: { error: 'Too many requests from this IP' },
+            standardHeaders: true,
+            legacyHeaders: false
         });
         this.app.use('/api/', limiter);
 
