@@ -17,7 +17,8 @@ const {
   PROJECT_TYPE = 'software',
 } = process.env;
 
-const baseRepo = process.env.REPO_PATH || path.resolve(__dirname, '..');
+// Default to the host project root (one level above infra/solaria-digital-field--operations)
+const baseRepo = process.env.REPO_PATH || path.resolve(__dirname, '..', '..');
 const milestonesPath = path.resolve(baseRepo, 'docs', 'PROJECT_MILESTONES.md');
 const specPath = path.resolve(baseRepo, 'docs', 'specs', 'ACADEIMATE_SPEC.md');
 
