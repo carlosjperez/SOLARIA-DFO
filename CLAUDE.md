@@ -1,7 +1,7 @@
 # SOLARIA Digital Field Operations - Oficina de Construcción en Campo
 
-**Versión:** 2.0.0
-**Última actualización:** 2025-12-10
+**Versión:** 3.0.0
+**Última actualización:** 2025-12-11
 
 ---
 
@@ -11,8 +11,47 @@ Esta es una **Oficina Digital de Construcción en Campo** completamente autocont
 
 1. Gestionar proyectos de construcción de software de forma autónoma
 2. Proporcionar dashboards ejecutivos para CEO, CTO, COO y CFO
-3. Coordinar agentes IA especializados
+3. Coordinar agentes IA especializados (SOLARIA Agents)
 4. Ser desmantelable sin afectar el proyecto construido
+5. **NUEVO:** Integrarse con cualquier agente IA via MCP (Model Context Protocol)
+
+---
+
+## IMPORTANTE: Instalación Automática del MCP
+
+**Cualquier agente IA (Claude Code, Cursor, Windsurf, Codex, etc.) que acceda a este proyecto DEBE ejecutar primero:**
+
+```bash
+# Auto-instalar el servidor MCP para integración con el dashboard
+bash scripts/install-mcp.sh
+```
+
+Este script:
+- Detecta automáticamente el entorno (Claude Code, Cursor, Windsurf, Continue, Codex, etc.)
+- Instala las dependencias necesarias
+- Configura el MCP en el archivo de configuración correcto
+- Habilita herramientas directas para gestionar tareas, agentes y proyectos
+
+**Después de instalar el MCP, el agente puede usar comandos naturales como:**
+- "Muéstrame el estado del proyecto"
+- "Crea una tarea: Implementar autenticación con prioridad alta"
+- "Marca la tarea #5 como completada"
+- "Lista todas las tareas asignadas a SOLARIA-DEV-01"
+- "¿Cuál es el progreso actual?"
+
+### Herramientas MCP Disponibles
+
+| Herramienta | Descripción |
+|-------------|-------------|
+| `get_dashboard_overview` | Ver KPIs ejecutivos y métricas |
+| `list_tasks` | Listar todas las tareas |
+| `create_task` | Crear nueva tarea |
+| `update_task` | Actualizar tarea (estado, prioridad, progreso) |
+| `complete_task` | Marcar tarea como completada |
+| `list_agents` | Ver agentes SOLARIA |
+| `get_agent_tasks` | Ver tareas de un agente |
+| `list_projects` | Listar proyectos |
+| `get_activity_logs` | Ver logs de actividad |
 
 ---
 
@@ -295,6 +334,20 @@ docker exec redis redis-cli FLUSHALL
 
 ## Notas para Claude Code y Agentes IA
 
+### PASO OBLIGATORIO AL INICIAR
+
+```bash
+# 1. PRIMERO: Instalar MCP para integración directa
+bash scripts/install-mcp.sh
+
+# 2. Iniciar Docker si no está corriendo
+docker-compose up -d
+
+# 3. Ahora puedes usar herramientas MCP directamente
+```
+
+### Información General
+
 1. Este directorio es una **oficina temporal** de construcción
 2. Todos los cambios al proyecto real deben hacerse en el repositorio del proyecto
 3. Esta oficina solo coordina y monitorea el trabajo
@@ -302,8 +355,20 @@ docker exec redis redis-cli FLUSHALL
 5. Los datos críticos deben exportarse antes de desmantelar
 6. El color corporativo SOLARIA es **#f6921d** (naranja)
 7. El acceso rápido usa el usuario `carlosjperez` con password `bypass`
+8. **NUEVO:** Usa el MCP para interactuar con el dashboard programáticamente
+9. Los agentes se llaman SOLARIA-PM, SOLARIA-ARCH, SOLARIA-DEV-01, etc.
+
+### Ejecutar Tests
+
+```bash
+# Tests de API del dashboard
+bash dashboard/tests/api-tests.sh
+
+# Tests completos del proyecto
+bash scripts/run-tests.sh
+```
 
 ---
 
 **SOLARIA Digital Field Operations**
-**Oficina de Construcción en Campo v2.0.0**
+**Oficina de Construcción en Campo v3.0.0**
