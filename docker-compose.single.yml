@@ -16,5 +16,43 @@ services:
       - office_mysql_data:/var/lib/mysql
       - ./logs:/app/logs
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3030/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker.Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DB_HOST=office
+      - DB_PASSWORD=${DB_PASSWORD:-solaria2024}
+      - DB_NAME=solaria_construction
+      - DB_USER=solaria_user
+    depends_on:
+      office:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   office_mysql_data:
+  redis_data:

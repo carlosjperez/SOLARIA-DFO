@@ -1,0 +1,17 @@
+{
+  "name": "solaria-workers",
+  "version": "1.0.0",
+  "description": "Background job workers for SOLARIA Digital Field Operations",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "ioredis": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true
+}

@@ -8,6 +8,10 @@ DB_NAME=${DB_NAME:-solaria_construction}
 DB_USER=${DB_USER:-solaria_user}
 PORT=${PORT:-3030}
 
+# Validate required environment variables
+: "${DB_PASSWORD:?DB_PASSWORD is required}"
+: "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
+
 # Ensure perms
 chown -R mysql:mysql /var/lib/mysql /var/run/mysqld
 
@@ -19,7 +23,7 @@ fi
 
 # Start MariaDB in background
 echo "[office] Starting mariadbd"
-mariadbd --user=mysql --bind-address=0.0.0.0 &
+mariadbd --user=mysql --bind-address=0.0.0.0 --innodb-use-native-aio=0 &
 MYSQL_PID=$!
 
 # Wait for MariaDB with timeout

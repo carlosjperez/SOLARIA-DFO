@@ -322,6 +322,30 @@ npm run agents -- --reset
 docker exec redis redis-cli FLUSHALL
 ```
 
+### Script de ingesta falla
+```bash
+# Verificar nombre exacto del contenedor
+docker ps --format "{{.Names}}" | grep office
+
+# Ejecutar con nombre explícito
+CONTAINER="<nombre_exacto>" bash scripts/ingest-project.sh "Proyecto" /path/to/milestones.md
+```
+
+### Worker no conecta a Redis
+```bash
+# Verificar que Redis esté corriendo
+docker exec redis redis-cli ping
+
+# Ver logs del worker
+docker compose -f docker-compose.single.yml logs worker
+
+# Reiniciar worker
+docker compose -f docker-compose.single.yml restart worker
+```
+
+### MariaDB warnings de io_uring
+Este es un warning benigno en contenedores. Se resuelve con `--innodb-use-native-aio=0` (ya configurado en office-entrypoint.sh).
+
 ---
 
 ## Contacto y Soporte
