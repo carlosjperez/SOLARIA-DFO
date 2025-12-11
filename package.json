@@ -19,7 +19,10 @@
     "import": "node scripts/data-importer.js",
     "ingest-akademate": "node scripts/ingest-akademate.js",
     "health": "node scripts/health-check.js",
-    "office:bootstrap": "bash scripts/bootstrap-office.sh"
+    "office:bootstrap": "bash scripts/bootstrap-office.sh",
+    "mcp:dfo": "pnpm -C mcp-server start",
+    "mcp:playwright": "pnpm exec mcp-server-playwright",
+    "test:ui:dfo": "pnpm exec playwright test tests/ui-smoke.spec.ts --config playwright.config.ts"
   },
   "keywords": [
     "construction",
@@ -47,7 +50,8 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "@playwright/test": "1.48.2"
   },
   "engines": {
     "node": ">=18.0.0",
