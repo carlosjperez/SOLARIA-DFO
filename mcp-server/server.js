@@ -23,7 +23,8 @@ import {
 // Configuration
 const DASHBOARD_API = process.env.DASHBOARD_API_URL || "http://localhost:3030/api";
 const AUTH_USER = process.env.DASHBOARD_USER || "carlosjperez";
-const AUTH_PASS = process.env.DASHBOARD_PASS || "bypass";
+// seeded password in mysql-init.sql (SHA256 hash)
+const AUTH_PASS = process.env.DASHBOARD_PASS || "SolariaAdmin2024!";
 
 let authToken = null;
 

@@ -23,11 +23,11 @@ cd mcp-server
 npm install
 ```
 
-2. Configure environment variables:
+2. Configure environment variables (defaults already set for Akademate):
 ```bash
 export DASHBOARD_API_URL=http://localhost:3030/api
 export DASHBOARD_USER=carlosjperez
-export DASHBOARD_PASS=bypass
+export DASHBOARD_PASS=SolariaAdmin2024!
 ```
 
 3. Run the server:
@@ -43,13 +43,8 @@ Add to your `~/.claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "solaria-dashboard": {
-      "command": "node",
-      "args": ["/path/to/solaria-digital-field--operations/mcp-server/server.js"],
-      "env": {
-        "DASHBOARD_API_URL": "http://localhost:3030/api",
-        "DASHBOARD_USER": "carlosjperez",
-        "DASHBOARD_PASS": "bypass"
-      }
+      "command": "pnpm",
+      "args": ["-C", "/Users/carlosjperez/Documents/GitHub/akademate.com", "mcp:dfo"]
     }
   }
 }
