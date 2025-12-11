@@ -171,6 +171,24 @@ services:
     networks:
       - solaria-network
 
+  # MCP Server for Agent Integration
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    environment:
+      - DASHBOARD_API_URL=http://dashboard-backend:3030/api
+      - DASHBOARD_USER=${DASHBOARD_USER:-carlosjperez}
+      - DASHBOARD_PASS=${DASHBOARD_PASS:-bypass}
+    depends_on:
+      dashboard-backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - solaria-network
+    # Note: MCP server uses stdio transport, not HTTP
+    # To use it, connect via stdin/stdout or configure your MCP client
+
   # File Storage Service
   minio:
     image: minio/minio:latest
