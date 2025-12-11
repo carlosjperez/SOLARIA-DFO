@@ -141,8 +141,9 @@ class SolariaDashboardServer {
         this.app.get('/api/reports/agents', this.getAgentReports.bind(this));
         this.app.get('/api/reports/financial', this.getFinancialReports.bind(this));
 
-        // Documentación y recursos del proyecto
+        // Documentacion y recursos del proyecto
         this.app.get('/api/docs', this.getProjectDocs.bind(this));
+        this.app.get('/api/docs/list', this.getDocumentsList.bind(this));
         this.app.get('/api/docs/specs', this.getProjectSpecs.bind(this));
         this.app.get('/api/docs/credentials', this.getProjectCredentials.bind(this));
         this.app.get('/api/docs/architecture', this.getProjectArchitecture.bind(this));
@@ -1030,9 +1031,10 @@ class SolariaDashboardServer {
     async getLogs(req, res) {
         try {
             const { level, category, limit = 100 } = req.query;
-            
+            const safeLimit = Math.min(Math.max(parseInt(limit) || 100, 1), 1000);
+
             let query = `
-                SELECT 
+                SELECT
                     al.*,
                     p.name as project_name,
                     aa.name as agent_name
@@ -1041,27 +1043,27 @@ class SolariaDashboardServer {
                 LEFT JOIN ai_agents aa ON al.agent_id = aa.id
                 WHERE 1=1
             `;
-            
+
             const params = [];
-            
+
             if (level) {
                 query += ' AND al.level = ?';
                 params.push(level);
             }
-            
+
             if (category) {
                 query += ' AND al.category = ?';
                 params.push(category);
             }
-            
-            query += ' ORDER BY al.created_at DESC LIMIT ?';
-            params.push(parseInt(limit));
-            
+
+            query += ` ORDER BY al.created_at DESC LIMIT ${safeLimit}`;
+
             const [logs] = await this.db.execute(query, params);
             res.json(logs);
 
         } catch (error) {
-            res.status(500).json({ error: 'Failed to fetch logs' });
+            console.error('Error fetching logs:', error);
+            res.status(500).json({ error: 'Failed to fetch logs', details: error.message });
         }
     }
 
@@ -1203,6 +1205,85 @@ class SolariaDashboardServer {
             });
         } catch (error) {
             res.status(500).json({ error: 'Failed to fetch docs' });
+        }
+    }
+
+    async getDocumentsList(req, res) {
+        try {
+            const repoPath = process.env.REPO_PATH || '/repo';
+            const fs = require('fs');
+            const path = require('path');
+
+            // Patterns de archivos de documentacion
+            const docPatterns = [
+                { pattern: /\.md$/i, type: 'markdown', icon: 'fa-file-lines' },
+                { pattern: /\.txt$/i, type: 'text', icon: 'fa-file-alt' },
+                { pattern: /\.json$/i, type: 'json', icon: 'fa-file-code' },
+                { pattern: /\.ya?ml$/i, type: 'yaml', icon: 'fa-file-code' },
+                { pattern: /\.sql$/i, type: 'sql', icon: 'fa-database' },
+                { pattern: /\.env/i, type: 'env', icon: 'fa-cog' },
+                { pattern: /Dockerfile/i, type: 'docker', icon: 'fa-docker' },
+                { pattern: /docker-compose/i, type: 'docker', icon: 'fa-docker' }
+            ];
+
+            const documents = [];
+            const dirsToScan = ['', 'docs', 'documentation', 'specs', 'config'];
+
+            const getFileType = (filename) => {
+                for (const p of docPatterns) {
+                    if (p.pattern.test(filename)) return { type: p.type, icon: p.icon };
+                }
+                return { type: 'file', icon: 'fa-file' };
+            };
+
+            const scanDir = (dir, relPath = '') => {
+                const fullPath = path.join(repoPath, dir);
+                if (!fs.existsSync(fullPath)) return;
+
+                try {
+                    const files = fs.readdirSync(fullPath);
+                    for (const file of files) {
+                        const filePath = path.join(fullPath, file);
+                        const stat = fs.statSync(filePath);
+
+                        if (stat.isFile()) {
+                            const { type, icon } = getFileType(file);
+                            if (type !== 'file' || file.endsWith('.md')) {
+                                documents.push({
+                                    name: file,
+                                    path: path.join(dir, file),
+                                    type: type,
+                                    icon: icon,
+                                    size: stat.size,
+                                    modified: stat.mtime,
+                                    repoUrl: 'https://github.com/SOLARIA-AGENCY/akademate.com/blob/main/' + path.join(dir, file).replace(/^\//, '')
+                                });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error scanning dir:', dir, e.message);
+                }
+            };
+
+            // Escanear directorios principales
+            for (const dir of dirsToScan) {
+                scanDir(dir);
+            }
+
+            // Ordenar por tipo y nombre
+            documents.sort((a, b) => {
+                if (a.type !== b.type) return a.type.localeCompare(b.type);
+                return a.name.localeCompare(b.name);
+            });
+
+            res.json({
+                total: documents.length,
+                documents: documents.slice(0, 50) // Limitar a 50 documentos
+            });
+        } catch (error) {
+            console.error('Error listing documents:', error);
+            res.status(500).json({ error: 'Failed to list documents' });
         }
     }
 
@@ -1374,7 +1455,9 @@ class SolariaDashboardServer {
                 LIMIT 5
             `);
 
-            const executiveSummary = `Akademate: ${Math.round(projects.find(p => p.name LIKE '%Akademate%')?.completion_percentage || projects[0]?.completion_percentage || 0)}% completado; ${criticalAlerts.length} alertas críticas activas; presupuesto utilizado ${(budgetSummary[0].total_spent || 0)} / ${(budgetSummary[0].total_budget || 0)}.`;
+            const akademateProject = projects.find(p => p.name && p.name.toLowerCase().includes('akademate'));
+            const mainProject = akademateProject || projects[0];
+            const executiveSummary = `${mainProject?.name || 'Proyecto'}: ${Math.round(mainProject?.completion_percentage || 0)}% completado; ${criticalAlerts.length} alertas críticas activas; presupuesto utilizado ${(budgetSummary[0].total_spent || 0)} / ${(budgetSummary[0].total_budget || 0)}.`;
 
             res.json({
                 role: 'CEO',
@@ -1649,10 +1732,16 @@ class SolariaDashboardServer {
         try {
             const { project_id, agent_id, action, details, category = 'system', level = 'info' } = req.body;
 
+            // Convertir undefined a null para MySQL
+            const safeProjectId = project_id ?? null;
+            const safeAgentId = agent_id ?? null;
+            const safeAction = action ?? 'unknown';
+            const safeDetails = details ? JSON.stringify(details) : null;
+
             const [result] = await this.db.execute(`
                 INSERT INTO activity_logs (project_id, agent_id, action, details, category, level)
                 VALUES (?, ?, ?, ?, ?, ?)
-            `, [project_id, agent_id, action, JSON.stringify(details), category, level]);
+            `, [safeProjectId, safeAgentId, safeAction, safeDetails, category, level]);
 
             res.status(201).json({
                 success: true,

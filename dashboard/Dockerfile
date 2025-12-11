@@ -10,12 +10,12 @@ RUN npm install --omit=dev
 COPY server.js ./
 COPY public ./public/
 
-# Expose port
-EXPOSE 3000
+# Expose port (uses PORT env variable, default 3030)
+EXPOSE 3030
 
-# Health check
+# Health check - use environment variable PORT with default 3030
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3030}/api/health || exit 1
 
 # Start server
 CMD ["node", "server.js"]

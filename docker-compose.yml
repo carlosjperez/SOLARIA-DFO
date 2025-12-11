@@ -1,19 +1,22 @@
 services:
-  # C-Suite Dashboard (CEO/CTO/COO/CFO) - Puerto 3000
+  # C-Suite Dashboard (CEO/CTO/COO/CFO) - Puerto 3030
   dashboard-backend:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3030:3030"
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3000
+      - PORT=3030
       - DB_HOST=mysql
       - DB_USER=solaria_user
       - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
       - DB_NAME=solaria_construction
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - REPO_PATH=/repo
+    volumes:
+      - ../../:/repo:ro
     depends_on:
       mysql:
         condition: service_healthy
@@ -21,7 +24,7 @@ services:
     networks:
       - solaria-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3030/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

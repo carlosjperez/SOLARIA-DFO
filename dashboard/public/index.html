@@ -368,6 +368,24 @@
                         <span>Analytics</span>
                     </button>
 
+                    <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-3 mt-6">C-Suite</p>
+                    <button data-section="ceo" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground text-sm">
+                        <i class="fa-solid fa-crown w-5 text-center text-solaria"></i>
+                        <span>CEO Dashboard</span>
+                    </button>
+                    <button data-section="cto" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground text-sm">
+                        <i class="fa-solid fa-microchip w-5 text-center text-blue-500"></i>
+                        <span>CTO Dashboard</span>
+                    </button>
+                    <button data-section="coo" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground text-sm">
+                        <i class="fa-solid fa-gears w-5 text-center text-green-500"></i>
+                        <span>COO Dashboard</span>
+                    </button>
+                    <button data-section="cfo" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground text-sm">
+                        <i class="fa-solid fa-chart-pie w-5 text-center text-purple-500"></i>
+                        <span>CFO Dashboard</span>
+                    </button>
+
                     <p class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-3 mt-6">Sistema</p>
                     <button data-section="logs" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground text-sm">
                         <i class="fa-solid fa-clock-rotate-left w-5 text-center"></i>
@@ -375,7 +393,7 @@
                     </button>
                     <button data-section="settings" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground text-sm">
                         <i class="fa-solid fa-gear w-5 text-center"></i>
-                        <span>Configuración</span>
+                        <span>Configuracion</span>
                     </button>
                 </nav>
 
@@ -414,19 +432,19 @@
             <div class="p-6">
                 <!-- Overview Section -->
                 <section id="overviewSection">
-                    <!-- Stats Cards -->
+                    <!-- Stats Cards - Interactive -->
                     <div class="grid grid-cols-4 gap-4 mb-6">
-                        <div class="stat-card rounded-xl p-4 transition-all cursor-pointer">
+                        <div class="stat-card rounded-xl p-4 transition-all cursor-pointer hover:border-solaria/50" data-card="projects">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="w-10 h-10 rounded-lg bg-solaria/10 flex items-center justify-center">
                                     <i class="fa-solid fa-folder text-solaria"></i>
                                 </div>
-                                <span class="text-xs text-green-500 font-medium">+12%</span>
+                                <span class="text-xs text-green-500 font-medium">Activo</span>
                             </div>
                             <p class="text-2xl font-bold text-foreground" id="totalProjects">0</p>
-                            <p class="text-sm text-muted-foreground">Proyectos Activos</p>
+                            <p class="text-sm text-muted-foreground">Proyectos</p>
                         </div>
-                        <div class="stat-card rounded-xl p-4 transition-all cursor-pointer">
+                        <div class="stat-card rounded-xl p-4 transition-all cursor-pointer hover:border-solaria/50" data-card="agents">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
                                     <i class="fa-solid fa-robot text-blue-500"></i>
@@ -434,19 +452,19 @@
                                 <span class="text-xs text-green-500 font-medium">Online</span>
                             </div>
                             <p class="text-2xl font-bold text-foreground" id="activeAgents">0</p>
-                            <p class="text-sm text-muted-foreground">Agentes IA Activos</p>
+                            <p class="text-sm text-muted-foreground">Agentes SOLARIA</p>
                         </div>
-                        <div class="stat-card rounded-xl p-4 transition-all cursor-pointer">
+                        <div class="stat-card rounded-xl p-4 transition-all cursor-pointer hover:border-solaria/50" data-card="tasks">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
                                     <i class="fa-solid fa-list-check text-green-500"></i>
                                 </div>
-                                <span class="text-xs text-muted-foreground">Esta semana</span>
+                                <span class="text-xs text-muted-foreground">Total</span>
                             </div>
                             <p class="text-2xl font-bold text-foreground" id="completedTasks">0</p>
                             <p class="text-sm text-muted-foreground">Tareas Completadas</p>
                         </div>
-                        <div class="stat-card rounded-xl p-4 transition-all cursor-pointer">
+                        <div class="stat-card rounded-xl p-4 transition-all cursor-pointer hover:border-solaria/50" data-card="alerts">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
                                     <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
@@ -454,7 +472,7 @@
                                 <span id="alertIndicator" class="text-xs text-green-500 font-medium">OK</span>
                             </div>
                             <p class="text-2xl font-bold text-foreground" id="criticalAlerts">0</p>
-                            <p class="text-sm text-muted-foreground">Alertas Críticas</p>
+                            <p class="text-sm text-muted-foreground">Alertas</p>
                         </div>
                     </div>
 
@@ -463,13 +481,13 @@
                         <div class="bg-card rounded-xl p-6 border border-border">
                             <h3 class="text-lg font-semibold text-foreground mb-4">Progreso del Proyecto</h3>
                             <div class="h-64">
-                                <canvas id="progressChart"></canvas>
+                                <canvas id="projectProgressChart"></canvas>
                             </div>
                         </div>
                         <div class="bg-card rounded-xl p-6 border border-border">
                             <h3 class="text-lg font-semibold text-foreground mb-4">Rendimiento de Agentes</h3>
                             <div class="h-64">
-                                <canvas id="agentChart"></canvas>
+                                <canvas id="agentPerformanceChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -639,29 +657,53 @@
 
                 <!-- Docs Section -->
                 <section id="docsSection" class="hidden">
-                    <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center justify-between mb-6">
                         <div>
-                            <h2 class="text-lg font-semibold text-foreground">Documentación</h2>
-                            <p class="text-sm text-muted-foreground">Spec y milestones importados del repo</p>
+                            <h2 class="text-lg font-semibold text-foreground">Documentacion del Proyecto</h2>
+                            <p class="text-sm text-muted-foreground">Archivos de documentacion disponibles en el repositorio</p>
                         </div>
-                        <button class="px-3 py-2 rounded-lg bg-secondary text-sm" onclick="dashboard.loadDocs(true)">Refrescar</button>
+                        <button class="btn-ghost px-4 py-2 rounded-lg text-sm flex items-center gap-2" onclick="dashboard.loadProjectDocs()">
+                            <i class="fa-solid fa-rotate"></i> Refrescar
+                        </button>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-card rounded-xl border border-border p-4">
-                            <h3 class="text-sm font-semibold mb-2">Spec (snippet)</h3>
-                            <pre id="docSpec" class="text-xs text-muted-foreground whitespace-pre-wrap"></pre>
-                        </div>
-                        <div class="bg-card rounded-xl border border-border p-4">
-                            <h3 class="text-sm font-semibold mb-2">Milestones</h3>
-                            <ul id="docMilestones" class="text-sm text-muted-foreground space-y-1 list-disc list-inside"></ul>
-                        </div>
+                    <!-- Document List -->
+                    <div id="docsListContainer" class="space-y-3">
+                        <p class="text-muted-foreground">Cargando documentos...</p>
                     </div>
                 </section>
 
                 <!-- Analytics Section -->
                 <section id="analyticsSection" class="hidden">
-                    <h2 class="text-lg font-semibold text-foreground mb-6">Analytics & Reportes</h2>
-                    <div class="grid grid-cols-2 gap-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-semibold text-foreground">Analytics & Reportes</h2>
+                        <select id="analyticsTimeframe" class="input-field px-3 py-2 rounded-lg text-sm" onchange="dashboard.loadAnalyticsData()">
+                            <option value="7">Ultimos 7 dias</option>
+                            <option value="30" selected>Ultimos 30 dias</option>
+                            <option value="90">Ultimos 90 dias</option>
+                        </select>
+                    </div>
+
+                    <!-- KPI Summary -->
+                    <div id="analyticsKpis" class="grid grid-cols-4 gap-4 mb-6">
+                        <div class="stat-card rounded-xl p-4">
+                            <p class="text-2xl font-bold text-foreground" id="analyticsTotalTasks">0</p>
+                            <p class="text-sm text-muted-foreground">Tareas Totales</p>
+                        </div>
+                        <div class="stat-card rounded-xl p-4">
+                            <p class="text-2xl font-bold text-green-500" id="analyticsCompletedTasks">0</p>
+                            <p class="text-sm text-muted-foreground">Completadas</p>
+                        </div>
+                        <div class="stat-card rounded-xl p-4">
+                            <p class="text-2xl font-bold text-blue-500" id="analyticsAvgProgress">0%</p>
+                            <p class="text-sm text-muted-foreground">Progreso Promedio</p>
+                        </div>
+                        <div class="stat-card rounded-xl p-4">
+                            <p class="text-2xl font-bold text-solaria" id="analyticsActiveAgents">0</p>
+                            <p class="text-sm text-muted-foreground">Agentes Activos</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6 mb-6">
                         <div class="bg-card rounded-xl p-6 border border-border">
                             <h3 class="font-semibold text-foreground mb-4">Tendencia de Productividad</h3>
                             <div class="h-64">
@@ -669,17 +711,38 @@
                             </div>
                         </div>
                         <div class="bg-card rounded-xl p-6 border border-border">
-                            <h3 class="font-semibold text-foreground mb-4">Distribución de Costos</h3>
+                            <h3 class="font-semibold text-foreground mb-4">Tareas por Estado</h3>
                             <div class="h-64">
-                                <canvas id="costChart"></canvas>
+                                <canvas id="tasksByStatusChart"></canvas>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent Performance Table -->
+                    <div class="bg-card rounded-xl p-6 border border-border">
+                        <h3 class="font-semibold text-foreground mb-4">Rendimiento por Agente</h3>
+                        <div id="agentPerformanceTable" class="overflow-x-auto">
+                            <p class="text-muted-foreground">Cargando datos...</p>
                         </div>
                     </div>
                 </section>
 
                 <!-- Logs Section -->
                 <section id="logsSection" class="hidden">
-                    <h2 class="text-lg font-semibold text-foreground mb-6">Activity Logs</h2>
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-semibold text-foreground">Activity Logs</h2>
+                        <div class="flex gap-2">
+                            <select id="logsLevelFilter" class="input-field px-3 py-2 rounded-lg text-sm" onchange="dashboard.filterLogs()">
+                                <option value="all">Todos los niveles</option>
+                                <option value="info">Info</option>
+                                <option value="warning">Warning</option>
+                                <option value="error">Error</option>
+                            </select>
+                            <button class="btn-ghost px-3 py-2 rounded-lg text-sm" onclick="dashboard.loadActivityLogs()">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                        </div>
+                    </div>
                     <div id="logsContainer" class="bg-card rounded-xl border border-border divide-y divide-border">
                         <p class="p-4 text-muted-foreground">Cargando logs...</p>
                     </div>
