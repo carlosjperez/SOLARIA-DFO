@@ -906,7 +906,13 @@ class SolariaDashboard {
         if (!container) return;
         if (this.agentsData.length === 0) await this.fetchAgents();
 
-        container.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">${this.agentsData.map(agent => this.renderAgentCard(agent)).join('')}</div>`;
+        const agents = this.agentsData;
+
+        container.innerHTML = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 auto-rows-fr">
+                ${agents.map(agent => `<div class="h-full">${this.renderAgentCard(agent)}</div>`).join('')}
+            </div>
+        `;
     }
 
     renderAgentCard(agent) {
