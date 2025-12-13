@@ -52,6 +52,65 @@ chmod +x install-mcp-remote.sh
 
 El script detectara automaticamente tu entorno (Claude Code, Cursor, Windsurf, etc.) y configurara la conexion.
 
+### Opcion 3: Configuracion Manual por IDE
+
+#### Claude Code
+
+Editar `~/.claude/claude_code_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "solaria-dfo": {
+      "transport": {
+        "type": "http",
+        "url": "https://dfo.solaria.agency/mcp"
+      },
+      "headers": {
+        "Authorization": "Bearer default",
+        "X-Project-Id": "mi-proyecto"
+      }
+    }
+  }
+}
+```
+
+#### Cursor
+
+Editar `~/.config/Cursor/User/mcp.json` (Linux) o `~/Library/Application Support/Cursor/User/mcp.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "solaria-dfo": {
+      "transport": "http",
+      "url": "https://dfo.solaria.agency/mcp",
+      "headers": {
+        "Authorization": "Bearer default",
+        "X-Project-Id": "mi-proyecto"
+      }
+    }
+  }
+}
+```
+
+#### Windsurf
+
+Editar `~/.config/windsurf/mcp_config.json` (Linux) o `~/Library/Application Support/Windsurf/mcp_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "solaria-dfo": {
+      "transport": "http",
+      "url": "https://dfo.solaria.agency/mcp"
+    }
+  }
+}
+```
+
+Despues de configurar, reinicia tu IDE para activar la conexion MCP.
+
 ## Dashboard
 
 - **URL:** https://dfo.solaria.agency

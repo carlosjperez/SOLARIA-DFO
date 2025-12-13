@@ -1,7 +1,26 @@
 # SOLARIA Digital Field Operations - Oficina de Construcción en Campo
 
-**Versión:** 3.0.0
+**Versión:** 3.1.0
 **Última actualización:** 2025-12-13
+
+---
+
+## Servidor de Producción
+
+**SOLARIA DFO está desplegado de forma centralizada:**
+
+| Recurso | URL |
+|---------|-----|
+| Dashboard | https://dfo.solaria.agency |
+| API | https://dfo.solaria.agency/api |
+| MCP HTTP | https://dfo.solaria.agency/mcp |
+| Health Check | https://dfo.solaria.agency/mcp/health |
+
+**Credenciales Dashboard:**
+- Usuario: `carlosjperez`
+- Password: `bypass`
+
+**Servidor VPS:** 148.230.118.124 (Hostinger)
 
 ---
 
@@ -17,25 +36,31 @@ Esta es una **Oficina Digital de Construcción en Campo** completamente autocont
 
 ---
 
-## Arquitectura v3.0 (Unificada)
+## Arquitectura v3.1 (Centralizada)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    SOLARIA DFO v3.0                         │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │           Office Container (Puerto 3030)            │    │
-│  │  ┌───────────────┐    ┌───────────────────────┐    │    │
-│  │  │   MariaDB     │    │   Node.js Dashboard   │    │    │
-│  │  │   (embedded)  │◄──►│   (Express+Socket.IO) │    │    │
-│  │  └───────────────┘    └───────────────────────┘    │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                             │                                │
-│  ┌──────────────┐    ┌─────┴─────┐    ┌──────────────┐     │
-│  │    Redis     │    │   Worker  │    │    Nginx     │     │
-│  │   (cache)    │◄──►│  (queues) │    │  (optional)  │     │
-│  └──────────────┘    └───────────┘    └──────────────┘     │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Proyecto A    │     │   Proyecto B    │     │   Proyecto C    │
+│  (MCP Client)   │     │  (MCP Client)   │     │  (MCP Client)   │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    HTTPS (dfo.solaria.agency)
+                                 │
+                                 ▼
+┌────────────────────────────────────────────────────────────────┐
+│                    VPS Hostinger (148.230.118.124)             │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐     │
+│  │    Nginx     │───►│  MCP HTTP    │───►│   Dashboard  │     │
+│  │   (80/443)   │    │   (:3031)    │    │   (:3030)    │     │
+│  └──────────────┘    └──────────────┘    └──────┬───────┘     │
+│                                                  │             │
+│                                           ┌──────▼───────┐     │
+│                                           │   MariaDB    │     │
+│                                           │  (embedded)  │     │
+│                                           └──────────────┘     │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ### Servicios
@@ -81,9 +106,37 @@ MYSQL_ROOT_PASSWORD=SolariaRoot2024
 
 ## MCP Integration (Para Agentes IA)
 
+### Conexión Remota (Recomendado)
+
 ```bash
-# Instalar MCP para integración directa
-bash scripts/install-mcp.sh
+# Opción 1: Script automático
+bash <(curl -s https://dfo.solaria.agency/install.sh)
+
+# Opción 2: Script desde GitHub
+curl -O https://raw.githubusercontent.com/SOLARIA-AGENCY/solaria-digital-field--operations/main/scripts/install-mcp-remote.sh
+chmod +x install-mcp-remote.sh
+./install-mcp-remote.sh
+```
+
+### Configuración Manual (Claude Code)
+
+Editar `~/.claude/claude_code_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "solaria-dfo": {
+      "transport": {
+        "type": "http",
+        "url": "https://dfo.solaria.agency/mcp"
+      },
+      "headers": {
+        "Authorization": "Bearer default",
+        "X-Project-Id": "mi-proyecto"
+      }
+    }
+  }
+}
 ```
 
 ### Herramientas MCP Disponibles
@@ -233,16 +286,30 @@ docker compose down -v
 
 ## Notas para Agentes IA
 
-1. Siempre usar `docker compose` (no `docker-compose`)
-2. El servicio principal es `office` en puerto 3030
-3. Credenciales: `carlosjperez` / `bypass`
+1. **MCP Remoto**: Usar `https://dfo.solaria.agency/mcp` para integración
+2. **Dashboard**: `https://dfo.solaria.agency` - Credenciales: `carlosjperez` / `bypass`
+3. **Health Check**: `curl https://dfo.solaria.agency/mcp/health`
 4. Color corporativo SOLARIA: **#f6921d** (naranja)
 5. Agentes se llaman: SOLARIA-PM, SOLARIA-ARCH, SOLARIA-DEV-01, etc.
-6. El MCP está disponible para integración programática
+6. Para desarrollo local: `docker compose up -d` (usa `docker compose`, no `docker-compose`)
+7. El servicio principal es `office` en puerto 3030
+
+### Verificar Conexión MCP
+
+```bash
+# Test health
+curl https://dfo.solaria.agency/mcp/health
+
+# Test tools list
+curl -X POST https://dfo.solaria.agency/mcp \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer default" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
 
 ---
 
 **SOLARIA Digital Field Operations**
-**Oficina de Construcción en Campo v3.0.0**
+**Oficina de Construcción en Campo v3.1.0**
 
 © 2024-2025 SOLARIA AGENCY
