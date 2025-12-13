@@ -1,262 +1,282 @@
 # SOLARIA Digital Field Operations
 
-**Oficina Digital de Construccion en Campo** - Version 3.0.0
+**Oficina Digital de Construccion en Campo** - Version 3.1.0
 
-Sistema autocontenido para gestion de proyectos de software con supervision ejecutiva (CEO/CTO/COO/CFO).
+Sistema centralizado para gestion de proyectos de software con supervision ejecutiva (CEO/CTO/COO/CFO) e integracion con agentes IA via MCP.
 
-## Arquitectura Unificada v3.0
+## Arquitectura Centralizada
 
-A partir de la version 3.0, DFO utiliza una **arquitectura unificada** basada en el servicio `office`:
+A partir de la version 3.1, DFO opera como un **servicio centralizado** al que los proyectos se conectan remotamente via MCP HTTP:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    SOLARIA DFO v3.0                         │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │           Office Container (Puerto 3030)            │    │
-│  │  ┌───────────────┐    ┌───────────────────────┐    │    │
-│  │  │   MariaDB     │    │   Node.js Dashboard   │    │    │
-│  │  │   (embedded)  │◄──►│   (Express+Socket.IO) │    │    │
-│  │  └───────────────┘    └───────────────────────┘    │    │
-│  └─────────────────────────────────────────────────────┘    │
-│                             │                                │
-│  ┌──────────────┐    ┌─────┴─────┐    ┌──────────────┐     │
-│  │    Redis     │    │   Worker  │    │    Nginx     │     │
-│  │   (cache)    │◄──►│  (queues) │    │  (optional)  │     │
-│  └──────────────┘    └───────────┘    └──────────────┘     │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Proyecto A    │     │   Proyecto B    │     │   Proyecto C    │
+│  (MCP Client)   │     │  (MCP Client)   │     │  (MCP Client)   │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    HTTPS (dfo.solaria.agency)
+                                 │
+                                 ▼
+┌────────────────────────────────────────────────────────────────┐
+│                    SOLARIA DFO Server                          │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐     │
+│  │    Nginx     │───►│  MCP HTTP    │───►│   Dashboard  │     │
+│  │   (80/443)   │    │   (:3031)    │    │   (:3030)    │     │
+│  └──────────────┘    └──────────────┘    └──────┬───────┘     │
+│                                                  │             │
+│                                           ┌──────▼───────┐     │
+│                                           │   MariaDB    │     │
+│                                           │  (embedded)  │     │
+│                                           └──────────────┘     │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-## Inicio Rapido
+## Conexion Rapida (Para Proyectos)
+
+### Opcion 1: Script automatico
 
 ```bash
-# 1. Clonar y configurar
-git clone https://github.com/SOLARIA-AGENCY/solaria-digital-field--operations.git
-cd solaria-digital-field--operations
-cp .env.example .env
-
-# 2. Levantar servicios (3 contenedores: office, redis, worker)
-docker compose up -d
-
-# 3. Verificar estado
-docker compose ps
-curl http://localhost:3030/api/health
-
-# 4. Acceder al dashboard
-# URL: http://localhost:3030
-# Usuario: carlosjperez
-# Password: bypass
+bash <(curl -s https://dfo.solaria.agency/install.sh)
 ```
 
-## Comandos Utiles
+### Opcion 2: Manual
+
+```bash
+# Descargar e instalar cliente MCP
+curl -O https://raw.githubusercontent.com/SOLARIA-AGENCY/solaria-digital-field--operations/main/scripts/install-mcp-remote.sh
+chmod +x install-mcp-remote.sh
+./install-mcp-remote.sh
+```
+
+El script detectara automaticamente tu entorno (Claude Code, Cursor, Windsurf, etc.) y configurara la conexion.
+
+## Dashboard
+
+- **URL:** https://dfo.solaria.agency
+- **Usuario:** carlosjperez
+- **Password:** bypass
+
+## MCP Tools Disponibles
+
+Una vez conectado, tu agente IA tendra acceso a:
+
+### Proyectos
+- `list_projects` - Listar todos los proyectos
+- `create_project` - Crear nuevo proyecto
+- `get_project` - Obtener detalle de proyecto
+- `update_project` - Actualizar proyecto
+
+### Tareas
+- `list_tasks` - Listar tareas (filtrable por proyecto, estado, prioridad)
+- `create_task` - Crear nueva tarea
+- `update_task` - Actualizar tarea
+- `complete_task` - Marcar tarea como completada
+
+### Agentes IA
+- `list_agents` - Listar agentes SOLARIA
+- `get_agent` - Obtener estado de agente
+- `update_agent_status` - Actualizar estado
+
+### Dashboard
+- `get_dashboard_overview` - KPIs ejecutivos
+- `get_dashboard_alerts` - Alertas activas
+- `log_activity` - Registrar actividad
+
+## Ejemplo de Uso con Claude Code
+
+```
+Usuario: Crea una tarea para implementar autenticacion JWT
+
+Claude: Voy a usar la herramienta create_task del servidor SOLARIA DFO:
+
+[Llama a create_task con:
+  - title: "Implementar autenticacion JWT"
+  - description: "Sistema de autenticacion con tokens JWT"
+  - priority: "high"
+  - project_id: 1
+]
+
+Tarea creada exitosamente con ID #42. Esta asignada al proyecto y visible en el dashboard.
+```
+
+---
+
+## Desarrollo Local (Solo para contribuidores)
+
+Si necesitas ejecutar DFO localmente para desarrollo:
+
+### Requisitos
+- Docker y Docker Compose
+- Node.js 22+
+- pnpm
+
+### Instalacion Local
+
+```bash
+# 1. Clonar repositorio
+git clone https://github.com/SOLARIA-AGENCY/solaria-digital-field--operations.git
+cd solaria-digital-field--operations
+
+# 2. Configurar entorno
+cp .env.example .env
+
+# 3. Levantar servicios
+docker compose up -d
+
+# 4. Verificar
+curl http://localhost:3030/api/health
+```
+
+### Comandos de Desarrollo
 
 ```bash
 # Desarrollo
-docker compose up -d              # Iniciar servicios
-docker compose logs -f office     # Ver logs del dashboard
-docker compose down               # Detener servicios
+docker compose up -d              # Iniciar
+docker compose logs -f office     # Ver logs
+docker compose down               # Detener
 
 # Testing
-pnpm test                         # Tests API y integracion
-pnpm test:ui                      # Tests UI con Playwright
+pnpm test                         # Tests API
+pnpm test:ui                      # Tests UI
 
-# Mantenimiento
-docker compose restart office     # Reiniciar dashboard
-docker volume ls                  # Ver volumenes
-docker compose down -v            # Eliminar datos (CUIDADO)
-
-# Proyecto Akademate
-pnpm ingest-akademate             # Poblar con datos de Akademate
+# MCP Local
+cd mcp-server && npm run dev      # MCP stdio (local)
+cd mcp-server && npm run dev:http # MCP HTTP (servidor)
 ```
 
-## Configuracion
+---
 
-### Variables de Entorno (.env)
+## Despliegue en Produccion
+
+### Deploy a VPS (Hostinger/Hetzner/etc)
 
 ```bash
-# Base de datos (NO usar caracteres especiales en passwords)
-DB_PASSWORD=solaria2024
-MYSQL_ROOT_PASSWORD=SolariaRoot2024
-DB_NAME=solaria_construction
-DB_USER=solaria_user
+# 1. Clonar en servidor
+ssh root@your-server
+cd /var/www
+git clone https://github.com/SOLARIA-AGENCY/solaria-digital-field--operations.git solaria-dfo
+cd solaria-dfo
 
-# Aplicacion
-NODE_ENV=production
-PORT=3030
-JWT_SECRET=your_secret_min_32_chars
+# 2. Configurar
+cp .env.prod.example .env.prod
 
-# Proyecto a monitorear (opcional)
-REPO_PATH=/path/to/your/project
-PROJECT_NAME=MyProject
-CI_MODE=false
+# 3. Generar JWT secret
+openssl rand -hex 32  # Copiar a JWT_SECRET en .env.prod
+
+# 4. Configurar SSL (Let's Encrypt)
+certbot certonly --standalone -d dfo.your-domain.com
+
+# 5. Desplegar
+docker compose -f docker-compose.prod.yml up -d
+
+# 6. Verificar
+curl https://dfo.your-domain.com/api/health
+curl https://dfo.your-domain.com/mcp/health
 ```
 
-> **IMPORTANTE**: Evitar caracteres especiales (!@#$%^&*) en passwords para prevenir problemas de escaping en bash.
-
-## Servicios
+### Servicios en Produccion
 
 | Servicio | Puerto | Descripcion |
 |----------|--------|-------------|
-| office | 3030 | Dashboard C-Suite + API REST + MariaDB |
-| redis | 6379 | Cache y cola de trabajos |
-| worker | - | Procesador de trabajos en background |
-| nginx | 80/443 | Reverse proxy (opcional, con `--profile with-proxy`) |
+| nginx | 80/443 | Reverse proxy con SSL |
+| office | 3030 | Dashboard + API + MariaDB |
+| mcp-http | 3031 | MCP HTTP transport |
+| redis | 6379 | Cache y colas |
 
-## API Endpoints
+---
+
+## API REST
 
 ### Autenticacion
-- `POST /api/auth/login` - Iniciar sesion
-- `POST /api/auth/logout` - Cerrar sesion
-- `GET /api/auth/verify` - Verificar token
+```
+POST /api/auth/login    - { userId, password }
+POST /api/auth/logout
+GET  /api/auth/verify
+```
 
 ### Proyectos
-- `GET /api/projects` - Listar proyectos
-- `POST /api/projects` - Crear proyecto
-- `GET /api/projects/:id` - Detalle de proyecto
-- `PUT /api/projects/:id` - Actualizar proyecto
+```
+GET    /api/projects
+POST   /api/projects
+GET    /api/projects/:id
+PUT    /api/projects/:id
+```
 
 ### Tareas
-- `GET /api/tasks` - Listar tareas
-- `POST /api/tasks` - Crear tarea
-- `GET /api/tasks/:id` - Detalle de tarea
-- `PUT /api/tasks/:id` - Actualizar tarea
+```
+GET    /api/tasks?project_id=1&status=pending
+POST   /api/tasks
+PUT    /api/tasks/:id
+```
 
-### Agentes IA
-- `GET /api/agents` - Listar agentes
-- `GET /api/agents/:id` - Estado de agente
-- `PUT /api/agents/:id/status` - Actualizar estado
+### C-Suite
+```
+GET /api/csuite/ceo   - Vista CEO
+GET /api/csuite/cto   - Vista CTO
+GET /api/csuite/coo   - Vista COO
+GET /api/csuite/cfo   - Vista CFO
+```
 
-### C-Suite Dashboards
-- `GET /api/csuite/ceo` - Vista CEO
-- `GET /api/csuite/cto` - Vista CTO
-- `GET /api/csuite/coo` - Vista COO
-- `GET /api/csuite/cfo` - Vista CFO
-
-### Integracion de Agentes
-- `POST /api/agent/register-doc` - Registrar documento
-- `POST /api/agent/update-project` - Actualizar proyecto
-- `POST /api/agent/add-task` - Agregar tarea
-- `POST /api/agent/log-activity` - Registrar actividad
+---
 
 ## Estructura del Proyecto
 
 ```
 solaria-digital-field--operations/
 ├── dashboard/                    # C-Suite Dashboard
-│   ├── server.js                # Express + Socket.IO server
-│   ├── public/                  # Static HTML/CSS/JS
-│   └── Dockerfile
-├── workers/                      # Background job processor
-│   └── index.js                 # Redis queue consumer
-├── mcp-server/                  # MCP para agentes IA
-│   └── server.js                # Stdio-based MCP server
+│   ├── server.js                # Express + Socket.IO
+│   └── public/                  # Frontend
+├── mcp-server/                  # MCP Server
+│   ├── server.js                # Stdio transport (local)
+│   ├── http-server.js           # HTTP transport (remoto)
+│   └── handlers.js              # Handlers compartidos
 ├── infrastructure/
 │   ├── database/
 │   │   └── mysql-init.sql       # Schema inicial
 │   └── nginx/
-│       └── nginx.unified.conf   # Config nginx consolidada
-├── tests/
-│   ├── ui-smoke.spec.ts         # Tests UI
-│   ├── api.spec.ts              # Tests API
-│   └── integration.spec.ts      # Tests integracion
-├── docker-compose.yml           # Compose unificado v3.0
-├── office.Dockerfile            # Imagen office
-├── office-entrypoint.sh         # Entrypoint con retry logic
-├── .env.example                 # Variables de entorno ejemplo
+│       └── nginx.prod.conf      # Config produccion
+├── scripts/
+│   ├── install-mcp-remote.sh    # Instalador cliente MCP
+│   └── install-mcp.sh           # Instalador local
+├── docker-compose.yml           # Desarrollo local
+├── docker-compose.prod.yml      # Produccion
 └── README.md
 ```
 
-## Caracteristicas Clave
-
-### Retry Logic en Base de Datos
-El servidor incluye reconexion automatica con backoff exponencial:
-- 10 intentos maximos al inicio
-- Delay incremental (1s, 2s, 4s, 8s... max 30s)
-- Health check cada 30 segundos
-- Reconexion automatica si pierde conexion
-
-### WebSocket (Socket.IO)
-Actualizaciones en tiempo real para:
-- Estados de agentes
-- Metricas de proyectos
-- Alertas criticas
-- Cambios en tareas
-
-### Seguridad
-- Autenticacion JWT
-- Rate limiting
-- CORS configurado
-- Headers de seguridad (Helmet)
-- CSP permisivo para CDNs
-
-## Testing
-
-```bash
-# Instalar dependencias de test
-pnpm install
-
-# Tests API (requiere servicios activos)
-pnpm exec playwright test tests/api.spec.ts
-
-# Tests de integracion
-pnpm exec playwright test tests/integration.spec.ts
-
-# Tests UI smoke
-pnpm exec playwright test tests/ui-smoke.spec.ts
-
-# Todos los tests
-pnpm test
-```
+---
 
 ## Troubleshooting
 
-### Dashboard no arranca
+### No puedo conectar via MCP
 ```bash
-# Ver logs
+# Verificar que el servidor responde
+curl https://dfo.solaria.agency/mcp/health
+
+# Revisar configuracion local
+cat ~/.claude/claude_code_config.json  # Claude Code
+cat ~/.config/Cursor/User/mcp.json     # Cursor
+```
+
+### Dashboard no carga
+```bash
+# Verificar servicios
+docker compose ps
 docker compose logs office
 
-# Problemas comunes:
-# 1. MariaDB no esta listo - esperar 30-45 segundos
-# 2. Password con caracteres especiales - simplificar en .env
-# 3. Puerto 3030 ocupado - verificar con lsof -i :3030
+# Reiniciar
+docker compose restart office
 ```
 
-### Base de datos no conecta
+### Error de autenticacion
 ```bash
-# Verificar que MariaDB esta corriendo
-docker compose exec office mariadb-admin ping
-
-# Reset completo (elimina datos!)
-docker compose down -v
-docker compose up -d
+# Las credenciales por defecto son:
+# Usuario: carlosjperez
+# Password: bypass
 ```
 
-### Tests fallan
-```bash
-# Verificar que servicios estan activos
-curl http://localhost:3030/api/health
-
-# Ver estado de contenedores
-docker compose ps
-```
-
-## Migracion desde v2.0
-
-Si usabas `docker-compose.single.yml` o el multi-container setup:
-
-1. Respaldar datos si necesario
-2. Actualizar a version 3.0
-3. Usar el nuevo `docker-compose.yml` unificado
-4. Las credenciales ahora son simplificadas (sin caracteres especiales)
-
-```bash
-# Eliminar volumenes antiguos (CUIDADO - pierde datos)
-docker compose down -v
-docker volume rm solaria-digital-field--operations_mysql_data
-
-# Levantar con nuevos volumenes
-docker compose up -d
-```
+---
 
 ## Contribuir
 
@@ -266,6 +286,8 @@ docker compose up -d
 4. Push: `git push origin feature/mi-feature`
 5. Crear Pull Request
 
+---
+
 ## Licencia
 
 MIT License - Ver [LICENSE](LICENSE)
@@ -274,4 +296,6 @@ MIT License - Ver [LICENSE](LICENSE)
 
 **SOLARIA Digital Field Operations** - *Gestion de proyectos potenciada por IA*
 
-© 2024-2025 SOLARIA AGENCY. Todos los derechos reservados.
+Dashboard: https://dfo.solaria.agency
+
+(c) 2024-2025 SOLARIA AGENCY

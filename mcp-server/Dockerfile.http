@@ -1,0 +1,28 @@
+# SOLARIA MCP HTTP Server
+# Dockerfile for HTTP transport MCP server
+
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm install --omit=dev
+
+# Copy source
+COPY handlers.js ./
+COPY http-server.js ./
+
+# Environment
+ENV NODE_ENV=production
+ENV MCP_PORT=3031
+
+# Expose port
+EXPOSE 3031
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3031/health || exit 1
+
+# Start server
+CMD ["node", "http-server.js"]

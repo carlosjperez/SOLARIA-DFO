@@ -1,0 +1,119 @@
+# SOLARIA Digital Field Operations - Production Docker Compose
+# For deployment on dfo.solaria.agency (148.230.118.124)
+
+version: '3.8'
+
+services:
+  # ===========================================
+  # OFFICE: Dashboard + MariaDB (unified)
+  # ===========================================
+  office:
+    build:
+      context: .
+      dockerfile: office.Dockerfile
+    container_name: solaria-dfo-office
+    ports:
+      - "3030:3030"
+    environment:
+      - DB_PASSWORD=${DB_PASSWORD:-solaria2024}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-SolariaRoot2024}
+      - DB_NAME=solaria_construction
+      - DB_USER=solaria_user
+      - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
+      - NODE_ENV=production
+      - PORT=3030
+    volumes:
+      - office_mysql_data:/var/lib/mysql
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3030/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: always
+    networks:
+      - solaria-dfo-network
+
+  # ===========================================
+  # MCP-HTTP: HTTP Transport for remote agents
+  # ===========================================
+  mcp-http:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile.http
+    container_name: solaria-dfo-mcp
+    ports:
+      - "3031:3031"
+    environment:
+      - DASHBOARD_API_URL=http://office:3030/api
+      - DASHBOARD_USER=${DASHBOARD_USER:-carlosjperez}
+      - DASHBOARD_PASS=${DASHBOARD_PASS:-bypass}
+      - MCP_PORT=3031
+      - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
+      - NODE_ENV=production
+    depends_on:
+      office:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3031/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: always
+    networks:
+      - solaria-dfo-network
+
+  # ===========================================
+  # REDIS: Cache and job queues
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: solaria-dfo-redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    networks:
+      - solaria-dfo-network
+
+  # ===========================================
+  # NGINX: Reverse proxy with SSL
+  # ===========================================
+  nginx:
+    image: nginx:alpine
+    container_name: solaria-dfo-nginx
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - office
+      - mcp-http
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    networks:
+      - solaria-dfo-network
+
+volumes:
+  office_mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  solaria-dfo-network:
+    driver: bridge

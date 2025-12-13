@@ -6,11 +6,16 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "start:http": "node http-server.js",
     "dev": "node --watch server.js",
+    "dev:http": "node --watch http-server.js",
     "test": "node tests/smoke.cjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.3"
+    "@modelcontextprotocol/sdk": "^1.24.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0"
   },
   "keywords": [
     "mcp",
