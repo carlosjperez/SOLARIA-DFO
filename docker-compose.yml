@@ -1,225 +1,127 @@
+# SOLARIA Digital Field Operations - Unified Docker Compose
+# Version: 3.0.0 - Consolidated Architecture
+#
+# This configuration uses the unified "office" service that combines:
+# - C-Suite Dashboard (Node.js Express + Socket.IO)
+# - MariaDB database (embedded)
+# - All dashboard APIs in a single container
+#
+# For legacy multi-container setup, see docker-compose.legacy.yml
+
 services:
-  # C-Suite Dashboard (CEO/CTO/COO/CFO) - Puerto 3030
-  dashboard-backend:
+  # ============================================================================
+  # PRIMARY SERVICE: Office (Dashboard + Database)
+  # ============================================================================
+  office:
     build:
-      context: ./dashboard
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: office.Dockerfile
     ports:
-      - "3030:3030"
+      - "3030:3030"       # Dashboard HTTP
+      - "33060:3306"      # MariaDB (external access)
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
+      # Database credentials (no special characters for shell compatibility)
+      - DB_PASSWORD=${DB_PASSWORD:-solaria2024}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-SolariaRoot2024}
+      - DB_NAME=${DB_NAME:-solaria_construction}
+      - DB_USER=${DB_USER:-solaria_user}
+      # Application
+      - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
       - PORT=3030
-      - DB_HOST=mysql
-      - DB_USER=solaria_user
-      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
-      - DB_NAME=solaria_construction
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - NODE_ENV=${NODE_ENV:-production}
+      # Project ingestion
       - REPO_PATH=/repo
+      - CI_MODE=${CI_MODE:-false}
     volumes:
-      - ../../:/repo:ro
-    depends_on:
-      mysql:
-        condition: service_healthy
+      - office_mysql_data:/var/lib/mysql
+      - ./logs:/app/logs
+      - ${REPO_PATH:-/tmp}:/repo:ro
     restart: unless-stopped
-    networks:
-      - solaria-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3030/api/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:3030/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # MySQL Database for Dashboard
-  mysql:
-    image: mysql:8.0
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
-      - MYSQL_DATABASE=solaria_construction
-      - MYSQL_USER=solaria_user
-      - MYSQL_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./infrastructure/database/mysql-init.sql:/docker-entrypoint-initdb.d/01-init.sql
-    ports:
-      - "3306:3306"
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: unless-stopped
+      start_period: 45s
     networks:
       - solaria-network
 
-  # Backend API Server - Puerto 3001 (separado del dashboard)
-  solaria-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PORT=3001
-      - DATABASE_URL=postgresql://solaria:${DB_PASSWORD}@postgres:5432/solaria_field_ops
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    volumes:
-      - ./storage:/app/storage
-      - ./logs:/app/logs
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - solaria-network
-
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_DB=solaria_field_ops
-      - POSTGRES_USER=solaria
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./infrastructure/database/init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U solaria -d solaria_field_ops"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - solaria-network
-
-  # Redis Cache
+  # ============================================================================
+  # REDIS: Cache and Queue
+  # ============================================================================
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    restart: unless-stopped
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - solaria-network
 
-  # Nginx Reverse Proxy
+  # ============================================================================
+  # WORKER: Background Job Processor
+  # ============================================================================
+  worker:
+    build:
+      context: .
+      dockerfile: worker.Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DASHBOARD_URL=http://office:3030
+      - NODE_ENV=${NODE_ENV:-production}
+    depends_on:
+      office:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # NGINX: Reverse Proxy (Optional - for production with SSL)
+  # ============================================================================
   nginx:
     image: nginx:alpine
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d
-      - ./storage:/var/www/storage
-      - ./ssl:/etc/nginx/ssl
+      - ./infrastructure/nginx/nginx.unified.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
-      - solaria-backend
-    restart: unless-stopped
-    networks:
-      - solaria-network
-
-  # AI Agent Services
-  agent-manager:
-    build:
-      context: ./agents
-      dockerfile: Dockerfile
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://solaria:${DB_PASSWORD}@postgres:5432/solaria_field_ops
-      - REDIS_URL=redis://redis:6379
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    volumes:
-      - ./agents/config:/app/config
-      - ./logs:/app/logs
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
+      office:
         condition: service_healthy
     restart: unless-stopped
+    profiles:
+      - with-proxy
     networks:
       - solaria-network
 
-  # Document Processing Service
-  document-processor:
-    build:
-      context: ./services/document-processor
-      dockerfile: Dockerfile
-    environment:
-      - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
-      - STORAGE_PATH=/app/storage
-    volumes:
-      - ./storage/documents:/app/storage/documents
-      - ./logs:/app/logs
-    depends_on:
-      - redis
-    restart: unless-stopped
-    networks:
-      - solaria-network
-
-  # MCP Server for Agent Integration
-  mcp-server:
-    build:
-      context: ./mcp-server
-      dockerfile: Dockerfile
-    environment:
-      - DASHBOARD_API_URL=http://dashboard-backend:3030/api
-      - DASHBOARD_USER=${DASHBOARD_USER:-carlosjperez}
-      - DASHBOARD_PASS=${DASHBOARD_PASS:-bypass}
-    depends_on:
-      dashboard-backend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - solaria-network
-    # Note: MCP server uses stdio transport, not HTTP
-    # To use it, connect via stdin/stdout or configure your MCP client
-
-  # File Storage Service
-  minio:
-    image: minio/minio:latest
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-    restart: unless-stopped
-    networks:
-      - solaria-network
-
+# ============================================================================
+# VOLUMES
+# ============================================================================
 volumes:
-  postgres_data:
+  office_mysql_data:
     driver: local
   redis_data:
     driver: local
-  minio_data:
-    driver: local
-  mysql_data:
-    driver: local
 
+# ============================================================================
+# NETWORKS
+# ============================================================================
 networks:
   solaria-network:
     driver: bridge

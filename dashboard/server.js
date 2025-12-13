@@ -60,37 +60,73 @@ class SolariaDashboardServer {
         this.app.use(express.static(path.join(__dirname, 'public')));
     }
 
-    async initializeDatabase() {
-        try {
-            this.db = await mysql.createConnection({
-                host: process.env.DB_HOST || 'localhost',
-                user: process.env.DB_USER || 'root',
-                password: process.env.DB_PASSWORD || '',
-                database: process.env.DB_NAME || 'solaria_construction',
-                charset: 'utf8mb4',
-                timezone: '+00:00',
-                connectTimeout: 60000,
-                waitForConnections: true,
-                connectionLimit: 10,
-                queueLimit: 0
-            });
+    /**
+     * Initialize database connection with exponential backoff retry
+     * @param {number} maxRetries - Maximum retry attempts (default: 10)
+     * @param {number} baseDelay - Base delay in ms (default: 1000)
+     */
+    async initializeDatabase(maxRetries = 10, baseDelay = 1000) {
+        const dbConfig = {
+            host: process.env.DB_HOST || 'localhost',
+            user: process.env.DB_USER || 'root',
+            password: process.env.DB_PASSWORD || '',
+            database: process.env.DB_NAME || 'solaria_construction',
+            charset: 'utf8mb4',
+            timezone: '+00:00',
+            connectTimeout: 60000,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0
+        };
 
-            console.log('✅ Database connected successfully');
-            
-            // Verificar conexión periódicamente
-            setInterval(async () => {
-                try {
-                    await this.db.execute('SELECT 1');
-                } catch (error) {
-                    console.error('❌ Database connection lost:', error);
-                    await this.initializeDatabase();
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`🔄 Database connection attempt ${attempt}/${maxRetries}...`);
+                this.db = await mysql.createConnection(dbConfig);
+
+                // Verify connection works
+                await this.db.execute('SELECT 1');
+                console.log('✅ Database connected successfully');
+
+                // Setup connection health check with auto-reconnect
+                this.setupDatabaseHealthCheck();
+                return;
+
+            } catch (error) {
+                const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 30000);
+                console.error(`❌ Database connection attempt ${attempt} failed: ${error.message}`);
+
+                if (attempt < maxRetries) {
+                    console.log(`⏳ Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('💀 All database connection attempts exhausted. Exiting.');
+                    process.exit(1);
                 }
-            }, 30000);
-
-        } catch (error) {
-            console.error('❌ Database connection failed:', error);
-            process.exit(1);
+            }
         }
+    }
+
+    /**
+     * Setup periodic database health check with auto-reconnect
+     */
+    setupDatabaseHealthCheck() {
+        // Clear any existing interval
+        if (this._dbHealthInterval) {
+            clearInterval(this._dbHealthInterval);
+        }
+
+        this._dbHealthInterval = setInterval(async () => {
+            try {
+                if (this.db) {
+                    await this.db.execute('SELECT 1');
+                }
+            } catch (error) {
+                console.error('❌ Database connection lost:', error.message);
+                console.log('🔄 Attempting to reconnect...');
+                await this.initializeDatabase(5, 2000); // Fewer retries for reconnect
+            }
+        }, 30000);
     }
 
     initializeRoutes() {

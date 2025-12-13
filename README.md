@@ -1,477 +1,277 @@
 # SOLARIA Digital Field Operations
 
-**Oficina Digital de Construccion en Campo** - Version 2.0.0
+**Oficina Digital de Construccion en Campo** - Version 3.0.0
 
 Sistema autocontenido para gestion de proyectos de software con supervision ejecutiva (CEO/CTO/COO/CFO).
 
-## Inicio Rápido (oficina single-container recomendada)
+## Arquitectura Unificada v3.0
+
+A partir de la version 3.0, DFO utiliza una **arquitectura unificada** basada en el servicio `office`:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SOLARIA DFO v3.0                         │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │           Office Container (Puerto 3030)            │    │
+│  │  ┌───────────────┐    ┌───────────────────────┐    │    │
+│  │  │   MariaDB     │    │   Node.js Dashboard   │    │    │
+│  │  │   (embedded)  │◄──►│   (Express+Socket.IO) │    │    │
+│  │  └───────────────┘    └───────────────────────┘    │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                             │                                │
+│  ┌──────────────┐    ┌─────┴─────┐    ┌──────────────┐     │
+│  │    Redis     │    │   Worker  │    │    Nginx     │     │
+│  │   (cache)    │◄──►│  (queues) │    │  (optional)  │     │
+│  └──────────────┘    └───────────┘    └──────────────┘     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Inicio Rapido
 
 ```bash
-# Levantar oficina completa (MariaDB + dashboard)
-docker compose -f docker-compose.single.yml up -d
-
-# Poblar con proyecto Akademate
-pnpm ingest-akademate
-
-# Checks
-pnpm health
-pnpm test:ui:dfo   # smoke UI/API con Playwright
-
-# MCP (obligatorio)
-pnpm mcp:dfo         # MCP API (stdio)
-pnpm mcp:playwright  # MCP UI/headless
-
-# Acceso dashboard
-http://localhost:3030  (user: carlosjperez / pass: bypass)
-```
-
-> Runbook detallado: `docs/runbooks/office.md`
-
----
-
-## Descripcion General
-
-SOLARIA Digital Field Operations es un sistema de gestion de proyectos avanzado disenado para equipos de desarrollo de software. Combina agentes IA, analiticas en tiempo real y workflows automatizados.
-
-### Key Features
-
-- **AI Agent Coordination**: Virtual agents for specialized development tasks
-- **Real-time Dashboard**: Live project monitoring and analytics
-- **Automated Project Analysis**: Repository scanning and configuration
-- **Task Management**: Intelligent task assignment and tracking
-- **Performance Metrics**: Comprehensive KPIs and analytics
-- **WebSocket Integration**: Real-time updates and collaboration
-
-## 🏗️ Architecture
-
-### Core Components
-
-#### AI Agents
-- **Project Manager**: Overall project coordination and planning
-- **Architect**: System design and technical architecture
-- **Developer**: Code implementation and feature development
-- **Tester**: Quality assurance and automated testing
-- **Analyst**: Requirements analysis and metrics reporting
-- **DevOps**: Deployment and infrastructure management
-
-#### Technology Stack
-- **Frontend**: React 18 + Vite + TailwindCSS
-- **Backend**: Node.js + Express + Socket.IO
-- **Database**: SQLite with RESTful API
-- **Real-time**: WebSocket communication
-- **Containerization**: Docker + Docker Compose
-
-#### External AI Integration
-- **Claude Code**: Advanced code generation and architecture
-- **GitHub Copilot**: Intelligent code assistance
-- **OpenAI Codex**: Automated code completion
-- **ChatGPT**: Documentation and analysis
-
-## 🚀 Workflow
-
-### 1. Repository Analysis
-```bash
-# Automated repository analysis and setup
-npm run auto-deploy --repo=https://github.com/user/project
-```
-
-### 2. Project Configuration
-- **Documentation Analysis**: README.md and technical docs parsing
-- **Project Type Detection**: Web, mobile, backend, or full-stack identification
-- **Requirements Extraction**: Automated specification gathering
-- **Agent Team Setup**: Specialized AI agent configuration
-- **Metrics Configuration**: Custom KPIs and analytics setup
-
-### 3. Dashboard Management
-- **Task Board**: Visual project management interface
-- **Progress Analytics**: Real-time charts and metrics
-- **Team Collaboration**: Agent coordination and communication
-- **Issue Tracking**: Bug and feature request management
-- **Performance Reports**: Comprehensive analytics dashboard
-
-### 4. AI Agent Execution
-Agents provide automated assistance for:
-- **Task Assignment**: Intelligent workload distribution
-- **Feature Development**: Automated code generation
-- **Bug Resolution**: Automated debugging and fixes
-- **Documentation**: Auto-generated technical documentation
-- **Cross-agent Coordination**: Collaborative problem solving
-
-## 📁 Project Structure
-
-```
-solaria-digital-field-operations/
-├── backend/                     # Node.js API Server
-│   ├── server.js               # Main application server
-│   └── package.json            # Backend dependencies
-├── frontend/                    # React Dashboard
-│   ├── src/
-│   │   ├── components/         # Reusable UI components
-│   │   ├── pages/             # Dashboard pages
-│   │   ├── contexts/          # React contexts
-│   │   └── main.jsx           # Application entry point
-│   ├── public/                # Static assets
-│   └── package.json           # Frontend dependencies
-├── scripts/                     # Automation Scripts
-│   ├── ai-agent-coordinator.js # Agent management system
-│   ├── auto-deploy.js          # Repository deployment
-│   ├── project-analyzer.js     # Code analysis tools
-│   └── agent-setup.js          # Agent configuration
-├── docker-compose.yml           # Container orchestration
-├── package.json                # Root package configuration
-└── README.md                   # Project documentation
-```
-
-## 📊 Dashboard Features
-
-### Task Management
-```javascript
-// Task structure with intelligent assignment
-const tasks = [
-  {
-    id: 'TASK-001',
-    title: 'Implement authentication API',
-    type: 'feature',
-    status: 'in-progress',
-    assignee: 'developer-agent',
-    priority: 'high',
-    estimated: '3 days',
-    technologies: ['nodejs', 'express', 'jwt'],
-    dependencies: ['database-schema-design']
-  },
-  {
-    id: 'TASK-002', 
-    title: 'Fix login validation bug',
-    type: 'bug',
-    status: 'identified',
-    assignee: 'tester-agent',
-    priority: 'critical',
-    estimated: '1 day',
-    affected: 'authentication-module'
-  }
-];
-```
-
-### Analytics & Metrics
-- **Development Velocity**: Features completed per sprint
-- **Quality Metrics**: Test coverage and bug resolution rates
-- **Performance Analytics**: System response times and resource usage
-- **Team Productivity**: Agent efficiency and task completion rates
-
-### Agent Management
-- **Active Agents**: Real-time AI agent status monitoring
-- **Performance Tracking**: Individual agent productivity metrics
-- **Task Assignment**: Intelligent workload distribution
-- **Collaboration**: Cross-agent communication and coordination
-
-## 🔌 AI Integration
-
-### Claude Code Integration
-```javascript
-const claudeIntegration = {
-  endpoint: 'https://api.anthropic.com/v1',
-  model: 'claude-3-opus-20240229',
-  capabilities: [
-    'code_generation',
-    'architecture_design', 
-    'debugging',
-    'documentation',
-    'code_review'
-  ],
-  taskTypes: [
-    'feature_development',
-    'bug_fixing',
-    'code_refactoring',
-    'technical_design'
-  ]
-};
-```
-
-### GitHub Copilot Integration
-```javascript
-const copilotIntegration = {
-  endpoint: 'github-copilot-api',
-  capabilities: [
-    'code_completion',
-    'suggestion_generation',
-    'pattern_recognition'
-  ],
-  context: 'full_project_context'
-};
-```
-
-## 🚀 Auto-Deployment System
-
-### Automated Workflow
-1. **Repository Cloning**: Secure project download
-2. **Structure Analysis**: Technology stack identification
-3. **Dashboard Configuration**: Customized setup
-4. **Agent Deployment**: AI assistant activation
-5. **Task Board Creation**: Issue/task import
-6. **Metrics Setup**: KPI configuration
-7. **System Activation**: Ready-to-use dashboard
-
-### Web App Deployment Example
-```bash
-# Deploy web application project
-npm run auto-deploy \
-  --repo=https://github.com/company/my-web-app \
-  --type=web-app \
-  --team-size=5 \
-  --timeline=8-weeks
-
-# Results:
-✅ Analyzed: React + Node.js + MongoDB
-✅ Configured: Web development dashboard
-✅ Activated: 5 specialized AI agents
-✅ Imported: 47 tasks from GitHub Issues
-✅ Established: Web development metrics
-✅ Ready: Active digital management system
-```
-
-### Use Cases
-
-#### New Web Project
-```bash
-npm run auto-deploy --repo=https://github.com/startup/saas-app
-
-# Automatic configuration:
-- React + TypeScript + Node.js detection
-- Web development agent setup
-- GitHub issues task board creation
-- Web development metrics establishment
-- Claude/Copilot integration preparation
-```
-
-#### Legacy System Migration
-```bash
-npm run auto-deploy --repo=https://github.com/company/legacy-system
-
-# System capabilities:
-- Existing code analysis
-- Technical debt identification
-- Refactoring planning
-- Modernization agent assignment
-- Migration metrics establishment
-```
-
-#### Distributed Team Setup
-```bash
-npm run auto-deploy --repo=https://github.com/org/distributed-app --team=remote
-
-# Remote team features:
-- Remote work agent configuration
-- Communication channel setup
-- Productivity dashboard creation
-- Collaboration tool integration
-- Distributed progress monitoring
-```
-
-## ⚙️ Agent Configuration
-
-### Developer Agent
-```json
-{
-  "name": "Developer Agent",
-  "role": "software_development",
-  "ai_integration": "claude-code",
-  "capabilities": [
-    "feature_development",
-    "bug_fixing", 
-    "code_refactoring",
-    "testing",
-    "documentation"
-  ],
-  "task_types": [
-    "build_new_feature",
-    "fix_bug",
-    "optimize_performance",
-    "write_tests",
-    "update_documentation"
-  ],
-  "tools": [
-    "vscode",
-    "git",
-    "npm/yarn",
-    "testing_frameworks",
-    "claude_code"
-  ],
-  "metrics": [
-    "features_completed",
-    "bugs_fixed",
-    "code_quality",
-    "test_coverage",
-    "documentation_completeness"
-  ]
-}
-```
-
-### Architect Agent
-```json
-{
-  "name": "Architect Agent", 
-  "role": "software_architecture",
-  "ai_integration": "claude-opus",
-  "capabilities": [
-    "system_design",
-    "architecture_planning",
-    "technology_selection",
-    "api_design",
-    "database_design"
-  ],
-  "deliverables": [
-    "architecture_diagrams",
-    "technical_specifications", 
-    "api_documentation",
-    "database_schemas",
-    "deployment_strategies"
-  ]
-}
-```
-
-## 📈 Metrics & KPIs
-
-### Development Metrics
-- **Velocity**: Features completed per sprint
-- **Burndown**: Remaining work tracking
-- **Quality Gates**: Test pass/fail rates
-- **Bug Rate**: Bugs per feature ratio
-- **Code Coverage**: Test coverage percentage
-- **Deployment Frequency**: Weekly deployment count
-- **Performance**: Response time metrics
-
-### Real-time Dashboard
-```javascript
-const realTimeStatus = {
-  project_phase: 'backend-development',
-  progress: {
-    completed: 65,
-    in_progress: 25,
-    pending: 10
-  },
-  agents: {
-    active: 5,
-    current_tasks: 3,
-    completed_today: 12
-  },
-  quality: {
-    tests_passed: 89,
-    code_coverage: 78,
-    bugs_open: 3
-  },
-  timeline: {
-    current_sprint: 'Sprint-12',
-    days_remaining: 8,
-    on_track: true
-  }
-};
-```
-
-## 🎨 User Interface
-
-### Design System
-- **Modern Theme**: Professional dark mode interface
-- **Task Cards**: Interactive task management
-- **Progress Visualization**: Real-time progress bars
-- **Team Management**: Agent status displays
-- **Milestone Tracking**: Project milestone visualization
-
-### Visual Elements
-- **Status Indicators**: Real-time status updates
-- **Progress Metrics**: Visual progress tracking
-- **Agent Avatars**: AI agent representations
-- **Technical Documentation**: Integrated documentation view
-- **Analytics Dashboard**: Comprehensive metrics display
-
-## 🚀 Quick Start
-
-### Installation
-```bash
-# 1. Clone the repository
-git clone https://github.com/SOLARIA-AGENCY/solaria-digital-field-operations.git
-cd solaria-digital-field-operations
-
-# 2. Install dependencies
-npm install
-
-# 3. Set up environment
+# 1. Clonar y configurar
+git clone https://github.com/SOLARIA-AGENCY/solaria-digital-field--operations.git
+cd solaria-digital-field--operations
 cp .env.example .env
-# Edit .env with your configuration
 
-# 4. Start the application
-npm run dev
+# 2. Levantar servicios (3 contenedores: office, redis, worker)
+docker compose up -d
+
+# 3. Verificar estado
+docker compose ps
+curl http://localhost:3030/api/health
+
+# 4. Acceder al dashboard
+# URL: http://localhost:3030
+# Usuario: carlosjperez
+# Password: bypass
 ```
 
-### Auto-Deploy Your Project
+## Comandos Utiles
+
 ```bash
-# Deploy system for your project
-npm run auto-deploy --repo=YOUR_REPOSITORY_URL
+# Desarrollo
+docker compose up -d              # Iniciar servicios
+docker compose logs -f office     # Ver logs del dashboard
+docker compose down               # Detener servicios
 
-# Access the dashboard
-http://localhost:3000
+# Testing
+pnpm test                         # Tests API y integracion
+pnpm test:ui                      # Tests UI con Playwright
+
+# Mantenimiento
+docker compose restart office     # Reiniciar dashboard
+docker volume ls                  # Ver volumenes
+docker compose down -v            # Eliminar datos (CUIDADO)
+
+# Proyecto Akademate
+pnpm ingest-akademate             # Poblar con datos de Akademate
 ```
 
-### Development Mode
+## Configuracion
+
+### Variables de Entorno (.env)
+
 ```bash
-# Start development servers
-npm run dev
+# Base de datos (NO usar caracteres especiales en passwords)
+DB_PASSWORD=solaria2024
+MYSQL_ROOT_PASSWORD=SolariaRoot2024
+DB_NAME=solaria_construction
+DB_USER=solaria_user
 
-# Access points:
-# Dashboard: http://localhost:3000
-# API: http://localhost:3001/api
-# Real-time: WebSocket on port 3001
+# Aplicacion
+NODE_ENV=production
+PORT=3030
+JWT_SECRET=your_secret_min_32_chars
+
+# Proyecto a monitorear (opcional)
+REPO_PATH=/path/to/your/project
+PROJECT_NAME=MyProject
+CI_MODE=false
 ```
 
-### Docker Deployment
+> **IMPORTANTE**: Evitar caracteres especiales (!@#$%^&*) en passwords para prevenir problemas de escaping en bash.
+
+## Servicios
+
+| Servicio | Puerto | Descripcion |
+|----------|--------|-------------|
+| office | 3030 | Dashboard C-Suite + API REST + MariaDB |
+| redis | 6379 | Cache y cola de trabajos |
+| worker | - | Procesador de trabajos en background |
+| nginx | 80/443 | Reverse proxy (opcional, con `--profile with-proxy`) |
+
+## API Endpoints
+
+### Autenticacion
+- `POST /api/auth/login` - Iniciar sesion
+- `POST /api/auth/logout` - Cerrar sesion
+- `GET /api/auth/verify` - Verificar token
+
+### Proyectos
+- `GET /api/projects` - Listar proyectos
+- `POST /api/projects` - Crear proyecto
+- `GET /api/projects/:id` - Detalle de proyecto
+- `PUT /api/projects/:id` - Actualizar proyecto
+
+### Tareas
+- `GET /api/tasks` - Listar tareas
+- `POST /api/tasks` - Crear tarea
+- `GET /api/tasks/:id` - Detalle de tarea
+- `PUT /api/tasks/:id` - Actualizar tarea
+
+### Agentes IA
+- `GET /api/agents` - Listar agentes
+- `GET /api/agents/:id` - Estado de agente
+- `PUT /api/agents/:id/status` - Actualizar estado
+
+### C-Suite Dashboards
+- `GET /api/csuite/ceo` - Vista CEO
+- `GET /api/csuite/cto` - Vista CTO
+- `GET /api/csuite/coo` - Vista COO
+- `GET /api/csuite/cfo` - Vista CFO
+
+### Integracion de Agentes
+- `POST /api/agent/register-doc` - Registrar documento
+- `POST /api/agent/update-project` - Actualizar proyecto
+- `POST /api/agent/add-task` - Agregar tarea
+- `POST /api/agent/log-activity` - Registrar actividad
+
+## Estructura del Proyecto
+
+```
+solaria-digital-field--operations/
+├── dashboard/                    # C-Suite Dashboard
+│   ├── server.js                # Express + Socket.IO server
+│   ├── public/                  # Static HTML/CSS/JS
+│   └── Dockerfile
+├── workers/                      # Background job processor
+│   └── index.js                 # Redis queue consumer
+├── mcp-server/                  # MCP para agentes IA
+│   └── server.js                # Stdio-based MCP server
+├── infrastructure/
+│   ├── database/
+│   │   └── mysql-init.sql       # Schema inicial
+│   └── nginx/
+│       └── nginx.unified.conf   # Config nginx consolidada
+├── tests/
+│   ├── ui-smoke.spec.ts         # Tests UI
+│   ├── api.spec.ts              # Tests API
+│   └── integration.spec.ts      # Tests integracion
+├── docker-compose.yml           # Compose unificado v3.0
+├── office.Dockerfile            # Imagen office
+├── office-entrypoint.sh         # Entrypoint con retry logic
+├── .env.example                 # Variables de entorno ejemplo
+└── README.md
+```
+
+## Caracteristicas Clave
+
+### Retry Logic en Base de Datos
+El servidor incluye reconexion automatica con backoff exponencial:
+- 10 intentos maximos al inicio
+- Delay incremental (1s, 2s, 4s, 8s... max 30s)
+- Health check cada 30 segundos
+- Reconexion automatica si pierde conexion
+
+### WebSocket (Socket.IO)
+Actualizaciones en tiempo real para:
+- Estados de agentes
+- Metricas de proyectos
+- Alertas criticas
+- Cambios en tareas
+
+### Seguridad
+- Autenticacion JWT
+- Rate limiting
+- CORS configurado
+- Headers de seguridad (Helmet)
+- CSP permisivo para CDNs
+
+## Testing
+
 ```bash
-# Using Docker Compose
-docker-compose up -d
+# Instalar dependencias de test
+pnpm install
 
-# Access the application
-http://localhost:3000
+# Tests API (requiere servicios activos)
+pnpm exec playwright test tests/api.spec.ts
+
+# Tests de integracion
+pnpm exec playwright test tests/integration.spec.ts
+
+# Tests UI smoke
+pnpm exec playwright test tests/ui-smoke.spec.ts
+
+# Todos los tests
+pnpm test
 ```
 
-## 📚 Documentation
+## Troubleshooting
 
-- [User Guide](./docs/user-guide.md) - Complete user documentation
-- [Agent Configuration](./docs/agents.md) - AI agent setup and management
-- [API Reference](./docs/api.md) - REST API documentation
-- [Development Guide](./docs/development.md) - Contributor guidelines
-
-## 🔧 Configuration
-
-### Environment Variables
+### Dashboard no arranca
 ```bash
-# Database
-DATABASE_URL=./solaria_dfo.db
+# Ver logs
+docker compose logs office
 
-# Server
-PORT=3001
-FRONTEND_URL=http://localhost:3000
-
-# AI Services
-ANTHROPIC_API_KEY=your_anthropic_key
-OPENAI_API_KEY=your_openai_key
-GITHUB_TOKEN=your_github_token
+# Problemas comunes:
+# 1. MariaDB no esta listo - esperar 30-45 segundos
+# 2. Password con caracteres especiales - simplificar en .env
+# 3. Puerto 3030 ocupado - verificar con lsof -i :3030
 ```
 
-## 🤝 Contributing
+### Base de datos no conecta
+```bash
+# Verificar que MariaDB esta corriendo
+docker compose exec office mariadb-admin ping
 
-We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
+# Reset completo (elimina datos!)
+docker compose down -v
+docker compose up -d
+```
 
-### Development Process
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+### Tests fallan
+```bash
+# Verificar que servicios estan activos
+curl http://localhost:3030/api/health
 
-## 📄 License
+# Ver estado de contenedores
+docker compose ps
+```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Migracion desde v2.0
+
+Si usabas `docker-compose.single.yml` o el multi-container setup:
+
+1. Respaldar datos si necesario
+2. Actualizar a version 3.0
+3. Usar el nuevo `docker-compose.yml` unificado
+4. Las credenciales ahora son simplificadas (sin caracteres especiales)
+
+```bash
+# Eliminar volumenes antiguos (CUIDADO - pierde datos)
+docker compose down -v
+docker volume rm solaria-digital-field--operations_mysql_data
+
+# Levantar con nuevos volumenes
+docker compose up -d
+```
+
+## Contribuir
+
+1. Fork el repositorio
+2. Crear branch: `git checkout -b feature/mi-feature`
+3. Commit: `git commit -m "feat: mi feature"`
+4. Push: `git push origin feature/mi-feature`
+5. Crear Pull Request
+
+## Licencia
+
+MIT License - Ver [LICENSE](LICENSE)
 
 ---
 
-**SOLARIA Digital Field Operations** - *AI-Powered Project Management*
+**SOLARIA Digital Field Operations** - *Gestion de proyectos potenciada por IA*
 
-© 2024 SOLARIA AGENCY. All rights reserved.
+© 2024-2025 SOLARIA AGENCY. Todos los derechos reservados.
