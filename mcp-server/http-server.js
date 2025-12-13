@@ -137,9 +137,9 @@ app.get("/", (req, res) => {
 });
 
 /**
- * Health check
+ * Health check (supports both /health and /mcp/health)
  */
-app.get("/health", async (req, res) => {
+async function healthHandler(req, res) {
   try {
     // Check dashboard connectivity
     const response = await fetch(`${DASHBOARD_API}/health`);
@@ -158,7 +158,11 @@ app.get("/health", async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   }
-});
+}
+
+// Register health check on multiple paths
+app.get("/health", healthHandler);
+app.get("/mcp/health", healthHandler);
 
 /**
  * Initialize MCP session with project context
