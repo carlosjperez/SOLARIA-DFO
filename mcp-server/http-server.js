@@ -203,10 +203,13 @@ app.post("/mcp", async (req, res) => {
     // Get session or project context
     const sessionId = req.headers["mcp-session-id"];
     const projectIdHeader = req.headers["x-project-id"];
+    const adminModeHeader = req.headers["x-admin-mode"];
     const session = getSession(sessionId);
 
     const context = {
       project_id: session?.project_id || (projectIdHeader ? parseInt(projectIdHeader) : null),
+      // Admin mode: explicit header OR no project_id
+      adminMode: adminModeHeader === "true" || adminModeHeader === "1",
     };
 
     // Update session activity
