@@ -587,7 +587,7 @@ class SolariaDashboardServer {
             const [projects] = await this.db.execute(`
                 SELECT
                     p.id, p.name, p.description, p.client, p.status, p.priority,
-                    p.budget, p.start_date, p.end_date, p.completion_percentage,
+                    p.budget, p.start_date, p.deadline as end_date, p.completion_percentage,
                     (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as task_count,
                     (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'pending') as pending_tasks,
                     (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks

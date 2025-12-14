@@ -293,6 +293,93 @@ const testDashboardAlerts = test('Dashboard: Get alerts', async () => {
     assert(Array.isArray(data), 'Response should be an array');
 });
 
+// ==================== PUBLIC API TESTS (No Auth Required) ====================
+
+// Helper for public endpoints (no auth token)
+async function fetchPublicJson(url) {
+    const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' }
+    });
+    return { status: response.status, data: await response.json() };
+}
+
+const testPublicProjectsList = test('Public API: List projects without auth', async () => {
+    const { status, data } = await fetchPublicJson(`${API_BASE}/public/projects`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(data.projects, 'Response should have projects array');
+    assert(Array.isArray(data.projects), 'projects should be an array');
+});
+
+const testPublicProjectsHaveFields = test('Public API: Projects have required fields', async () => {
+    const { data } = await fetchPublicJson(`${API_BASE}/public/projects`);
+    if (data.projects.length > 0) {
+        const project = data.projects[0];
+        assert(project.id, 'Project should have id');
+        assert(project.name, 'Project should have name');
+        assert(project.status, 'Project should have status');
+        assert(project.budget !== undefined, 'Project should have budget');
+        assert(project.task_count !== undefined, 'Project should have task_count');
+    }
+});
+
+const testPublicBusinessesList = test('Public API: List businesses without auth', async () => {
+    const { status, data } = await fetchPublicJson(`${API_BASE}/public/businesses`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(data.businesses, 'Response should have businesses array');
+    assert(Array.isArray(data.businesses), 'businesses should be an array');
+});
+
+const testPublicBusinessesHaveFields = test('Public API: Businesses have required fields', async () => {
+    const { data } = await fetchPublicJson(`${API_BASE}/public/businesses`);
+    if (data.businesses.length > 0) {
+        const business = data.businesses[0];
+        assert(business.id, 'Business should have id');
+        assert(business.name, 'Business should have name');
+        assert(business.status, 'Business should have status');
+    }
+});
+
+const testPublicTasksList = test('Public API: List tasks without auth', async () => {
+    const { status, data } = await fetchPublicJson(`${API_BASE}/public/tasks`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(data.tasks, 'Response should have tasks array');
+    assert(Array.isArray(data.tasks), 'tasks should be an array');
+});
+
+const testPublicTasksWithProjectFilter = test('Public API: Filter tasks by project_id', async () => {
+    const { data: projectsData } = await fetchPublicJson(`${API_BASE}/public/projects`);
+    if (projectsData.projects.length > 0) {
+        const projectId = projectsData.projects[0].id;
+        const { status, data } = await fetchPublicJson(`${API_BASE}/public/tasks?project_id=${projectId}`);
+        assertEqual(status, 200, 'Status should be 200');
+        assert(data.tasks, 'Response should have tasks array');
+    }
+});
+
+const testPublicDashboard = test('Public API: Get dashboard stats without auth', async () => {
+    const { status, data } = await fetchPublicJson(`${API_BASE}/public/dashboard`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(data.projects, 'Response should have projects stats');
+    assert(data.tasks, 'Response should have tasks stats');
+    assert(data.businesses, 'Response should have businesses stats');
+});
+
+const testPublicDashboardHasCorrectStats = test('Public API: Dashboard stats have correct fields', async () => {
+    const { data } = await fetchPublicJson(`${API_BASE}/public/dashboard`);
+
+    // Projects stats
+    assert(data.projects.total_projects !== undefined, 'Should have total_projects');
+    assert(data.projects.total_budget !== undefined, 'Should have total_budget');
+
+    // Tasks stats
+    assert(data.tasks.total_tasks !== undefined, 'Should have total_tasks');
+    assert(data.tasks.completed !== undefined, 'Should have completed tasks count');
+    assert(data.tasks.pending !== undefined, 'Should have pending tasks count');
+
+    // Businesses stats
+    assert(data.businesses.total_businesses !== undefined, 'Should have total_businesses');
+});
+
 // ==================== RUN ALL TESTS ====================
 
 async function runTests() {
@@ -331,7 +418,16 @@ async function runTests() {
         testLogsHaveRequiredFields,
         // Dashboard
         testDashboardOverview,
-        testDashboardAlerts
+        testDashboardAlerts,
+        // Public API (No Auth Required)
+        testPublicProjectsList,
+        testPublicProjectsHaveFields,
+        testPublicBusinessesList,
+        testPublicBusinessesHaveFields,
+        testPublicTasksList,
+        testPublicTasksWithProjectFilter,
+        testPublicDashboard,
+        testPublicDashboardHasCorrectStats
     ];
 
     for (const runTest of tests) {
