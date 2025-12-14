@@ -339,6 +339,385 @@ const testPublicBusinessesHaveFields = test('Public API: Businesses have require
     }
 });
 
+const testPublicBusinessesHaveAllFields = test('Public API: Businesses have all expected fields', async () => {
+    const { data } = await fetchPublicJson(`${API_BASE}/public/businesses`);
+    if (data.businesses.length > 0) {
+        const business = data.businesses[0];
+        const requiredFields = ['id', 'name', 'description', 'website', 'status', 'revenue', 'expenses', 'profit', 'logo_url'];
+        for (const field of requiredFields) {
+            assert(field in business, `Business should have field: ${field}`);
+        }
+    }
+});
+
+// ==================== BUSINESSES API TESTS (Authenticated) ====================
+
+const testBusinessesList = test('Businesses: List all businesses', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/businesses`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(data.businesses, 'Response should have businesses');
+    assert(Array.isArray(data.businesses), 'businesses should be an array');
+});
+
+const testBusinessesHaveRequiredFields = test('Businesses: Have required fields', async () => {
+    const { data } = await fetchJson(`${API_BASE}/businesses`);
+    if (data.businesses.length > 0) {
+        const business = data.businesses[0];
+        assert(business.id, 'Business should have id');
+        assert(business.name, 'Business should have name');
+        assert(business.status, 'Business should have status');
+    }
+});
+
+const testBusinessesHaveAllFields = test('Businesses: Have all expected fields', async () => {
+    const { data } = await fetchJson(`${API_BASE}/businesses`);
+    if (data.businesses.length > 0) {
+        const business = data.businesses[0];
+        const requiredFields = ['id', 'name', 'description', 'website', 'status', 'revenue', 'expenses', 'profit', 'logo_url'];
+        for (const field of requiredFields) {
+            assert(field in business, `Business should have field: ${field}`);
+        }
+    }
+});
+
+const testBusinessDetail = test('Businesses: Get single business detail', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const businessId = listData.businesses[0].id;
+        const { status, data } = await fetchJson(`${API_BASE}/businesses/${businessId}`);
+        assertEqual(status, 200, 'Status should be 200');
+        assert(data.business, 'Response should have business');
+        assertEqual(data.business.id, businessId, 'Business ID should match');
+    }
+});
+
+const testBusinessDetailNotFound = test('Businesses: Return 404 for non-existent business', async () => {
+    const { status } = await fetchJson(`${API_BASE}/businesses/99999`);
+    assertEqual(status, 404, 'Status should be 404 for non-existent business');
+});
+
+const testBusinessUpdateName = test('Businesses: Update name field', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalName = business.name;
+        const testName = 'TEST NAME UPDATE';
+
+        // Update
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name: testName })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(updated.business.name, testName, 'Name should be updated');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ name: originalName })
+        });
+    }
+});
+
+const testBusinessUpdateDescription = test('Businesses: Update description field', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalDesc = business.description;
+        const testDesc = 'TEST DESCRIPTION UPDATE';
+
+        // Update
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ description: testDesc })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(updated.business.description, testDesc, 'Description should be updated');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ description: originalDesc })
+        });
+    }
+});
+
+const testBusinessUpdateWebsite = test('Businesses: Update website field', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalWebsite = business.website;
+        const testWebsite = 'https://test-website.com';
+
+        // Update
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ website: testWebsite })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(updated.business.website, testWebsite, 'Website should be updated');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ website: originalWebsite })
+        });
+    }
+});
+
+const testBusinessUpdateStatus = test('Businesses: Update status field', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalStatus = business.status;
+        const testStatus = originalStatus === 'active' ? 'inactive' : 'active';
+
+        // Update
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: testStatus })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(updated.business.status, testStatus, 'Status should be updated');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: originalStatus })
+        });
+    }
+});
+
+const testBusinessUpdateRevenue = test('Businesses: Update revenue field', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalRevenue = business.revenue;
+        const testRevenue = 50000.50;
+
+        // Update
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ revenue: testRevenue })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(parseFloat(updated.business.revenue), testRevenue, 'Revenue should be updated');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ revenue: originalRevenue })
+        });
+    }
+});
+
+const testBusinessUpdateExpenses = test('Businesses: Update expenses field', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalExpenses = business.expenses;
+        const testExpenses = 25000.25;
+
+        // Update
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ expenses: testExpenses })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(parseFloat(updated.business.expenses), testExpenses, 'Expenses should be updated');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ expenses: originalExpenses })
+        });
+    }
+});
+
+const testBusinessUpdateProfit = test('Businesses: Update profit field', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalProfit = business.profit;
+        const testProfit = 25000.25;
+
+        // Update
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ profit: testProfit })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(parseFloat(updated.business.profit), testProfit, 'Profit should be updated');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ profit: originalProfit })
+        });
+    }
+});
+
+const testBusinessUpdateLogoUrl = test('Businesses: Update logo_url field', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalLogoUrl = business.logo_url;
+        const testLogoUrl = 'https://example.com/logo-test.png';
+
+        // Update
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ logo_url: testLogoUrl })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(updated.business.logo_url, testLogoUrl, 'Logo URL should be updated');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ logo_url: originalLogoUrl })
+        });
+    }
+});
+
+const testBusinessUpdateMultipleFields = test('Businesses: Update multiple fields at once', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const original = { ...business };
+        const testData = {
+            name: 'MULTI UPDATE TEST',
+            description: 'Multi field test description',
+            revenue: 100000,
+            expenses: 50000,
+            profit: 50000
+        };
+
+        // Update multiple fields
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(testData)
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify all fields
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(updated.business.name, testData.name, 'Name should be updated');
+        assertEqual(updated.business.description, testData.description, 'Description should be updated');
+        assertEqual(parseFloat(updated.business.revenue), testData.revenue, 'Revenue should be updated');
+        assertEqual(parseFloat(updated.business.expenses), testData.expenses, 'Expenses should be updated');
+        assertEqual(parseFloat(updated.business.profit), testData.profit, 'Profit should be updated');
+
+        // Restore all fields
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                name: original.name,
+                description: original.description,
+                revenue: original.revenue,
+                expenses: original.expenses,
+                profit: original.profit
+            })
+        });
+    }
+});
+
+const testBusinessUpdateNoFields = test('Businesses: Return 400 when no fields provided', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({})
+        });
+        assertEqual(status, 400, 'Status should be 400 when no fields provided');
+    }
+});
+
+const testBusinessUpdateNotFound = test('Businesses: Return 404 when updating non-existent business', async () => {
+    const { status } = await fetchJson(`${API_BASE}/businesses/99999`, {
+        method: 'PUT',
+        body: JSON.stringify({ name: 'Test' })
+    });
+    assertEqual(status, 404, 'Status should be 404 for non-existent business');
+});
+
+const testBusinessUpdateNullWebsite = test('Businesses: Update website to null', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const originalWebsite = business.website;
+
+        // Update to null
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ website: null })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(updated.business.website, null, 'Website should be null');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ website: originalWebsite })
+        });
+    }
+});
+
+const testBusinessUpdateZeroValues = test('Businesses: Update financial fields to zero', async () => {
+    const { data: listData } = await fetchJson(`${API_BASE}/businesses`);
+    if (listData.businesses.length > 0) {
+        const business = listData.businesses[0];
+        const original = { revenue: business.revenue, expenses: business.expenses, profit: business.profit };
+
+        // Update to zeros
+        const { status } = await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ revenue: 0, expenses: 0, profit: 0 })
+        });
+        assertEqual(status, 200, 'Update should succeed');
+
+        // Verify
+        const { data: updated } = await fetchJson(`${API_BASE}/businesses/${business.id}`);
+        assertEqual(parseFloat(updated.business.revenue), 0, 'Revenue should be zero');
+        assertEqual(parseFloat(updated.business.expenses), 0, 'Expenses should be zero');
+        assertEqual(parseFloat(updated.business.profit), 0, 'Profit should be zero');
+
+        // Restore
+        await fetchJson(`${API_BASE}/businesses/${business.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(original)
+        });
+    }
+});
+
 const testPublicTasksList = test('Public API: List tasks without auth', async () => {
     const { status, data } = await fetchPublicJson(`${API_BASE}/public/tasks`);
     assertEqual(status, 200, 'Status should be 200');
@@ -424,10 +803,30 @@ async function runTests() {
         testPublicProjectsHaveFields,
         testPublicBusinessesList,
         testPublicBusinessesHaveFields,
+        testPublicBusinessesHaveAllFields,
         testPublicTasksList,
         testPublicTasksWithProjectFilter,
         testPublicDashboard,
-        testPublicDashboardHasCorrectStats
+        testPublicDashboardHasCorrectStats,
+        // Businesses API (Authenticated)
+        testBusinessesList,
+        testBusinessesHaveRequiredFields,
+        testBusinessesHaveAllFields,
+        testBusinessDetail,
+        testBusinessDetailNotFound,
+        testBusinessUpdateName,
+        testBusinessUpdateDescription,
+        testBusinessUpdateWebsite,
+        testBusinessUpdateStatus,
+        testBusinessUpdateRevenue,
+        testBusinessUpdateExpenses,
+        testBusinessUpdateProfit,
+        testBusinessUpdateLogoUrl,
+        testBusinessUpdateMultipleFields,
+        testBusinessUpdateNoFields,
+        testBusinessUpdateNotFound,
+        testBusinessUpdateNullWebsite,
+        testBusinessUpdateZeroValues
     ];
 
     for (const runTest of tests) {
