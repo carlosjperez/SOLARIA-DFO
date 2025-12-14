@@ -209,18 +209,35 @@ INSERT INTO agent_states (agent_id, status, current_task, last_heartbeat) VALUES
 (9, 'active', 'Updating documentation', NOW()),
 (10, 'active', 'Security audit in progress', NOW());
 
--- Insert demo project
+-- Insert demo projects
 INSERT INTO projects (name, client, description, status, priority, budget, actual_cost, completion_percentage, start_date, deadline, created_by) VALUES
-('SOLARIA Digital Field Operations', 'SOLARIA AGENCY', 'Digital Construction Field Office - Oficina de construccion autocontenida y desmantelable', 'development', 'high', 250000.00, 45000.00, 45, '2025-12-01', '2026-03-31', 1);
+('SOLARIA Digital Field Operations', 'SOLARIA AGENCY', 'Digital Construction Field Office - Oficina de construccion autocontenida y desmantelable', 'development', 'high', 250000.00, 45000.00, 45, '2025-12-01', '2026-03-31', 1),
+('Akademate.com', 'Akademate SaaS', 'Plataforma SaaS multitenant para academias y centros de formacion', 'planning', 'critical', 250000.00, 0.00, 0, NULL, '2025-06-30', 1),
+('INMOBILIARIA VIRGEN DEL ROCIO', 'Virgen del Rocio', 'Sistema de gestion inmobiliaria', 'planning', 'high', 75000.00, 0.00, 0, NULL, NULL, 1),
+('ADEPAC CANARIAS', 'ADEPAC', 'Proyecto ADEPAC Canarias', 'planning', 'high', 50000.00, 0.00, 0, NULL, NULL, 1);
 
 -- Insert demo tasks
 INSERT INTO tasks (title, description, project_id, agent_id, assigned_agent_id, status, priority, estimated_hours, actual_hours, progress) VALUES
+-- Project 1: SOLARIA DFO
 ('Setup Docker infrastructure', 'Configure Docker containers for all services', 1, 8, 8, 'completed', 'high', 8, 6, 100),
 ('Implement C-Suite Dashboard', 'Create CEO/CTO/COO/CFO dashboard views', 1, 3, 3, 'in_progress', 'critical', 40, 25, 75),
 ('Design database schema', 'Create MySQL schema for construction office', 1, 2, 2, 'completed', 'high', 16, 12, 100),
 ('Implement Quick Access', 'Add bypass authentication for development', 1, 3, 3, 'completed', 'medium', 4, 3, 100),
 ('Write Playwright tests', 'Create exhaustive E2E tests', 1, 5, 5, 'pending', 'high', 16, 0, 0),
-('Security audit', 'Review authentication and authorization', 1, 10, 10, 'pending', 'high', 8, 0, 0);
+('Security audit', 'Review authentication and authorization', 1, 10, 10, 'pending', 'high', 8, 0, 0),
+-- Project 2: Akademate.com - Milestones
+('P0 Multitenancy Core', 'Dominio→tenant, claims JWT, RLS/hooks en Payload/SDK, theming por tenant, seeds superadmin', 2, NULL, NULL, 'pending', 'critical', 80, 0, 0),
+('P0 API + Logica', 'Endpoints REST/GraphQL (tenants, users, memberships, courses, course_runs, leads), rate limiting por tenant, webhooks, API keys con scopes', 2, NULL, NULL, 'pending', 'critical', 160, 0, 0),
+('P0 Auth & Security', 'Login staff/alumno con cookies httpOnly, MFA para ops, RBAC por tenant, auditoria completa', 2, NULL, NULL, 'pending', 'critical', 80, 0, 0),
+('P1 Billing & Usage', 'Stripe (planes/checkout/portal), metering basico, suspension por impago', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
+('P1 Jobs/Infra logica', 'BullMQ+Redis, colas tenant-aware, reintentos (webhooks/email/search), observabilidad OTEL', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
+('P1 Dashboard Ops', 'Metricas globales, health checks, flags, billing overview, gestion tenants/domains', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
+('P1 Dashboard Cliente', 'CRUD catalogo/convocatorias/sedes, paginas seccionables, blog/FAQ, leads CRM simple, branding/domains, media manager', 2, NULL, NULL, 'pending', 'high', 160, 0, 0),
+('P1 Front Publica Tenant', 'Home/cursos/convocatorias/blog/paginas, SEO+sitemaps/OG/JSON-LD, formularios leads con UTM+captcha, custom domain', 2, NULL, NULL, 'pending', 'high', 120, 0, 0),
+('P1 Campus Virtual', 'Matriculas, modulos/lecciones, materiales, evaluaciones simples, progreso, certificados', 2, NULL, NULL, 'pending', 'high', 160, 0, 0),
+('P2 Storage & Media', 'R2/MinIO, uploads presignados por tenant, thumbs opcional', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0),
+('P2 Feature Flags', 'Rollout % y kill switches tenant-aware', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0),
+('P2 CI/CD & Runbooks', 'GH Actions lint/typecheck/test/build/migrate, pipelines preview, runbooks backup/restore, IaC scaffold', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0);
 
 -- Insert sample metrics
 INSERT INTO project_metrics (project_id, metric_date, completion_percentage, agent_efficiency, code_quality_score, test_coverage, total_hours_worked, tasks_completed, tasks_pending, budget_used) VALUES
@@ -245,6 +262,32 @@ INSERT INTO activity_logs (project_id, agent_id, action, details, category, leve
 (1, 8, 'deployment_started', 'Initiating deployment to staging', 'deployment', 'info'),
 (1, 5, 'tests_passed', 'All unit tests passed (45/45)', 'testing', 'info'),
 (1, 10, 'security_scan', 'Security scan completed - no critical issues', 'security', 'info');
+
+-- ============================================================================
+-- BUSINESSES - Negocios operativos (independiente de proyectos)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS businesses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    website VARCHAR(255),
+    status ENUM('inactive', 'planning', 'active', 'paused') DEFAULT 'inactive',
+    revenue DECIMAL(15, 2) DEFAULT 0,
+    expenses DECIMAL(15, 2) DEFAULT 0,
+    profit DECIMAL(15, 2) DEFAULT 0,
+    logo_url VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Initial businesses data
+INSERT INTO businesses (name, description, website, status, revenue, expenses, profit) VALUES
+('SOLARIA AGENCY', 'Agencia de desarrollo digital', 'https://solaria.agency', 'inactive', 0, 0, 0),
+('AKADEMATE.COM', 'Plataforma SaaS educativa', 'https://akademate.com', 'inactive', 0, 0, 0),
+('INSCOUTER.COM', 'Plataforma de scouting', 'https://inscouter.com', 'inactive', 0, 0, 0),
+('NAZCATRADE', 'Plataforma de trading', NULL, 'inactive', 0, 0, 0);
 
 -- ============================================================================
 -- PROJECT EXTENDED DATA (PWA Dashboard v2.0)
@@ -310,9 +353,12 @@ CREATE TABLE IF NOT EXISTS project_requests (
     FOREIGN KEY (assigned_to) REFERENCES ai_agents(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insert demo client data for existing project
+-- Insert demo client data for all projects
 INSERT INTO project_clients (project_id, name, fiscal_name, rfc, website, address, contact_name, contact_email, contact_phone) VALUES
-(1, 'SOLARIA AGENCY', 'SOLARIA AGENCY S.A. de C.V.', 'SOL240101XXX', 'https://solaria.agency', 'Av. Reforma 123, Col. Centro, CDMX, Mexico', 'Carlos J. Perez', 'carlos@solaria.agency', '+52 55 1234 5678');
+(1, 'SOLARIA AGENCY', 'SOLARIA AGENCY S.A. de C.V.', 'SOL240101XXX', 'https://solaria.agency', 'Av. Reforma 123, Col. Centro, CDMX, Mexico', 'Carlos J. Perez', 'carlos@solaria.agency', '+52 55 1234 5678'),
+(2, 'Akademate SaaS', 'Akademate Technologies S.L.', 'B12345678', 'https://akademate.com', 'Madrid, Spain', 'Carlos J. Perez', 'carlos@akademate.com', '+34 600 000 000'),
+(3, 'Inmobiliaria Virgen del Rocio', 'Inmobiliaria Virgen del Rocio S.L.', 'B87654321', 'https://virgendelrocio.com', 'Sevilla, Spain', 'Cliente VDR', 'contacto@virgendelrocio.com', '+34 955 000 000'),
+(4, 'ADEPAC Canarias', 'ADEPAC Canarias S.L.', 'B11223344', 'https://adepac.es', 'Las Palmas, Canarias, Spain', 'Cliente ADEPAC', 'info@adepac.es', '+34 928 000 000');
 
 -- Insert demo documents
 INSERT INTO project_documents (project_id, name, type, url, description, uploaded_by) VALUES

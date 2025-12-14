@@ -179,6 +179,11 @@ class SolariaDashboardServer {
         this.app.post('/api/tasks', this.createTask.bind(this));
         this.app.put('/api/tasks/:id', this.updateTask.bind(this));
 
+        // Gestión de negocios (Businesses)
+        this.app.get('/api/businesses', this.getBusinesses.bind(this));
+        this.app.get('/api/businesses/:id', this.getBusiness.bind(this));
+        this.app.put('/api/businesses/:id', this.updateBusiness.bind(this));
+
         // Logs y auditoría
         this.app.get('/api/logs', this.getLogs.bind(this));
         this.app.get('/api/logs/audit', this.getAuditLogs.bind(this));
@@ -1050,6 +1055,77 @@ class SolariaDashboardServer {
         } catch (error) {
             console.error('Error deleting project request:', error);
             res.status(500).json({ error: 'Failed to delete project request' });
+        }
+    }
+
+    // Métodos de negocios (Businesses)
+    async getBusinesses(req, res) {
+        try {
+            const [businesses] = await this.db.execute(`
+                SELECT * FROM businesses ORDER BY name
+            `);
+
+            res.json({ businesses });
+        } catch (error) {
+            console.error('Error getting businesses:', error);
+            res.status(500).json({ error: 'Failed to get businesses' });
+        }
+    }
+
+    async getBusiness(req, res) {
+        try {
+            const { id } = req.params;
+            const [businesses] = await this.db.execute(
+                'SELECT * FROM businesses WHERE id = ?',
+                [id]
+            );
+
+            if (businesses.length === 0) {
+                return res.status(404).json({ error: 'Business not found' });
+            }
+
+            res.json({ business: businesses[0] });
+        } catch (error) {
+            console.error('Error getting business:', error);
+            res.status(500).json({ error: 'Failed to get business' });
+        }
+    }
+
+    async updateBusiness(req, res) {
+        try {
+            const { id } = req.params;
+            const { name, description, website, status, revenue, expenses, profit, logo_url } = req.body;
+
+            let query = 'UPDATE businesses SET ';
+            const updates = [];
+            const params = [];
+
+            if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+            if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+            if (website !== undefined) { updates.push('website = ?'); params.push(website); }
+            if (status !== undefined) { updates.push('status = ?'); params.push(status); }
+            if (revenue !== undefined) { updates.push('revenue = ?'); params.push(revenue); }
+            if (expenses !== undefined) { updates.push('expenses = ?'); params.push(expenses); }
+            if (profit !== undefined) { updates.push('profit = ?'); params.push(profit); }
+            if (logo_url !== undefined) { updates.push('logo_url = ?'); params.push(logo_url); }
+
+            if (updates.length === 0) {
+                return res.status(400).json({ error: 'No fields to update' });
+            }
+
+            query += updates.join(', ') + ' WHERE id = ?';
+            params.push(id);
+
+            const [result] = await this.db.execute(query, params);
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: 'Business not found' });
+            }
+
+            res.json({ message: 'Business updated successfully' });
+        } catch (error) {
+            console.error('Error updating business:', error);
+            res.status(500).json({ error: 'Failed to update business' });
         }
     }
 
