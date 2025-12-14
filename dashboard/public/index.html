@@ -4957,21 +4957,11 @@
             },
 
             openProject(id) {
-                console.log('[openProject] Called with id:', id, 'type:', typeof id);
-                console.log('[openProject] PROJECTS_DATA length:', PROJECTS_DATA.length);
-                console.log('[openProject] PROJECTS_DATA IDs:', PROJECTS_DATA.map(p => ({ id: p.id, type: typeof p.id, name: p.name })));
-
                 const project = PROJECTS_DATA.find(p => p.id === id);
-                console.log('[openProject] Found project:', project?.name || 'NOT FOUND');
-
-                if (!project) {
-                    console.warn('[openProject] Project not found for id:', id);
-                    return;
-                }
+                if (!project) return;
 
                 this.state.currentProjectId = id;
                 this.state.currentProject = project;
-                console.log('[openProject] Set currentProject to:', this.state.currentProject?.name);
                 this.renderProjectDetail(project);
             },
 
@@ -6869,9 +6859,6 @@
 
             async openTasksDetail() {
                 const project = this.state.currentProject;
-                console.log('[openTasksDetail] currentProject:', project);
-                console.log('[openTasksDetail] project.id:', project?.id);
-
                 if (!project) {
                     console.warn('No project selected');
                     return;
@@ -6886,26 +6873,22 @@
                 `;
 
                 try {
-                    // Fetch real tasks from API (using relative URL)
-                    const apiUrl = `/api/public/tasks?project_id=${project.id}`;
-                    console.log('[openTasksDetail] Fetching:', apiUrl);
-                    const response = await fetch(apiUrl);
-                    console.log('[openTasksDetail] Response status:', response.status);
+                    // Fetch real tasks from API
+                    const response = await fetch(`/api/public/tasks?project_id=${project.id}`);
                     const data = await response.json();
-                    console.log('[openTasksDetail] Tasks received:', data.tasks?.length);
 
                     // Transform API tasks to UI format
                     const tasks = this.transformTasksFromAPI(data.tasks || []);
-                    this.state.tasksView = 'kanban'; // Default view
-                    this.state.currentTasks = tasks; // Store for later use
+                    this.state.tasksView = 'kanban';
+                    this.state.currentTasks = tasks;
 
                     this.renderTasksDetailPage(project, tasks);
                 } catch (error) {
-                    console.error('[openTasksDetail] Error fetching tasks:', error);
+                    console.error('Error fetching tasks:', error);
                     // Fallback to mock data if API fails
                     const mockTasks = this.generateMockTasks(project);
                     this.state.tasksView = 'kanban';
-                    this.state.currentTasks = mockTasks; // Store mock tasks too!
+                    this.state.currentTasks = mockTasks;
                     this.renderTasksDetailPage(project, mockTasks);
                 }
             },
