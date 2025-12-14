@@ -325,6 +325,173 @@ export const toolDefinitions = [
       },
     },
   },
+
+  // ============================================================================
+  // MEMORY TOOLS (Integrated from Memora)
+  // Persistent agent memory with full-text search and cross-references
+  // ============================================================================
+  {
+    name: "memory_create",
+    description: "Create a new memory entry. Use this to store important information, decisions, context, or learnings that should persist across sessions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        content: { type: "string", description: "The memory content (text, notes, code snippets, decisions, etc.)" },
+        summary: { type: "string", description: "Optional short summary (max 500 chars) for quick reference" },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Tags for categorization (e.g., ['decision', 'architecture', 'bug'])",
+        },
+        metadata: {
+          type: "object",
+          description: "Additional metadata (e.g., {source: 'meeting', priority: 'high'})",
+        },
+        importance: {
+          type: "number",
+          minimum: 0,
+          maximum: 1,
+          description: "Importance score 0-1 (default: 0.5). Higher = more relevant in searches",
+        },
+      },
+      required: ["content"],
+    },
+  },
+  {
+    name: "memory_list",
+    description: "List memories with optional filters. Returns memories sorted by importance and recency.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Text search query (searches content and summary)" },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Filter by tags (returns memories with ANY of these tags)",
+        },
+        limit: { type: "number", description: "Max results to return (default: 20)" },
+        offset: { type: "number", description: "Skip first N results (for pagination)" },
+        sort_by: {
+          type: "string",
+          enum: ["importance", "created_at", "updated_at", "access_count"],
+          description: "Sort order (default: importance)",
+        },
+      },
+    },
+  },
+  {
+    name: "memory_get",
+    description: "Get a specific memory by ID. Also increments access count and updates last_accessed.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        memory_id: { type: "number", description: "Memory ID to retrieve" },
+      },
+      required: ["memory_id"],
+    },
+  },
+  {
+    name: "memory_update",
+    description: "Update an existing memory. Only provided fields are updated.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        memory_id: { type: "number", description: "Memory ID to update" },
+        content: { type: "string", description: "New content" },
+        summary: { type: "string", description: "New summary" },
+        tags: { type: "array", items: { type: "string" }, description: "New tags (replaces existing)" },
+        metadata: { type: "object", description: "New metadata (merged with existing)" },
+        importance: { type: "number", minimum: 0, maximum: 1, description: "New importance score" },
+      },
+      required: ["memory_id"],
+    },
+  },
+  {
+    name: "memory_delete",
+    description: "Delete a memory by ID. This also removes all cross-references.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        memory_id: { type: "number", description: "Memory ID to delete" },
+      },
+      required: ["memory_id"],
+    },
+  },
+  {
+    name: "memory_search",
+    description: "Search memories using full-text search. More powerful than memory_list for finding specific information.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query (uses MySQL FULLTEXT BOOLEAN MODE)" },
+        tags: { type: "array", items: { type: "string" }, description: "Filter by tags" },
+        min_importance: { type: "number", minimum: 0, maximum: 1, description: "Minimum importance score" },
+        limit: { type: "number", description: "Max results (default: 10)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "memory_tags",
+    description: "List all available memory tags with descriptions and usage counts",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "memory_stats",
+    description: "Get statistics about stored memories (counts, top tags, recent activity)",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "memory_boost",
+    description: "Boost a memory's importance score. Use when a memory proves particularly useful.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        memory_id: { type: "number", description: "Memory ID to boost" },
+        boost_amount: { type: "number", description: "Amount to add (default: 0.1, max: 0.5)" },
+      },
+      required: ["memory_id"],
+    },
+  },
+  {
+    name: "memory_related",
+    description: "Get memories related to a specific memory via cross-references",
+    inputSchema: {
+      type: "object",
+      properties: {
+        memory_id: { type: "number", description: "Memory ID to find relations for" },
+        relationship_type: {
+          type: "string",
+          enum: ["related", "depends_on", "contradicts", "supersedes", "child_of"],
+          description: "Filter by relationship type",
+        },
+      },
+      required: ["memory_id"],
+    },
+  },
+  {
+    name: "memory_link",
+    description: "Create a cross-reference link between two memories",
+    inputSchema: {
+      type: "object",
+      properties: {
+        source_id: { type: "number", description: "Source memory ID" },
+        target_id: { type: "number", description: "Target memory ID" },
+        relationship_type: {
+          type: "string",
+          enum: ["related", "depends_on", "contradicts", "supersedes", "child_of"],
+          description: "Type of relationship (default: related)",
+        },
+      },
+      required: ["source_id", "target_id"],
+    },
+  },
 ];
 
 // Resource definitions
@@ -713,6 +880,93 @@ export async function executeTool(name, args, apiCall, context = {}) {
         return (allDocs || []).filter(d => d.project_id === context.project_id);
       }
       return apiCall("/docs/list");
+
+    // ========================================================================
+    // MEMORY TOOLS - Project Isolated
+    // ========================================================================
+    case "memory_create":
+      return apiCall("/memories", {
+        method: "POST",
+        body: JSON.stringify({
+          content: args.content,
+          summary: args.summary || args.content.substring(0, 200),
+          tags: JSON.stringify(args.tags || []),
+          metadata: JSON.stringify(args.metadata || {}),
+          importance: args.importance || 0.5,
+          project_id: isIsolated ? context.project_id : (args.project_id || projectId),
+        }),
+      });
+
+    case "memory_list": {
+      const memParams = [];
+      if (isIsolated) {
+        memParams.push(`project_id=${context.project_id}`);
+      }
+      if (args?.query) memParams.push(`query=${encodeURIComponent(args.query)}`);
+      if (args?.tags) memParams.push(`tags=${encodeURIComponent(JSON.stringify(args.tags))}`);
+      if (args?.limit) memParams.push(`limit=${args.limit}`);
+      if (args?.offset) memParams.push(`offset=${args.offset}`);
+      if (args?.sort_by) memParams.push(`sort_by=${args.sort_by}`);
+      const memEndpoint = `/memories${memParams.length ? '?' + memParams.join('&') : ''}`;
+      return apiCall(memEndpoint);
+    }
+
+    case "memory_get":
+      // Get and track access
+      return apiCall(`/memories/${args.memory_id}?track_access=true`);
+
+    case "memory_update":
+      const updatePayload = {};
+      if (args.content !== undefined) updatePayload.content = args.content;
+      if (args.summary !== undefined) updatePayload.summary = args.summary;
+      if (args.tags !== undefined) updatePayload.tags = JSON.stringify(args.tags);
+      if (args.metadata !== undefined) updatePayload.metadata = JSON.stringify(args.metadata);
+      if (args.importance !== undefined) updatePayload.importance = args.importance;
+      return apiCall(`/memories/${args.memory_id}`, {
+        method: "PUT",
+        body: JSON.stringify(updatePayload),
+      });
+
+    case "memory_delete":
+      return apiCall(`/memories/${args.memory_id}`, { method: "DELETE" });
+
+    case "memory_search": {
+      const searchParams = [`query=${encodeURIComponent(args.query)}`];
+      if (isIsolated) searchParams.push(`project_id=${context.project_id}`);
+      if (args?.tags) searchParams.push(`tags=${encodeURIComponent(JSON.stringify(args.tags))}`);
+      if (args?.min_importance) searchParams.push(`min_importance=${args.min_importance}`);
+      if (args?.limit) searchParams.push(`limit=${args.limit}`);
+      return apiCall(`/memories/search?${searchParams.join('&')}`);
+    }
+
+    case "memory_tags":
+      return apiCall("/memories/tags");
+
+    case "memory_stats": {
+      const statsParams = isIsolated ? `?project_id=${context.project_id}` : '';
+      return apiCall(`/memories/stats${statsParams}`);
+    }
+
+    case "memory_boost":
+      const boostAmount = Math.min(args.boost_amount || 0.1, 0.5);
+      return apiCall(`/memories/${args.memory_id}/boost`, {
+        method: "POST",
+        body: JSON.stringify({ boost_amount: boostAmount }),
+      });
+
+    case "memory_related":
+      const relParams = args.relationship_type ? `?type=${args.relationship_type}` : '';
+      return apiCall(`/memories/${args.memory_id}/related${relParams}`);
+
+    case "memory_link":
+      return apiCall("/memories/crossrefs", {
+        method: "POST",
+        body: JSON.stringify({
+          source_memory_id: args.source_id,
+          target_memory_id: args.target_id,
+          relationship_type: args.relationship_type || "related",
+        }),
+      });
 
     default:
       throw new Error(`Unknown tool: ${name}`);

@@ -199,6 +199,19 @@ class SolariaDashboardServer {
         this.app.post('/api/agent/update-metrics', this.updateMetricsFromAgent.bind(this));
         this.app.get('/api/agent/instructions', this.getAgentInstructions.bind(this));
 
+        // ========== MEMORY API (Integrated from Memora) ==========
+        this.app.get('/api/memories', this.getMemories.bind(this));
+        this.app.get('/api/memories/search', this.searchMemories.bind(this));
+        this.app.get('/api/memories/tags', this.getMemoryTags.bind(this));
+        this.app.get('/api/memories/stats', this.getMemoryStats.bind(this));
+        this.app.get('/api/memories/:id', this.getMemory.bind(this));
+        this.app.get('/api/memories/:id/related', this.getRelatedMemories.bind(this));
+        this.app.post('/api/memories', this.createMemory.bind(this));
+        this.app.post('/api/memories/:id/boost', this.boostMemory.bind(this));
+        this.app.post('/api/memories/crossrefs', this.createMemoryCrossref.bind(this));
+        this.app.put('/api/memories/:id', this.updateMemory.bind(this));
+        this.app.delete('/api/memories/:id', this.deleteMemory.bind(this));
+
         // Servir archivos estáticos
         this.app.use(express.static(path.join(__dirname, 'public')));
         
@@ -2013,6 +2026,383 @@ class SolariaDashboardServer {
         } catch (error) {
             console.error('Load logs error:', error);
             res.status(500).json({ error: 'Failed to load logs' });
+        }
+    }
+
+    // ========== MEMORY API HANDLERS (Integrated from Memora) ==========
+
+    async getMemories(req, res) {
+        try {
+            const { project_id, query, tags, limit = 20, offset = 0, sort_by = 'importance' } = req.query;
+
+            let sql = `
+                SELECT m.*, p.name as project_name, aa.name as agent_name
+                FROM memories m
+                LEFT JOIN projects p ON m.project_id = p.id
+                LEFT JOIN ai_agents aa ON m.agent_id = aa.id
+                WHERE 1=1
+            `;
+            const params = [];
+
+            if (project_id) {
+                sql += ' AND m.project_id = ?';
+                params.push(project_id);
+            }
+
+            if (query) {
+                sql += ' AND (m.content LIKE ? OR m.summary LIKE ?)';
+                params.push(`%${query}%`, `%${query}%`);
+            }
+
+            if (tags) {
+                const tagList = JSON.parse(tags);
+                if (tagList.length > 0) {
+                    const tagConditions = tagList.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
+                    sql += ` AND (${tagConditions})`;
+                    tagList.forEach(tag => params.push(JSON.stringify(tag)));
+                }
+            }
+
+            // Sort order
+            const sortMap = {
+                'importance': 'm.importance DESC, m.created_at DESC',
+                'created_at': 'm.created_at DESC',
+                'updated_at': 'm.updated_at DESC',
+                'access_count': 'm.access_count DESC'
+            };
+            sql += ` ORDER BY ${sortMap[sort_by] || sortMap['importance']}`;
+
+            sql += ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`;
+
+            const [memories] = await this.db.execute(sql, params);
+
+            // Parse JSON fields
+            memories.forEach(m => {
+                m.tags = m.tags ? JSON.parse(m.tags) : [];
+                m.metadata = m.metadata ? JSON.parse(m.metadata) : {};
+            });
+
+            res.json({ memories, count: memories.length });
+        } catch (error) {
+            console.error('Get memories error:', error);
+            res.status(500).json({ error: 'Failed to fetch memories' });
+        }
+    }
+
+    async searchMemories(req, res) {
+        try {
+            const { query, project_id, tags, min_importance = 0, limit = 10 } = req.query;
+
+            if (!query) {
+                return res.status(400).json({ error: 'Query parameter required' });
+            }
+
+            let sql = `
+                SELECT m.*,
+                    MATCH(m.content, m.summary) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance,
+                    p.name as project_name
+                FROM memories m
+                LEFT JOIN projects p ON m.project_id = p.id
+                WHERE MATCH(m.content, m.summary) AGAINST(? IN NATURAL LANGUAGE MODE)
+                AND m.importance >= ?
+            `;
+            const params = [query, query, parseFloat(min_importance)];
+
+            if (project_id) {
+                sql += ' AND m.project_id = ?';
+                params.push(project_id);
+            }
+
+            if (tags) {
+                const tagList = JSON.parse(tags);
+                if (tagList.length > 0) {
+                    const tagConditions = tagList.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
+                    sql += ` AND (${tagConditions})`;
+                    tagList.forEach(tag => params.push(JSON.stringify(tag)));
+                }
+            }
+
+            sql += ` ORDER BY relevance DESC, m.importance DESC LIMIT ${parseInt(limit)}`;
+
+            const [memories] = await this.db.execute(sql, params);
+
+            memories.forEach(m => {
+                m.tags = m.tags ? JSON.parse(m.tags) : [];
+                m.metadata = m.metadata ? JSON.parse(m.metadata) : {};
+            });
+
+            res.json({ memories, count: memories.length, query });
+        } catch (error) {
+            console.error('Search memories error:', error);
+            res.status(500).json({ error: 'Failed to search memories' });
+        }
+    }
+
+    async getMemory(req, res) {
+        try {
+            const { id } = req.params;
+            const { track_access } = req.query;
+
+            const [memories] = await this.db.execute(`
+                SELECT m.*, p.name as project_name, aa.name as agent_name
+                FROM memories m
+                LEFT JOIN projects p ON m.project_id = p.id
+                LEFT JOIN ai_agents aa ON m.agent_id = aa.id
+                WHERE m.id = ?
+            `, [id]);
+
+            if (memories.length === 0) {
+                return res.status(404).json({ error: 'Memory not found' });
+            }
+
+            // Track access
+            if (track_access === 'true') {
+                await this.db.execute(`
+                    UPDATE memories SET access_count = access_count + 1, last_accessed = NOW() WHERE id = ?
+                `, [id]);
+            }
+
+            const memory = memories[0];
+            memory.tags = memory.tags ? JSON.parse(memory.tags) : [];
+            memory.metadata = memory.metadata ? JSON.parse(memory.metadata) : {};
+
+            res.json(memory);
+        } catch (error) {
+            console.error('Get memory error:', error);
+            res.status(500).json({ error: 'Failed to fetch memory' });
+        }
+    }
+
+    async createMemory(req, res) {
+        try {
+            const { content, summary, tags, metadata, importance = 0.5, project_id, agent_id } = req.body;
+
+            if (!content) {
+                return res.status(400).json({ error: 'Content is required' });
+            }
+
+            const [result] = await this.db.execute(`
+                INSERT INTO memories (content, summary, tags, metadata, importance, project_id, agent_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [
+                content,
+                summary || content.substring(0, 200),
+                tags || '[]',
+                metadata || '{}',
+                importance,
+                project_id || null,
+                agent_id || null
+            ]);
+
+            // Log memory event
+            await this.db.execute(`
+                INSERT INTO memory_events (memory_id, event_type, agent_id, project_id, details)
+                VALUES (?, 'created', ?, ?, ?)
+            `, [result.insertId, agent_id || null, project_id || null, JSON.stringify({ summary: summary || content.substring(0, 100) })]);
+
+            res.status(201).json({
+                id: result.insertId,
+                message: 'Memory created successfully'
+            });
+        } catch (error) {
+            console.error('Create memory error:', error);
+            res.status(500).json({ error: 'Failed to create memory' });
+        }
+    }
+
+    async updateMemory(req, res) {
+        try {
+            const { id } = req.params;
+            const updates = req.body;
+
+            const fields = [];
+            const values = [];
+
+            if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
+            if (updates.summary !== undefined) { fields.push('summary = ?'); values.push(updates.summary); }
+            if (updates.tags !== undefined) { fields.push('tags = ?'); values.push(updates.tags); }
+            if (updates.metadata !== undefined) { fields.push('metadata = ?'); values.push(updates.metadata); }
+            if (updates.importance !== undefined) { fields.push('importance = ?'); values.push(updates.importance); }
+
+            if (fields.length === 0) {
+                return res.status(400).json({ error: 'No fields to update' });
+            }
+
+            values.push(id);
+
+            const [result] = await this.db.execute(
+                `UPDATE memories SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ?`,
+                values
+            );
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: 'Memory not found' });
+            }
+
+            // Log update event
+            await this.db.execute(`
+                INSERT INTO memory_events (memory_id, event_type, details)
+                VALUES (?, 'updated', ?)
+            `, [id, JSON.stringify({ fields_updated: Object.keys(updates) })]);
+
+            res.json({ message: 'Memory updated successfully' });
+        } catch (error) {
+            console.error('Update memory error:', error);
+            res.status(500).json({ error: 'Failed to update memory' });
+        }
+    }
+
+    async deleteMemory(req, res) {
+        try {
+            const { id } = req.params;
+
+            const [result] = await this.db.execute('DELETE FROM memories WHERE id = ?', [id]);
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: 'Memory not found' });
+            }
+
+            res.json({ message: 'Memory deleted successfully' });
+        } catch (error) {
+            console.error('Delete memory error:', error);
+            res.status(500).json({ error: 'Failed to delete memory' });
+        }
+    }
+
+    async getMemoryTags(req, res) {
+        try {
+            const [tags] = await this.db.execute(`
+                SELECT id, name, description, usage_count, parent_tag_id
+                FROM memory_tags
+                ORDER BY usage_count DESC, name ASC
+            `);
+
+            res.json({ tags });
+        } catch (error) {
+            console.error('Get memory tags error:', error);
+            res.status(500).json({ error: 'Failed to fetch tags' });
+        }
+    }
+
+    async getMemoryStats(req, res) {
+        try {
+            const { project_id } = req.query;
+
+            let whereClause = '';
+            const params = [];
+            if (project_id) {
+                whereClause = 'WHERE project_id = ?';
+                params.push(project_id);
+            }
+
+            const [countResult] = await this.db.execute(
+                `SELECT COUNT(*) as total, AVG(importance) as avg_importance, SUM(access_count) as total_accesses FROM memories ${whereClause}`,
+                params
+            );
+
+            const [tagStats] = await this.db.execute(`
+                SELECT name, usage_count FROM memory_tags ORDER BY usage_count DESC LIMIT 10
+            `);
+
+            const [recentActivity] = await this.db.execute(`
+                SELECT event_type, COUNT(*) as count, MAX(created_at) as last_event
+                FROM memory_events
+                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                GROUP BY event_type
+            `);
+
+            res.json({
+                total_memories: countResult[0].total || 0,
+                avg_importance: parseFloat(countResult[0].avg_importance) || 0,
+                total_accesses: countResult[0].total_accesses || 0,
+                top_tags: tagStats,
+                recent_activity: recentActivity
+            });
+        } catch (error) {
+            console.error('Get memory stats error:', error);
+            res.status(500).json({ error: 'Failed to fetch stats' });
+        }
+    }
+
+    async boostMemory(req, res) {
+        try {
+            const { id } = req.params;
+            const { boost_amount = 0.1 } = req.body;
+
+            const safeBoost = Math.min(Math.max(parseFloat(boost_amount), 0), 0.5);
+
+            const [result] = await this.db.execute(`
+                UPDATE memories
+                SET importance = LEAST(importance + ?, 1.0), updated_at = NOW()
+                WHERE id = ?
+            `, [safeBoost, id]);
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: 'Memory not found' });
+            }
+
+            res.json({ message: 'Memory boosted successfully', boost_applied: safeBoost });
+        } catch (error) {
+            console.error('Boost memory error:', error);
+            res.status(500).json({ error: 'Failed to boost memory' });
+        }
+    }
+
+    async getRelatedMemories(req, res) {
+        try {
+            const { id } = req.params;
+            const { type } = req.query;
+
+            let sql = `
+                SELECT m.*, mc.relationship_type, mc.strength
+                FROM memory_crossrefs mc
+                JOIN memories m ON mc.target_memory_id = m.id
+                WHERE mc.source_memory_id = ?
+            `;
+            const params = [id];
+
+            if (type) {
+                sql += ' AND mc.relationship_type = ?';
+                params.push(type);
+            }
+
+            sql += ' ORDER BY mc.strength DESC, m.importance DESC';
+
+            const [related] = await this.db.execute(sql, params);
+
+            related.forEach(m => {
+                m.tags = m.tags ? JSON.parse(m.tags) : [];
+                m.metadata = m.metadata ? JSON.parse(m.metadata) : {};
+            });
+
+            res.json({ related, count: related.length });
+        } catch (error) {
+            console.error('Get related memories error:', error);
+            res.status(500).json({ error: 'Failed to fetch related memories' });
+        }
+    }
+
+    async createMemoryCrossref(req, res) {
+        try {
+            const { source_memory_id, target_memory_id, relationship_type = 'related', strength = 0.5 } = req.body;
+
+            if (!source_memory_id || !target_memory_id) {
+                return res.status(400).json({ error: 'source_memory_id and target_memory_id are required' });
+            }
+
+            const [result] = await this.db.execute(`
+                INSERT INTO memory_crossrefs (source_memory_id, target_memory_id, relationship_type, strength)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE strength = VALUES(strength), relationship_type = VALUES(relationship_type)
+            `, [source_memory_id, target_memory_id, relationship_type, strength]);
+
+            res.status(201).json({
+                id: result.insertId,
+                message: 'Cross-reference created successfully'
+            });
+        } catch (error) {
+            console.error('Create crossref error:', error);
+            res.status(500).json({ error: 'Failed to create cross-reference' });
         }
     }
 

@@ -246,6 +246,97 @@ INSERT INTO activity_logs (project_id, agent_id, action, details, category, leve
 (1, 5, 'tests_passed', 'All unit tests passed (45/45)', 'testing', 'info'),
 (1, 10, 'security_scan', 'Security scan completed - no critical issues', 'security', 'info');
 
+-- ============================================================================
+-- MEMORY SYSTEM (Integrated from Memora)
+-- Persistent agent memory with full-text search and cross-references
+-- ============================================================================
+
+-- Memories table - main memory storage
+CREATE TABLE IF NOT EXISTS memories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    project_id INT,
+    agent_id INT,
+    content TEXT NOT NULL,
+    summary VARCHAR(500),
+    metadata JSON,
+    tags JSON,
+    importance DECIMAL(3, 2) DEFAULT 0.50,
+    access_count INT DEFAULT 0,
+    last_accessed TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_project (project_id),
+    INDEX idx_agent (agent_id),
+    INDEX idx_importance (importance),
+    INDEX idx_created (created_at),
+    FULLTEXT INDEX ft_content (content, summary),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Memory tags allowlist
+CREATE TABLE IF NOT EXISTS memory_tags (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description VARCHAR(255),
+    parent_tag_id INT,
+    usage_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_name (name),
+    INDEX idx_parent (parent_tag_id),
+    FOREIGN KEY (parent_tag_id) REFERENCES memory_tags(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Memory cross-references (relationships between memories)
+CREATE TABLE IF NOT EXISTS memory_crossrefs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    source_memory_id INT NOT NULL,
+    target_memory_id INT NOT NULL,
+    relationship_type ENUM('related', 'depends_on', 'contradicts', 'supersedes', 'child_of') DEFAULT 'related',
+    strength DECIMAL(3, 2) DEFAULT 0.50,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_crossref (source_memory_id, target_memory_id),
+    INDEX idx_source (source_memory_id),
+    INDEX idx_target (target_memory_id),
+    FOREIGN KEY (source_memory_id) REFERENCES memories(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_memory_id) REFERENCES memories(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Memory events (for multi-agent coordination)
+CREATE TABLE IF NOT EXISTS memory_events (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    memory_id INT NOT NULL,
+    event_type ENUM('created', 'updated', 'deleted', 'accessed', 'shared') NOT NULL,
+    agent_id INT,
+    project_id INT,
+    details JSON,
+    consumed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_memory (memory_id),
+    INDEX idx_consumed (consumed),
+    INDEX idx_created (created_at),
+    FOREIGN KEY (memory_id) REFERENCES memories(id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Insert default memory tags
+INSERT INTO memory_tags (name, description) VALUES
+('decision', 'Architectural or technical decisions'),
+('learning', 'Learned information or insights'),
+('context', 'Project or task context'),
+('requirement', 'User or system requirements'),
+('bug', 'Bug reports or fixes'),
+('solution', 'Solutions to problems'),
+('pattern', 'Code patterns or best practices'),
+('config', 'Configuration information'),
+('credential', 'Credentials or access info (encrypted)'),
+('todo', 'Tasks to remember'),
+('meeting', 'Meeting notes'),
+('feedback', 'User or stakeholder feedback');
+
+-- ============================================================================
+
 -- Grant permissions
 GRANT ALL PRIVILEGES ON solaria_construction.* TO 'solaria_user'@'%';
 FLUSH PRIVILEGES;

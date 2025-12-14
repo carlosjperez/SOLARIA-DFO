@@ -197,6 +197,8 @@ Error: ACCESS DENIED: Cannot access project #3. You are isolated to project #1
 
 | Herramienta | Descripción |
 |-------------|-------------|
+| `set_project_context` | **OBLIGATORIO** Registrar proyecto al inicio |
+| `get_current_context` | Verificar contexto actual |
 | `get_dashboard_overview` | Ver KPIs ejecutivos |
 | `list_tasks` | Listar tareas |
 | `create_task` | Crear tarea |
@@ -204,6 +206,43 @@ Error: ACCESS DENIED: Cannot access project #3. You are isolated to project #1
 | `complete_task` | Marcar completada |
 | `list_agents` | Ver agentes |
 | `list_projects` | Ver proyectos |
+
+### Herramientas de Memoria (Integrado de Memora)
+
+Sistema de memoria persistente para almacenar decisiones, contexto y aprendizajes.
+
+| Herramienta | Descripción |
+|-------------|-------------|
+| `memory_create` | Crear nueva memoria |
+| `memory_list` | Listar memorias (filtros: tags, query, importancia) |
+| `memory_get` | Obtener memoria por ID |
+| `memory_search` | Búsqueda full-text |
+| `memory_update` | Actualizar memoria |
+| `memory_delete` | Eliminar memoria |
+| `memory_tags` | Ver tags disponibles |
+| `memory_stats` | Estadísticas de uso |
+| `memory_boost` | Aumentar importancia |
+| `memory_related` | Memorias relacionadas |
+| `memory_link` | Crear relación entre memorias |
+
+#### Tags Predefinidos
+`decision`, `learning`, `context`, `requirement`, `bug`, `solution`, `pattern`, `config`, `credential`, `todo`, `meeting`, `feedback`
+
+#### Ejemplo de Uso
+```javascript
+// Guardar una decisión arquitectónica
+memory_create({
+  content: "Usaremos JWT con refresh tokens para auth",
+  tags: ["decision", "architecture"],
+  importance: 0.8
+})
+
+// Buscar decisiones previas
+memory_search({
+  query: "authentication architecture",
+  tags: ["decision"]
+})
+```
 
 ---
 
@@ -252,6 +291,21 @@ GET    /api/tasks             - Listar
 POST   /api/tasks             - Crear
 GET    /api/tasks/:id         - Detalle
 PUT    /api/tasks/:id         - Actualizar
+```
+
+### Memorias
+```
+GET    /api/memories              - Listar (query, tags, limit, offset)
+GET    /api/memories/search       - Busqueda full-text
+GET    /api/memories/tags         - Tags disponibles
+GET    /api/memories/stats        - Estadisticas
+GET    /api/memories/:id          - Detalle
+GET    /api/memories/:id/related  - Memorias relacionadas
+POST   /api/memories              - Crear
+POST   /api/memories/:id/boost    - Aumentar importancia
+POST   /api/memories/crossrefs    - Crear relacion
+PUT    /api/memories/:id          - Actualizar
+DELETE /api/memories/:id          - Eliminar
 ```
 
 ### Agentes

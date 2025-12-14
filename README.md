@@ -202,6 +202,36 @@ Una vez conectado, tu agente IA tendra acceso a:
 - `get_dashboard_alerts` - Alertas activas
 - `log_activity` - Registrar actividad
 
+### Memoria Persistente (Integrado de Memora)
+Sistema de memoria persistente para agentes IA con busqueda full-text y referencias cruzadas.
+
+- `memory_create` - Crear nueva memoria (decisiones, contexto, aprendizajes)
+- `memory_list` - Listar memorias con filtros por tags, importancia
+- `memory_get` - Obtener memoria especifica (incrementa contador de acceso)
+- `memory_update` - Actualizar contenido de memoria
+- `memory_delete` - Eliminar memoria
+- `memory_search` - Busqueda full-text en memorias
+- `memory_tags` - Listar tags disponibles
+- `memory_stats` - Estadisticas de uso de memoria
+- `memory_boost` - Aumentar importancia de una memoria util
+- `memory_related` - Obtener memorias relacionadas via cross-references
+- `memory_link` - Crear relacion entre dos memorias
+
+#### Ejemplo de Uso de Memoria
+```
+Usuario: Recuerda que decidimos usar JWT para autenticacion
+
+Claude: Voy a crear una memoria para esta decision:
+
+[Llama a memory_create con:
+  - content: "Arquitectura de autenticacion: Usaremos JWT tokens con refresh tokens..."
+  - tags: ["decision", "architecture", "security"]
+  - importance: 0.8
+]
+
+Memoria creada con ID #15. Puedo recuperarla mas tarde con memory_search.
+```
+
 ## Ejemplo de Uso con Claude Code
 
 ```
