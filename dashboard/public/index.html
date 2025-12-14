@@ -4957,11 +4957,21 @@
             },
 
             openProject(id) {
+                console.log('[openProject] Called with id:', id, 'type:', typeof id);
+                console.log('[openProject] PROJECTS_DATA length:', PROJECTS_DATA.length);
+                console.log('[openProject] PROJECTS_DATA IDs:', PROJECTS_DATA.map(p => ({ id: p.id, type: typeof p.id, name: p.name })));
+
                 const project = PROJECTS_DATA.find(p => p.id === id);
-                if (!project) return;
+                console.log('[openProject] Found project:', project?.name || 'NOT FOUND');
+
+                if (!project) {
+                    console.warn('[openProject] Project not found for id:', id);
+                    return;
+                }
 
                 this.state.currentProjectId = id;
                 this.state.currentProject = project;
+                console.log('[openProject] Set currentProject to:', this.state.currentProject?.name);
                 this.renderProjectDetail(project);
             },
 
