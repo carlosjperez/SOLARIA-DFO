@@ -6859,6 +6859,9 @@
 
             async openTasksDetail() {
                 const project = this.state.currentProject;
+                console.log('[openTasksDetail] currentProject:', project);
+                console.log('[openTasksDetail] project.id:', project?.id);
+
                 if (!project) {
                     console.warn('No project selected');
                     return;
@@ -6874,8 +6877,12 @@
 
                 try {
                     // Fetch real tasks from API (using relative URL)
-                    const response = await fetch(`/api/public/tasks?project_id=${project.id}`);
+                    const apiUrl = `/api/public/tasks?project_id=${project.id}`;
+                    console.log('[openTasksDetail] Fetching:', apiUrl);
+                    const response = await fetch(apiUrl);
+                    console.log('[openTasksDetail] Response status:', response.status);
                     const data = await response.json();
+                    console.log('[openTasksDetail] Tasks received:', data.tasks?.length);
 
                     // Transform API tasks to UI format
                     const tasks = this.transformTasksFromAPI(data.tasks || []);
@@ -6884,7 +6891,7 @@
 
                     this.renderTasksDetailPage(project, tasks);
                 } catch (error) {
-                    console.error('Error fetching tasks:', error);
+                    console.error('[openTasksDetail] Error fetching tasks:', error);
                     // Fallback to mock data if API fails
                     const mockTasks = this.generateMockTasks(project);
                     this.state.tasksView = 'kanban';
