@@ -269,29 +269,22 @@ app.post("/mcp", async (req, res) => {
 
     switch (method) {
       case "initialize":
+        // Create or get session for this connection
+        if (!session) {
+          session = createSession(null);
+        }
+        // Set Mcp-Session-Id header as per MCP Streamable HTTP spec
+        res.setHeader("Mcp-Session-Id", session.id);
+
         result = {
-          protocolVersion: "2024-11-05",
+          protocolVersion: "2025-06-18",
           capabilities: {
             tools: {},
             resources: {},
           },
           serverInfo: {
             name: "solaria-dashboard",
-            version: "3.1.0",
-          },
-          // Session information
-          session: {
-            id: session?.id || null,
-            hint: "Use 'Mcp-Session-Id' header with this ID to maintain session state across requests.",
-          },
-          // Project isolation information
-          isolation: {
-            enabled: !!context.project_id,
-            project_id: context.project_id || null,
-            mode: context.project_id ? "isolated" : "admin",
-            message: context.project_id
-              ? `You are operating in ISOLATED MODE for project #${context.project_id}. You can only access data from this project.`
-              : "No project context set. Call 'set_project_context' with project name to isolate to a specific project.",
+            version: "3.2.0",
           },
         };
         break;
@@ -390,6 +383,11 @@ app.post("/mcp", async (req, res) => {
           id,
           error: { code: -32601, message: `Method not found: ${method}` },
         });
+    }
+
+    // Include session header in all responses (MCP Streamable HTTP spec)
+    if (session?.id) {
+      res.setHeader("Mcp-Session-Id", session.id);
     }
 
     res.json({
