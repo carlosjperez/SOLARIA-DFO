@@ -27,6 +27,9 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- Socket.IO Client -->
+    <script src="/socket.io/socket.io.js"></script>
+
     <style>
         /* ============================================
            CSS Variables - SOLARIA Design System
@@ -457,13 +460,162 @@
 
         .notification-badge {
             position: absolute;
-            top: 6px;
-            right: 6px;
-            width: 8px;
-            height: 8px;
+            top: 2px;
+            right: 2px;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
             background: #ef4444;
-            border-radius: 50%;
+            border-radius: 9px;
             border: 2px solid var(--bg-secondary);
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .notification-badge.has-notifications {
+            display: flex;
+        }
+
+        /* Notifications Panel */
+        .notifications-panel {
+            position: absolute;
+            top: calc(var(--header-height) - 8px);
+            right: 100px;
+            width: 380px;
+            max-height: 480px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .notifications-panel.show {
+            display: flex;
+        }
+
+        .notifications-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .notifications-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .notifications-clear {
+            font-size: 12px;
+            color: var(--solaria-orange);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background var(--transition-fast);
+        }
+
+        .notifications-clear:hover {
+            background: var(--bg-hover);
+        }
+
+        .notifications-list {
+            flex: 1;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        .notification-item {
+            display: flex;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .notification-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .notification-item.unread {
+            background: rgba(246, 146, 29, 0.05);
+        }
+
+        .notification-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 14px;
+        }
+
+        .notification-icon.task { background: var(--color-info-bg); color: var(--color-info); }
+        .notification-icon.project { background: var(--color-positive-bg); color: var(--color-positive); }
+        .notification-icon.business { background: rgba(168, 85, 247, 0.12); color: #a855f7; }
+        .notification-icon.alert { background: var(--color-negative-bg); color: var(--color-negative); }
+
+        .notification-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .notification-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .notification-message {
+            font-size: 12px;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .notification-time {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .notifications-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+        }
+
+        .notifications-empty i {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .notifications-empty p {
+            font-size: 13px;
         }
 
         .mode-toggle {
@@ -3516,6 +3668,20 @@
                         <span class="notification-badge" id="notificationBadge"></span>
                     </button>
 
+                    <!-- Notifications Panel -->
+                    <div class="notifications-panel" id="notificationsPanel">
+                        <div class="notifications-header">
+                            <h3><i class="fas fa-bell"></i> Notificaciones</h3>
+                            <button class="notifications-clear" id="clearNotifications">Limpiar todo</button>
+                        </div>
+                        <div class="notifications-list" id="notificationsList">
+                            <div class="notifications-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <p>No hay notificaciones</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- User Menu -->
                     <button class="user-menu" id="userMenu">
                         <div class="user-avatar">
@@ -4251,7 +4417,13 @@
                 contentArea: document.getElementById('contentArea'),
                 statusDot: document.getElementById('statusDot'),
                 statusText: document.getElementById('statusText'),
-                navItems: document.querySelectorAll('.nav-item')
+                navItems: document.querySelectorAll('.nav-item'),
+                // Notifications elements
+                notificationsBtn: document.getElementById('notificationsBtn'),
+                notificationBadge: document.getElementById('notificationBadge'),
+                notificationsPanel: document.getElementById('notificationsPanel'),
+                notificationsList: document.getElementById('notificationsList'),
+                clearNotifications: document.getElementById('clearNotifications')
             },
 
             state: {
@@ -4264,8 +4436,13 @@
                 currentProject: null,
                 currentTasks: [],
                 tasksView: 'kanban',
-                darkMode: localStorage.getItem('theme') !== 'light'
+                darkMode: localStorage.getItem('theme') !== 'light',
+                // Notifications state
+                notifications: JSON.parse(localStorage.getItem('dfo_notifications') || '[]'),
+                notificationsPanelOpen: false
             },
+
+            socket: null,
 
             async init() {
                 this.bindEvents();
@@ -4277,6 +4454,10 @@
                 await this.loadDataFromAPI();
 
                 this.handleInitialRoute();
+
+                // Initialize Socket.IO and notifications
+                this.initSocket();
+                this.initNotifications();
 
                 // Prevent default touch behaviors that cause bounce
                 document.body.addEventListener('touchmove', (e) => {
@@ -8254,6 +8435,316 @@
 
             addNewUrl() {
                 alert('Agregar nueva URL personalizada\n\n(Esta funcionalidad permitira agregar URLs adicionales)');
+            },
+
+            // ============================================
+            // SOCKET.IO & NOTIFICATIONS SYSTEM
+            // ============================================
+
+            initSocket() {
+                if (typeof io === 'undefined') {
+                    console.warn('Socket.IO not available');
+                    return;
+                }
+
+                this.socket = io();
+
+                this.socket.on('connect', () => {
+                    console.log('🔌 Socket connected:', this.socket.id);
+
+                    // Authenticate with token
+                    const token = localStorage.getItem('authToken');
+                    if (token) {
+                        this.socket.emit('authenticate', token);
+                    }
+
+                    // Subscribe to notifications channel
+                    this.socket.emit('subscribe_notifications');
+                });
+
+                this.socket.on('authenticated', (data) => {
+                    console.log('✅ Socket authenticated:', data.user?.name);
+                });
+
+                // Listen for real-time notifications
+                this.socket.on('notification', (notification) => {
+                    this.addNotification(notification);
+                });
+
+                this.socket.on('task_created', (data) => {
+                    this.addNotification({
+                        type: 'task',
+                        title: 'Nueva tarea creada',
+                        message: data.title || 'Se creo una nueva tarea',
+                        projectId: data.project_id,
+                        taskId: data.id,
+                        timestamp: new Date().toISOString()
+                    });
+                });
+
+                this.socket.on('task_completed', (data) => {
+                    this.addNotification({
+                        type: 'task',
+                        title: 'Tarea completada',
+                        message: data.title || 'Se completo una tarea',
+                        projectId: data.project_id,
+                        taskId: data.id,
+                        timestamp: new Date().toISOString()
+                    });
+                });
+
+                this.socket.on('project_updated', (data) => {
+                    this.addNotification({
+                        type: 'project',
+                        title: 'Proyecto actualizado',
+                        message: data.name || 'Se actualizo un proyecto',
+                        projectId: data.id,
+                        timestamp: new Date().toISOString()
+                    });
+                });
+
+                this.socket.on('disconnect', () => {
+                    console.log('🔌 Socket disconnected');
+                });
+            },
+
+            initNotifications() {
+                // Update badge on load
+                this.updateNotificationBadge();
+                this.renderNotificationsList();
+
+                // Notification button click
+                this.elements.notificationsBtn?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleNotificationsPanel();
+                });
+
+                // Clear all button
+                this.elements.clearNotifications?.addEventListener('click', () => {
+                    this.clearAllNotifications();
+                });
+
+                // Close panel on outside click
+                document.addEventListener('click', (e) => {
+                    if (this.state.notificationsPanelOpen &&
+                        !this.elements.notificationsPanel?.contains(e.target) &&
+                        !this.elements.notificationsBtn?.contains(e.target)) {
+                        this.closeNotificationsPanel();
+                    }
+                });
+            },
+
+            addNotification(notification) {
+                const newNotif = {
+                    id: Date.now(),
+                    ...notification,
+                    read: false,
+                    timestamp: notification.timestamp || new Date().toISOString()
+                };
+
+                // Add to beginning of array (newest first)
+                this.state.notifications.unshift(newNotif);
+
+                // Keep only last 50 notifications
+                if (this.state.notifications.length > 50) {
+                    this.state.notifications = this.state.notifications.slice(0, 50);
+                }
+
+                // Save to localStorage
+                this.saveNotifications();
+
+                // Update UI
+                this.updateNotificationBadge();
+                this.renderNotificationsList();
+
+                // Show toast notification
+                this.showNotificationToast(newNotif);
+            },
+
+            saveNotifications() {
+                localStorage.setItem('dfo_notifications', JSON.stringify(this.state.notifications));
+            },
+
+            updateNotificationBadge() {
+                const unreadCount = this.state.notifications.filter(n => !n.read).length;
+                const badge = this.elements.notificationBadge;
+
+                if (badge) {
+                    if (unreadCount > 0) {
+                        badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                        badge.classList.add('has-notifications');
+                    } else {
+                        badge.textContent = '';
+                        badge.classList.remove('has-notifications');
+                    }
+                }
+            },
+
+            toggleNotificationsPanel() {
+                if (this.state.notificationsPanelOpen) {
+                    this.closeNotificationsPanel();
+                } else {
+                    this.openNotificationsPanel();
+                }
+            },
+
+            openNotificationsPanel() {
+                this.state.notificationsPanelOpen = true;
+                this.elements.notificationsPanel?.classList.add('show');
+                this.elements.notificationsBtn?.classList.add('active');
+
+                // Mark all as read when opening
+                this.state.notifications.forEach(n => n.read = true);
+                this.saveNotifications();
+                this.updateNotificationBadge();
+            },
+
+            closeNotificationsPanel() {
+                this.state.notificationsPanelOpen = false;
+                this.elements.notificationsPanel?.classList.remove('show');
+                this.elements.notificationsBtn?.classList.remove('active');
+            },
+
+            renderNotificationsList() {
+                const list = this.elements.notificationsList;
+                if (!list) return;
+
+                if (this.state.notifications.length === 0) {
+                    list.innerHTML = `
+                        <div class="notifications-empty">
+                            <i class="fas fa-bell-slash"></i>
+                            <p>No hay notificaciones</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                list.innerHTML = this.state.notifications.map(notif => {
+                    const icon = this.getNotificationIcon(notif.type);
+                    const timeAgo = this.getTimeAgo(notif.timestamp);
+
+                    return `
+                        <div class="notification-item ${notif.read ? '' : 'unread'}"
+                             onclick="App.handleNotificationClick(${notif.id})">
+                            <div class="notification-icon ${notif.type}">
+                                <i class="fas ${icon}"></i>
+                            </div>
+                            <div class="notification-content">
+                                <div class="notification-title">${this.escapeHtml(notif.title)}</div>
+                                <div class="notification-message">${this.escapeHtml(notif.message)}</div>
+                                <div class="notification-time">${timeAgo}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            },
+
+            getNotificationIcon(type) {
+                const icons = {
+                    task: 'fa-tasks',
+                    project: 'fa-folder',
+                    business: 'fa-building',
+                    alert: 'fa-exclamation-triangle',
+                    info: 'fa-info-circle'
+                };
+                return icons[type] || 'fa-bell';
+            },
+
+            getTimeAgo(timestamp) {
+                const now = new Date();
+                const date = new Date(timestamp);
+                const seconds = Math.floor((now - date) / 1000);
+
+                if (seconds < 60) return 'Ahora mismo';
+                if (seconds < 3600) return `Hace ${Math.floor(seconds / 60)} min`;
+                if (seconds < 86400) return `Hace ${Math.floor(seconds / 3600)}h`;
+                if (seconds < 604800) return `Hace ${Math.floor(seconds / 86400)}d`;
+                return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+            },
+
+            handleNotificationClick(notifId) {
+                const notif = this.state.notifications.find(n => n.id === notifId);
+                if (!notif) return;
+
+                // Mark as read
+                notif.read = true;
+                this.saveNotifications();
+                this.renderNotificationsList();
+
+                // Navigate based on type
+                if (notif.type === 'task' && notif.projectId) {
+                    this.closeNotificationsPanel();
+                    // Navigate to project tasks
+                    window.location.hash = `#project/${notif.projectId}/tasks`;
+                } else if (notif.type === 'project' && notif.projectId) {
+                    this.closeNotificationsPanel();
+                    window.location.hash = `#project/${notif.projectId}`;
+                }
+            },
+
+            clearAllNotifications() {
+                this.state.notifications = [];
+                this.saveNotifications();
+                this.updateNotificationBadge();
+                this.renderNotificationsList();
+            },
+
+            showNotificationToast(notif) {
+                // Create toast element
+                const toast = document.createElement('div');
+                toast.className = 'notification-toast';
+                toast.innerHTML = `
+                    <div class="notification-icon ${notif.type}">
+                        <i class="fas ${this.getNotificationIcon(notif.type)}"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notification-title">${this.escapeHtml(notif.title)}</div>
+                        <div class="notification-message">${this.escapeHtml(notif.message)}</div>
+                    </div>
+                `;
+
+                // Add styles if not exists
+                if (!document.getElementById('toast-styles')) {
+                    const style = document.createElement('style');
+                    style.id = 'toast-styles';
+                    style.textContent = `
+                        .notification-toast {
+                            position: fixed;
+                            top: 80px;
+                            right: 20px;
+                            display: flex;
+                            gap: 12px;
+                            padding: 16px;
+                            background: var(--bg-card);
+                            border: 1px solid var(--border-color);
+                            border-radius: 12px;
+                            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+                            z-index: 2000;
+                            animation: slideIn 0.3s ease, fadeOut 0.3s ease 4.7s;
+                            max-width: 350px;
+                        }
+                        @keyframes slideIn {
+                            from { transform: translateX(100%); opacity: 0; }
+                            to { transform: translateX(0); opacity: 1; }
+                        }
+                        @keyframes fadeOut {
+                            from { opacity: 1; }
+                            to { opacity: 0; }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                document.body.appendChild(toast);
+
+                // Remove after 5 seconds
+                setTimeout(() => toast.remove(), 5000);
+            },
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
             }
         };
 

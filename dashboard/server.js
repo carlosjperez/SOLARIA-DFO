@@ -286,6 +286,12 @@ class SolariaDashboardServer {
                 socket.join('alerts');
             });
 
+            // Suscribir a notificaciones en tiempo real
+            socket.on('subscribe_notifications', () => {
+                socket.join('notifications');
+                console.log(`📢 ${socket.id} subscribed to notifications`);
+            });
+
             socket.on('disconnect', () => {
                 const user = this.connectedClients.get(socket.id);
                 if (user) {
@@ -1519,6 +1525,14 @@ class SolariaDashboardServer {
                 req.user.userId
             ]);
 
+            // Emit task_created notification
+            this.io.to('notifications').emit('task_created', {
+                id: result.insertId,
+                title,
+                project_id,
+                priority
+            });
+
             res.status(201).json({
                 id: result.insertId,
                 message: 'Task created successfully'
@@ -1570,6 +1584,15 @@ class SolariaDashboardServer {
 
             if (result.affectedRows === 0) {
                 return res.status(404).json({ error: 'Task not found' });
+            }
+
+            // Emit task_completed notification if status changed to completed
+            if (updates.status === 'completed') {
+                this.io.to('notifications').emit('task_completed', {
+                    id: parseInt(id),
+                    title: updates.title || `Tarea #${id}`,
+                    project_id: updates.project_id
+                });
             }
 
             res.json({ message: 'Task updated successfully' });
