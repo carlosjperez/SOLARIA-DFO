@@ -1543,6 +1543,12 @@ class SolariaDashboardServer {
             if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
             if (updates.priority !== undefined) { fields.push('priority = ?'); values.push(updates.priority); }
             if (updates.progress !== undefined) { fields.push('progress = ?'); values.push(updates.progress); }
+
+            // Auto-set progress to 100% when task is marked as completed (if not explicitly provided)
+            if (updates.status === 'completed' && updates.progress === undefined) {
+                fields.push('progress = ?');
+                values.push(100);
+            }
             if (updates.actual_hours !== undefined) { fields.push('actual_hours = ?'); values.push(updates.actual_hours); }
             if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes); }
             if (updates.assigned_agent_id !== undefined) { fields.push('assigned_agent_id = ?'); values.push(updates.assigned_agent_id); }
