@@ -1006,3 +1006,340 @@ test.describe('Socket.IO Notifications', () => {
     expect(socketConnected).toBe(true);
   });
 });
+
+// ============================================
+// COMPLETED TASKS WIDGET TESTS
+// ============================================
+
+test.describe('Recent Completed Tasks API', () => {
+  let authToken;
+
+  test.beforeAll(async ({ request }) => {
+    const loginResponse = await request.post('http://localhost:3000/api/auth/login', {
+      data: { userId: 'carlosjperez', password: 'bypass' }
+    });
+    const loginData = await loginResponse.json();
+    authToken = loginData.token;
+  });
+
+  test('should return recent completed tasks list', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/tasks/recent-completed', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    expect(response.ok()).toBeTruthy();
+
+    const data = await response.json();
+    expect(Array.isArray(data)).toBeTruthy();
+  });
+
+  test('should return tasks with project and agent info', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/tasks/recent-completed', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const tasks = await response.json();
+
+    if (tasks.length > 0) {
+      const task = tasks[0];
+      // Required fields
+      expect(task.id).toBeDefined();
+      expect(task.title).toBeDefined();
+      expect(task.status).toBe('completed');
+      expect(task.priority).toBeDefined();
+      // Enriched fields from JOIN
+      expect(task.project_name).toBeDefined();
+      expect(task.agent_name !== undefined || task.agent_name === null).toBeTruthy();
+    }
+  });
+
+  test('should respect limit parameter', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/tasks/recent-completed?limit=5', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const tasks = await response.json();
+
+    expect(tasks.length).toBeLessThanOrEqual(5);
+  });
+
+  test('should return tasks ordered by completion date (most recent first)', async ({ request }) => {
+    const response = await request.get('http://localhost:3000/api/tasks/recent-completed', {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const tasks = await response.json();
+
+    if (tasks.length > 1) {
+      const firstDate = new Date(tasks[0].completed_at || tasks[0].updated_at);
+      const secondDate = new Date(tasks[1].completed_at || tasks[1].updated_at);
+      expect(firstDate >= secondDate).toBeTruthy();
+    }
+  });
+});
+
+test.describe('Dashboard Page with Completed Tasks Widget', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+  });
+
+  test('should display dashboard page with widgets when clicking Dashboard nav item', async ({ page }) => {
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(1000);
+
+    // Dashboard page should be visible
+    const dashboardSection = page.locator('#dashboardSection');
+    await expect(dashboardSection).toBeVisible();
+  });
+
+  test('should display completed tasks widget', async ({ page }) => {
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(1500);
+
+    // Completed tasks widget should be visible
+    const widget = page.locator('.completed-tasks-widget');
+    await expect(widget).toBeVisible();
+  });
+
+  test('should display widget header with title and count', async ({ page }) => {
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(1500);
+
+    // Widget header
+    const header = page.locator('.completed-tasks-widget .widget-header');
+    await expect(header).toBeVisible();
+    await expect(header).toContainText('Tareas Completadas');
+  });
+
+  test('should display completed task items in feed', async ({ page }) => {
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(2000);
+
+    // Feed container
+    const feed = page.locator('.completed-tasks-feed');
+    await expect(feed).toBeVisible();
+
+    // Should have task items or empty state
+    const hasItems = await page.locator('.completed-task-item').count();
+    const hasEmpty = await page.locator('.empty-feed').count();
+    expect(hasItems > 0 || hasEmpty > 0).toBeTruthy();
+  });
+
+  test('should display task item with correct structure', async ({ page }) => {
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(2000);
+
+    const taskItem = page.locator('.completed-task-item').first();
+
+    // Only check if there are completed tasks
+    const count = await taskItem.count();
+    if (count > 0) {
+      // Check icon
+      await expect(taskItem.locator('.task-check-icon')).toBeVisible();
+
+      // Check content
+      await expect(taskItem.locator('.task-content')).toBeVisible();
+      await expect(taskItem.locator('.task-title')).toBeVisible();
+      await expect(taskItem.locator('.task-meta')).toBeVisible();
+    }
+  });
+
+  test('should display task project name', async ({ page }) => {
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(2000);
+
+    const taskMeta = page.locator('.completed-task-item .task-meta').first();
+    const count = await taskMeta.count();
+
+    if (count > 0) {
+      // Meta should contain project icon and name
+      const projectSpan = taskMeta.locator('span').first();
+      await expect(projectSpan).toBeVisible();
+    }
+  });
+
+  test('should display relative time in task items', async ({ page }) => {
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(2000);
+
+    const taskTime = page.locator('.completed-task-item .task-time').first();
+    const count = await taskTime.count();
+
+    if (count > 0) {
+      const timeText = await taskTime.textContent();
+      // Should contain relative time like "hace X minutos", "ahora", etc.
+      expect(timeText.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+test.describe('Dashboard Stats Cards', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(1500);
+  });
+
+  test('should display projects stat card', async ({ page }) => {
+    const card = page.locator('.stat-card').filter({ hasText: 'Proyectos' });
+    await expect(card).toBeVisible();
+  });
+
+  test('should display tasks stat card', async ({ page }) => {
+    const card = page.locator('.stat-card').filter({ hasText: 'Tareas' });
+    await expect(card).toBeVisible();
+  });
+
+  test('should display agents stat card', async ({ page }) => {
+    const card = page.locator('.stat-card').filter({ hasText: 'Agentes' });
+    await expect(card).toBeVisible();
+  });
+
+  test('should display alerts stat card', async ({ page }) => {
+    const card = page.locator('.stat-card').filter({ hasText: 'Alertas' });
+    await expect(card).toBeVisible();
+  });
+
+  test('should show numeric values in stat cards', async ({ page }) => {
+    const statValues = page.locator('.stat-value');
+    const count = await statValues.count();
+
+    expect(count).toBeGreaterThan(0);
+
+    // First stat should have a number
+    const firstValue = await statValues.first().textContent();
+    expect(parseInt(firstValue)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+test.describe('Real-time Completed Tasks Updates', () => {
+  test('should have addCompletedTaskToFeed method available', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+
+    const hasMethod = await page.evaluate(() =>
+      typeof window.App.addCompletedTaskToFeed === 'function'
+    );
+    expect(hasMethod).toBe(true);
+  });
+
+  test('should add task to feed via JavaScript', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+
+    // Navigate to dashboard page
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(1500);
+
+    // Simulate adding a task
+    await page.evaluate(() => {
+      window.App.addCompletedTaskToFeed({
+        id: 999,
+        title: 'Test Real-time Task',
+        project_name: 'Test Project',
+        agent_name: 'Test Agent',
+        priority: 'high',
+        completed_at: new Date().toISOString()
+      });
+    });
+
+    await page.waitForTimeout(500);
+
+    // Check new task appears in feed
+    const newTask = page.locator('.completed-task-item').filter({ hasText: 'Test Real-time Task' });
+    await expect(newTask).toBeVisible();
+  });
+
+  test('should prepend new tasks to top of feed', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+
+    await page.locator('[data-section="dashboard"]').click();
+    await page.waitForTimeout(1500);
+
+    // Add a task
+    await page.evaluate(() => {
+      window.App.addCompletedTaskToFeed({
+        id: 888,
+        title: 'First Added Task',
+        project_name: 'Project A',
+        priority: 'medium',
+        completed_at: new Date().toISOString()
+      });
+    });
+
+    await page.waitForTimeout(300);
+
+    // Add another task
+    await page.evaluate(() => {
+      window.App.addCompletedTaskToFeed({
+        id: 889,
+        title: 'Second Added Task',
+        project_name: 'Project B',
+        priority: 'high',
+        completed_at: new Date().toISOString()
+      });
+    });
+
+    await page.waitForTimeout(500);
+
+    // Second task should be first in the list
+    const firstTask = page.locator('.completed-task-item').first();
+    await expect(firstTask).toContainText('Second Added Task');
+  });
+});
+
+test.describe('formatRelativeTime Function', () => {
+  test('should have formatRelativeTime method available', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+
+    const hasMethod = await page.evaluate(() =>
+      typeof window.App.formatRelativeTime === 'function'
+    );
+    expect(hasMethod).toBe(true);
+  });
+
+  test('should format recent time as "ahora"', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+
+    const result = await page.evaluate(() => {
+      const now = new Date().toISOString();
+      return window.App.formatRelativeTime(now);
+    });
+
+    expect(result).toBe('ahora');
+  });
+
+  test('should format minutes ago correctly', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+
+    const result = await page.evaluate(() => {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      return window.App.formatRelativeTime(fiveMinutesAgo);
+    });
+
+    expect(result).toContain('5m');
+  });
+
+  test('should format hours ago correctly', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('#quickAccessBtn').click();
+    await page.waitForSelector('#dashboardScreen:not(.hidden)', { timeout: 15000 });
+
+    const result = await page.evaluate(() => {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      return window.App.formatRelativeTime(twoHoursAgo);
+    });
+
+    expect(result).toContain('2h');
+  });
+});
