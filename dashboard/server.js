@@ -181,6 +181,7 @@ class SolariaDashboardServer {
 
         // Gestión de tareas
         this.app.get('/api/tasks', this.getTasks.bind(this));
+        this.app.get('/api/tasks/recent-completed', this.getRecentCompletedTasks.bind(this));
         this.app.get('/api/tasks/:id', this.getTask.bind(this));
         this.app.post('/api/tasks', this.createTask.bind(this));
         this.app.put('/api/tasks/:id', this.updateTask.bind(this));
@@ -1468,6 +1469,44 @@ class SolariaDashboardServer {
         }
     }
 
+    /**
+     * Get recently completed tasks across all projects
+     * Used for the global completed tasks widget on dashboard
+     */
+    async getRecentCompletedTasks(req, res) {
+        try {
+            const limit = parseInt(req.query.limit) || 20;
+
+            const [tasks] = await this.db.execute(`
+                SELECT
+                    t.id,
+                    t.title,
+                    t.status,
+                    t.priority,
+                    t.progress,
+                    t.completed_at,
+                    t.updated_at,
+                    p.id as project_id,
+                    p.name as project_name,
+                    aa.id as agent_id,
+                    aa.name as agent_name,
+                    aa.role as agent_role
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+                WHERE t.status = 'completed'
+                ORDER BY COALESCE(t.completed_at, t.updated_at) DESC
+                LIMIT ?
+            `, [limit]);
+
+            res.json(tasks);
+
+        } catch (error) {
+            console.error('Error fetching recent completed tasks:', error);
+            res.status(500).json({ error: 'Failed to fetch recent completed tasks' });
+        }
+    }
+
     async getTask(req, res) {
         try {
             const { id } = req.params;
@@ -1588,10 +1627,23 @@ class SolariaDashboardServer {
 
             // Emit task_completed notification if status changed to completed
             if (updates.status === 'completed') {
+                // Fetch task with project and agent names for rich notification
+                const [taskData] = await this.db.execute(`
+                    SELECT t.*, p.name as project_name, aa.name as agent_name
+                    FROM tasks t
+                    LEFT JOIN projects p ON t.project_id = p.id
+                    LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+                    WHERE t.id = ?
+                `, [id]);
+
+                const task = taskData[0] || {};
                 this.io.to('notifications').emit('task_completed', {
                     id: parseInt(id),
-                    title: updates.title || `Tarea #${id}`,
-                    project_id: updates.project_id
+                    title: task.title || `Tarea #${id}`,
+                    project_id: task.project_id,
+                    project_name: task.project_name || 'Sin proyecto',
+                    agent_name: task.agent_name,
+                    priority: task.priority || 'medium'
                 });
             }
 

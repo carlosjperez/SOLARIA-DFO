@@ -618,6 +618,335 @@
             font-size: 13px;
         }
 
+        /* ============================================
+           COMPLETED TASKS FEED WIDGET
+           Global view of recently completed tasks
+           ============================================ */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .completed-tasks-widget {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .widget-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(246, 146, 29, 0.05);
+        }
+
+        .widget-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .widget-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .widget-icon.success {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+        }
+
+        .widget-icon.info {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .widget-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .widget-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .widget-badge {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .completed-tasks-feed {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .completed-task-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: background var(--transition-fast);
+        }
+
+        .completed-task-item:last-child {
+            border-bottom: none;
+        }
+
+        .completed-task-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .completed-task-item.new {
+            animation: taskSlideIn 0.3s ease-out;
+            background: rgba(34, 197, 94, 0.08);
+        }
+
+        @keyframes taskSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .task-check-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .task-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .task-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .task-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .task-priority-badge {
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .task-priority-badge.critical {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .task-priority-badge.high {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+
+        .task-priority-badge.medium {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        .task-priority-badge.low {
+            background: rgba(107, 114, 128, 0.2);
+            color: #9ca3af;
+        }
+
+        .task-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .task-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .task-meta-item i {
+            font-size: 10px;
+            opacity: 0.7;
+        }
+
+        .task-time {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .feed-empty {
+            padding: 48px 24px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .feed-empty i {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .feed-empty p {
+            font-size: 13px;
+        }
+
+        .feed-loading {
+            padding: 24px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .feed-loading i {
+            font-size: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Dashboard Stats Cards */
+        .dashboard-stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .dashboard-stats-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .stat-icon.projects {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+        }
+
+        .stat-icon.tasks {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+        }
+
+        .stat-icon.agents {
+            background: rgba(168, 85, 247, 0.15);
+            color: #c084fc;
+        }
+
+        .stat-icon.active {
+            background: rgba(246, 146, 29, 0.15);
+            color: var(--solaria-orange);
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-change {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        .stat-change.positive {
+            color: #4ade80;
+        }
+
+        .stat-change.negative {
+            color: #f87171;
+        }
+
         .mode-toggle {
             width: 40px;
             height: 40px;
@@ -3861,6 +4190,11 @@
                 return this.request('/dashboard');
             },
 
+            // Recent completed tasks (global)
+            async getRecentCompletedTasks(limit = 20) {
+                return this.request(`/tasks/recent-completed?limit=${limit}`);
+            },
+
             // C-Suite
             async getCEODashboard() {
                 return this.request('/csuite/ceo');
@@ -4802,7 +5136,9 @@
             },
 
             loadPageContent(page) {
-                if (page === 'proyectos') {
+                if (page === 'dashboard') {
+                    this.renderDashboardPage();
+                } else if (page === 'proyectos') {
                     this.renderProjectsPage();
                 } else if (page === 'negocios') {
                     this.renderBusinessesPage();
@@ -4823,9 +5159,245 @@
                         </div>
                         <div class="content-placeholder">
                             <i class="fas ${pageInfo.icon}"></i>
-                            <p>Contenido del Dashboard pendiente</p>
+                            <p>Contenido pendiente</p>
                         </div>
                     `;
+                }
+            },
+
+            // ============================================
+            // Dashboard Home View
+            // ============================================
+
+            async renderDashboardPage() {
+                const pageInfo = this.getPageInfo('dashboard');
+
+                // Render initial structure with loading state
+                this.elements.contentArea.innerHTML = `
+                    <div class="section-header">
+                        <div>
+                            <h1 class="section-title">${pageInfo.title}</h1>
+                            <p class="section-subtitle">${pageInfo.subtitle}</p>
+                        </div>
+                    </div>
+
+                    <!-- Stats Row -->
+                    <div class="dashboard-stats-row" id="dashboardStats">
+                        <div class="stat-card">
+                            <div class="stat-icon projects"><i class="fas fa-folder-open"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">Proyectos Activos</div>
+                                <div class="stat-value" id="statProjects">-</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon tasks"><i class="fas fa-check-circle"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">Tareas Completadas</div>
+                                <div class="stat-value" id="statCompleted">-</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon active"><i class="fas fa-clock"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">En Progreso</div>
+                                <div class="stat-value" id="statInProgress">-</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon agents"><i class="fas fa-robot"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-label">Agentes Activos</div>
+                                <div class="stat-value" id="statAgents">-</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Widgets Grid -->
+                    <div class="dashboard-grid">
+                        <!-- Completed Tasks Feed -->
+                        <div class="completed-tasks-widget">
+                            <div class="widget-header">
+                                <div class="widget-header-left">
+                                    <div class="widget-icon success">
+                                        <i class="fas fa-check-double"></i>
+                                    </div>
+                                    <div>
+                                        <div class="widget-title">Tareas Completadas</div>
+                                        <div class="widget-subtitle">Feed global en tiempo real</div>
+                                    </div>
+                                </div>
+                                <div class="widget-badge" id="completedTasksCount">0</div>
+                            </div>
+                            <div class="completed-tasks-feed" id="completedTasksFeed">
+                                <div class="feed-loading">
+                                    <i class="fas fa-spinner"></i>
+                                    <p>Cargando tareas...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Projects Overview -->
+                        <div class="completed-tasks-widget">
+                            <div class="widget-header">
+                                <div class="widget-header-left">
+                                    <div class="widget-icon info">
+                                        <i class="fas fa-folder-open"></i>
+                                    </div>
+                                    <div>
+                                        <div class="widget-title">Proyectos Recientes</div>
+                                        <div class="widget-subtitle">Actividad de proyectos</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="completed-tasks-feed" id="recentProjectsFeed">
+                                ${PROJECTS_DATA.slice(0, 5).map(p => `
+                                    <div class="completed-task-item" onclick="App.showProjectDetail('${p.slug || p.id}')">
+                                        <div class="task-check-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+                                            <i class="fas fa-folder"></i>
+                                        </div>
+                                        <div class="task-content">
+                                            <div class="task-title-row">
+                                                <span class="task-title">${this.escapeHtml(p.name)}</span>
+                                                <span class="task-priority-badge ${p.status === 'completed' ? 'low' : p.status === 'development' ? 'high' : 'medium'}">${p.status || 'activo'}</span>
+                                            </div>
+                                            <div class="task-meta">
+                                                <span class="task-meta-item"><i class="fas fa-tasks"></i> ${p.tasks?.total || 0} tareas</span>
+                                                <span class="task-meta-item"><i class="fas fa-percentage"></i> ${p.completion || 0}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('') || '<div class="feed-empty"><i class="fas fa-folder-open"></i><p>No hay proyectos</p></div>'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Load dashboard stats and completed tasks
+                this.loadDashboardStats();
+                this.loadCompletedTasksFeed();
+            },
+
+            async loadDashboardStats() {
+                try {
+                    const dashboard = await Api.getDashboard();
+                    if (dashboard) {
+                        document.getElementById('statProjects').textContent = dashboard.projects?.active || PROJECTS_DATA.length;
+                        document.getElementById('statCompleted').textContent = dashboard.tasks?.completed || 0;
+                        document.getElementById('statInProgress').textContent = dashboard.tasks?.in_progress || 0;
+                        document.getElementById('statAgents').textContent = dashboard.agents?.active || 0;
+                    }
+                } catch (error) {
+                    console.warn('Failed to load dashboard stats:', error);
+                    // Use fallback data
+                    document.getElementById('statProjects').textContent = PROJECTS_DATA.length;
+                }
+            },
+
+            async loadCompletedTasksFeed() {
+                const feedContainer = document.getElementById('completedTasksFeed');
+                const countBadge = document.getElementById('completedTasksCount');
+
+                try {
+                    const tasks = await Api.getRecentCompletedTasks(15);
+
+                    if (tasks && tasks.length > 0) {
+                        countBadge.textContent = tasks.length;
+                        feedContainer.innerHTML = tasks.map(task => this.renderCompletedTaskItem(task)).join('');
+
+                        // Store for real-time updates
+                        this.state.completedTasks = tasks;
+                    } else {
+                        countBadge.textContent = '0';
+                        feedContainer.innerHTML = `
+                            <div class="feed-empty">
+                                <i class="fas fa-check-circle"></i>
+                                <p>No hay tareas completadas todavia</p>
+                            </div>
+                        `;
+                    }
+                } catch (error) {
+                    console.error('Failed to load completed tasks:', error);
+                    feedContainer.innerHTML = `
+                        <div class="feed-empty">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <p>Error cargando tareas</p>
+                        </div>
+                    `;
+                }
+            },
+
+            renderCompletedTaskItem(task, isNew = false) {
+                const timeStr = this.formatRelativeTime(task.completed_at || task.updated_at);
+                return `
+                    <div class="completed-task-item ${isNew ? 'new' : ''}">
+                        <div class="task-check-icon">
+                            <i class="fas fa-check"></i>
+                        </div>
+                        <div class="task-content">
+                            <div class="task-title-row">
+                                <span class="task-title">${this.escapeHtml(task.title)}</span>
+                                <span class="task-priority-badge ${task.priority || 'medium'}">${task.priority || 'medium'}</span>
+                            </div>
+                            <div class="task-meta">
+                                <span class="task-meta-item"><i class="fas fa-folder"></i> ${this.escapeHtml(task.project_name || 'Sin proyecto')}</span>
+                                ${task.agent_name ? `<span class="task-meta-item"><i class="fas fa-robot"></i> ${this.escapeHtml(task.agent_name)}</span>` : ''}
+                            </div>
+                        </div>
+                        <span class="task-time">${timeStr}</span>
+                    </div>
+                `;
+            },
+
+            formatRelativeTime(dateStr) {
+                if (!dateStr) return 'reciente';
+                const date = new Date(dateStr);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+
+                if (diffMins < 1) return 'ahora';
+                if (diffMins < 60) return `${diffMins}m`;
+                if (diffHours < 24) return `${diffHours}h`;
+                if (diffDays < 7) return `${diffDays}d`;
+                return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+            },
+
+            addCompletedTaskToFeed(task) {
+                // Only update if on dashboard page
+                if (this.state.currentPage !== 'dashboard') return;
+
+                const feedContainer = document.getElementById('completedTasksFeed');
+                const countBadge = document.getElementById('completedTasksCount');
+
+                if (!feedContainer) return;
+
+                // Check if empty state
+                const emptyState = feedContainer.querySelector('.feed-empty');
+                if (emptyState) {
+                    feedContainer.innerHTML = '';
+                }
+
+                // Add new task at the top
+                const newTaskHtml = this.renderCompletedTaskItem(task, true);
+                feedContainer.insertAdjacentHTML('afterbegin', newTaskHtml);
+
+                // Update count
+                const currentCount = parseInt(countBadge.textContent) || 0;
+                countBadge.textContent = currentCount + 1;
+
+                // Remove 'new' class after animation
+                setTimeout(() => {
+                    const newItem = feedContainer.querySelector('.completed-task-item.new');
+                    if (newItem) newItem.classList.remove('new');
+                }, 3000);
+
+                // Limit items in feed
+                const items = feedContainer.querySelectorAll('.completed-task-item');
+                if (items.length > 20) {
+                    items[items.length - 1].remove();
                 }
             },
 
@@ -8490,6 +9062,17 @@
                         projectId: data.project_id,
                         taskId: data.id,
                         timestamp: new Date().toISOString()
+                    });
+
+                    // Update completed tasks feed on dashboard (real-time)
+                    this.addCompletedTaskToFeed({
+                        id: data.id,
+                        title: data.title || `Tarea #${data.id}`,
+                        project_id: data.project_id,
+                        project_name: data.project_name || 'Proyecto',
+                        agent_name: data.agent_name,
+                        priority: data.priority || 'medium',
+                        completed_at: new Date().toISOString()
                     });
                 });
 
