@@ -8,24 +8,24 @@
 ## P0 - Criticas (Bloqueantes)
 
 ### DFO-032: Deep linking para cards de dashboard
-- [ ] Implementar `showTaskDetail(taskId)` - navegar a detalle de tarea
-- [ ] Implementar `showProjectDetail(projectSlug)` - navegar a detalle de proyecto
-- [ ] Hacer todas las cards clickeables en widgets:
-  - [ ] Tareas Completadas
-  - [ ] Nuevas Tareas por Proyecto
-  - [ ] Proyectos Recientes
-- [ ] CSS hover states para indicar que son clickeables
-- **Status:** NOT STARTED
-- **Impacto:** UX - cards no navegables
+- [x] Implementar `showTaskDetail(taskId)` - navegar a detalle de tarea
+- [x] Implementar `showProjectDetail(projectSlug)` - navegar a detalle de proyecto
+- [x] Hacer todas las cards clickeables en widgets:
+  - [x] Tareas Completadas
+  - [x] Nuevas Tareas por Proyecto
+  - [x] Proyectos Recientes
+- [x] CSS hover states para indicar que son clickeables
+- **Status:** COMPLETED (e071c56f)
+- **Impacto:** UX - cards ahora navegables
 
 ### DFO-033: Task codes visibles en UI
-- [ ] Mostrar codigo (DFO-XXX) en lugar de ID en todas las vistas
-- [ ] Kanban view - mostrar codigo en cards
-- [ ] Task detail modal - mostrar codigo en header
-- [ ] Notificaciones - mostrar codigo
-- [ ] Widgets - mostrar codigo
-- **Status:** NOT STARTED
-- **Impacto:** Consistencia visual
+- [x] Mostrar codigo (DFO-XXX) en lugar de ID en todas las vistas
+- [x] Kanban view - mostrar codigo en cards
+- [x] Task detail modal - mostrar codigo en header
+- [x] Notificaciones - mostrar codigo
+- [x] Widgets - mostrar codigo
+- **Status:** COMPLETED (e071c56f)
+- **Impacto:** Consistencia visual mejorada
 
 ### DFO-034: Kanban real-time updates
 - [ ] Socket.IO: escuchar `task_created` y agregar card sin refresh
@@ -68,6 +68,17 @@
 - [ ] Persistir preferencia en localStorage
 - **Status:** NOT STARTED
 - **Impacto:** UX - facilita gestion de tareas
+
+### DFO-038: Budget editing in project view (FEATURE)
+- [ ] Vista de presupuestos debe permitir editar presupuesto del proyecto
+- [ ] Input field para modificar budget (numerico)
+- [ ] Guardar cambios via API PUT /api/projects/:id
+- [ ] Validacion de formato numerico
+- [ ] Feedback visual al guardar
+- [ ] Historial de cambios (opcional)
+- **Status:** NOT STARTED
+- **Tipo:** FEATURE
+- **Impacto:** Permite gestionar presupuestos directamente desde dashboard
 
 ### DFO-002: Security audit
 - [ ] Review OWASP Top 10

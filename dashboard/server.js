@@ -632,19 +632,29 @@ class SolariaDashboardServer {
 
     async getTasksPublic(req, res) {
         try {
-            const { project_id } = req.query;
+            const { project_id, status, limit = 100 } = req.query;
             let query = `
                 SELECT t.id, t.title, t.description, t.status, t.priority, t.progress,
-                       t.project_id, p.name as project_name
+                       t.project_id, t.task_number, t.created_at, t.updated_at,
+                       p.name as project_name,
+                       p.code as project_code,
+                       CONCAT(COALESCE(p.code, 'TSK'), '-', LPAD(COALESCE(t.task_number, t.id), 3, '0')) as task_code,
+                       aa.name as agent_name
                 FROM tasks t
                 LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+                WHERE 1=1
             `;
             const params = [];
             if (project_id) {
-                query += ' WHERE t.project_id = ?';
+                query += ' AND t.project_id = ?';
                 params.push(project_id);
             }
-            query += ' ORDER BY t.updated_at DESC LIMIT 100';
+            if (status) {
+                query += ' AND t.status = ?';
+                params.push(status);
+            }
+            query += ` ORDER BY t.updated_at DESC LIMIT ${parseInt(limit)}`;
 
             const [tasks] = await this.db.execute(query, params);
             res.json({ tasks });
