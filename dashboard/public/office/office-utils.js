@@ -67,6 +67,11 @@
   }
 
   function filterOfficeProjects(projects = [], businessName = 'Solaria Agency') {
+    // Defensive: ensure projects is an array
+    if (!Array.isArray(projects)) {
+      console.warn('filterOfficeProjects: expected array, got', typeof projects);
+      return [];
+    }
     const normalized = businessName.toLowerCase()
     return projects.filter((project) => {
       const isOptOut = isTruthy(project.office_hidden || project.hide_from_office)

@@ -1777,13 +1777,24 @@
                 ]);
 
                 // Filter projects for Office visibility
-                const allProjects = projectsRes.data || projectsRes || [];
+                // Defensive: ensure we always have an array
+                let allProjects = projectsRes.data || projectsRes;
+                if (!Array.isArray(allProjects)) {
+                    // If it's an object with a nested array property, try common patterns
+                    allProjects = allProjects?.projects || allProjects?.items || allProjects?.results || [];
+                }
+                if (!Array.isArray(allProjects)) allProjects = [];
+
                 this.state.projects = typeof OfficeUtils !== 'undefined'
                     ? OfficeUtils.filterOfficeProjects(allProjects)
                     : allProjects;
 
                 // Merge tasks into projects
-                const allTasks = tasksRes.data || tasksRes || [];
+                let allTasks = tasksRes.data || tasksRes;
+                if (!Array.isArray(allTasks)) {
+                    allTasks = allTasks?.tasks || allTasks?.items || allTasks?.results || [];
+                }
+                if (!Array.isArray(allTasks)) allTasks = [];
                 this.state.tasks = allTasks;
 
                 if (typeof OfficeUtils !== 'undefined') {
@@ -1791,7 +1802,12 @@
                     this.state.clients = OfficeUtils.summarizeProjectsByClient(this.state.projects);
                 }
 
-                this.state.agents = agentsRes.data || agentsRes || [];
+                let allAgents = agentsRes.data || agentsRes;
+                if (!Array.isArray(allAgents)) {
+                    allAgents = allAgents?.agents || allAgents?.items || allAgents?.results || [];
+                }
+                if (!Array.isArray(allAgents)) allAgents = [];
+                this.state.agents = allAgents;
 
                 // Render current page
                 this.renderCurrentPage();
