@@ -2290,6 +2290,12 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
+        @keyframes pulse-highlight {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(246, 146, 29, 0.7); }
+            50% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(246, 146, 29, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(246, 146, 29, 0); }
+        }
+
         .edit-modal-header {
             padding: 20px 24px;
             border-bottom: 1px solid var(--border-color);
@@ -5171,27 +5177,70 @@
             },
 
             // Deep link navigation methods
-            showTaskDetail(taskId) {
+            async showTaskDetail(taskId) {
                 console.log('Navigating to task:', taskId);
-                // TODO: Navigate to task detail page or show modal
-                // For now, show a toast notification
-                this.showNotification({
-                    title: 'Tarea seleccionada',
-                    message: `Navegando a tarea #${taskId}`,
-                    type: 'info'
-                });
+
+                // Try to find task in current state first
+                let task = this.state.currentTasks?.find(t => t.id === taskId || t.id === parseInt(taskId));
+
+                if (!task) {
+                    // Fetch from API if not in state
+                    try {
+                        const response = await API.getTasks();
+                        if (response && response.tasks) {
+                            const rawTasks = response.tasks;
+                            this.state.currentTasks = this.transformTasksFromAPI(rawTasks);
+                            task = this.state.currentTasks.find(t => t.id === taskId || t.id === parseInt(taskId));
+                        }
+                    } catch (error) {
+                        console.error('Failed to fetch task:', error);
+                    }
+                }
+
+                if (task) {
+                    // Navigate to tareas page and open modal
+                    this.setActiveNav('tareas');
+                    this.state.currentPage = 'tareas';
+                    await this.renderTareasPage();
+                    // Open the task modal
+                    this.openTaskModal(task.id);
+                } else {
+                    this.showNotification({
+                        title: 'Tarea no encontrada',
+                        message: `No se encontro la tarea #${taskId}`,
+                        type: 'error'
+                    });
+                }
             },
 
-            showProjectDetail(projectId) {
+            async showProjectDetail(projectId) {
                 console.log('Navigating to project:', projectId);
-                // Navigate to projects page and highlight/show the project
+
+                // Navigate to projects page
                 this.setActiveNav('proyectos');
                 this.state.currentPage = 'proyectos';
-                this.renderProjectsPage();
-                // TODO: Scroll to or highlight specific project
+                await this.renderProjectsPage();
+
+                // Find and scroll to the project card
+                setTimeout(() => {
+                    const projectCards = document.querySelectorAll('.project-card');
+                    for (const card of projectCards) {
+                        const cardId = card.getAttribute('data-project-id') || card.dataset.projectId;
+                        if (cardId == projectId || card.querySelector(`[data-id="${projectId}"]`)) {
+                            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            card.style.animation = 'pulse-highlight 1.5s ease';
+                            card.style.boxShadow = '0 0 0 3px var(--solaria-orange)';
+                            setTimeout(() => {
+                                card.style.boxShadow = '';
+                            }, 2000);
+                            break;
+                        }
+                    }
+                }, 300);
+
                 this.showNotification({
-                    title: 'Proyecto seleccionado',
-                    message: `Mostrando proyecto #${projectId}`,
+                    title: 'Proyecto',
+                    message: `Navegando a proyecto #${projectId}`,
                     type: 'info'
                 });
             },
@@ -8214,6 +8263,8 @@
             transformTasksFromAPI(apiTasks) {
                 return apiTasks.map(t => ({
                     id: t.id,
+                    task_code: t.task_code || null, // Preserve task code (DFO-001, AKD-002, etc.)
+                    task_number: t.task_number || null,
                     title: t.title,
                     description: t.description || '',
                     status: this.mapTaskStatus(t.status),
@@ -8221,6 +8272,9 @@
                     priority: t.priority,
                     priorityLabel: this.formatPriority(t.priority),
                     assignee: t.assigned_agent || t.assigned_to || 'Sin asignar',
+                    agent_name: t.agent_name || t.assigned_agent || null,
+                    project_name: t.project_name || null,
+                    project_code: t.project_code || null,
                     dueDate: t.deadline || t.due_date || '',
                     createdAt: t.created_at,
                     progress: t.progress || 0,
