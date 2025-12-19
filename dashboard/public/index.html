@@ -886,10 +886,17 @@
             align-items: center;
             gap: 16px;
             transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(246, 146, 29, 0.1);
+            cursor: pointer;
         }
 
         .stat-card:hover {
             transform: translateY(-2px);
+        }
+
+        .stat-card:active {
+            transform: scale(0.97);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             border-color: var(--solaria-orange);
         }
@@ -1164,6 +1171,29 @@
         }
 
         /* Project Card - Grid Version (Compact) */
+        /* Scrollable container class */
+        .scrollable {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            touch-action: pan-y;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        .scrollable::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scrollable::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .scrollable::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
         .project-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -1173,6 +1203,8 @@
             flex-direction: column;
             overflow: hidden;
             transition: border-color var(--transition-fast), transform var(--transition-fast);
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(246, 146, 29, 0.1);
         }
 
         .project-card:active {
@@ -1934,18 +1966,188 @@
         /* ============================================
            Touch Optimizations
            ============================================ */
+
+        /* Scrollable containers - touch momentum scrolling */
+        .scrollable,
+        .kanban-column-body,
+        .projects-slider,
+        .modal-content,
+        .edit-modal,
+        [style*="overflow-y: auto"],
+        [style*="overflow-x: auto"] {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        /* Touch-specific media query for coarse pointers (touch screens) */
         @media (pointer: coarse) {
+            /* Ensure all scrollable containers have momentum scrolling */
+            .kanban-column-body {
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior-y: contain;
+                touch-action: pan-y;
+                scroll-behavior: smooth;
+            }
+
+            .scrollable {
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior: contain;
+                touch-action: pan-y;
+            }
+
+            /* Navigation items - larger touch targets */
             .nav-item {
                 padding: 14px 14px;
+                min-height: 48px;
             }
 
             .header-btn {
-                width: 44px;
-                height: 44px;
+                width: 48px;
+                height: 48px;
+                min-width: 48px;
+                min-height: 48px;
             }
 
             .collapse-btn {
                 padding: 14px;
+                min-width: 48px;
+                min-height: 48px;
+            }
+
+            /* Task cards - larger touch targets and better feedback */
+            .task-card {
+                min-height: 80px;
+                padding: 14px;
+                cursor: pointer;
+                -webkit-tap-highlight-color: rgba(246, 146, 29, 0.15);
+                touch-action: manipulation;
+            }
+
+            .task-card:active {
+                transform: scale(0.98);
+                background: var(--bg-tertiary);
+            }
+
+            /* Kanban columns - enable vertical scrolling */
+            .kanban-column {
+                touch-action: pan-y;
+            }
+
+            /* Project cards - touch feedback */
+            .project-card {
+                min-height: 60px;
+                -webkit-tap-highlight-color: rgba(246, 146, 29, 0.15);
+            }
+
+            .project-card:active {
+                transform: scale(0.98);
+            }
+
+            /* List view rows - touch friendly */
+            .list-table tr,
+            .gantt-row {
+                min-height: 52px;
+                -webkit-tap-highlight-color: rgba(246, 146, 29, 0.15);
+            }
+
+            .list-table tr:active,
+            .gantt-row:active {
+                background: var(--bg-tertiary) !important;
+            }
+
+            /* Stat cards - touch feedback */
+            .stat-card {
+                min-height: 80px;
+                -webkit-tap-highlight-color: rgba(246, 146, 29, 0.15);
+            }
+
+            .stat-card:active {
+                transform: scale(0.97);
+            }
+
+            /* Buttons - larger touch area */
+            .btn,
+            .view-toggle-btn,
+            .filter-btn,
+            .tab-btn {
+                min-height: 44px;
+                min-width: 44px;
+                padding: 10px 16px;
+            }
+
+            /* Dropdown and select elements */
+            select,
+            .dropdown-item {
+                min-height: 44px;
+                padding: 12px;
+            }
+
+            /* Memory cards */
+            .memory-card {
+                min-height: 60px;
+                -webkit-tap-highlight-color: rgba(246, 146, 29, 0.15);
+            }
+
+            .memory-card:active {
+                transform: scale(0.98);
+            }
+
+            /* Modal close buttons */
+            .modal-close,
+            .close-btn {
+                min-width: 44px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* Tab navigation */
+            .view-toggle-btn {
+                min-width: 80px;
+            }
+
+            /* Checkbox items - larger touch target */
+            .checklist-item {
+                min-height: 44px;
+                padding: 8px 12px;
+            }
+
+            /* Page indicators for slider */
+            .page-indicator {
+                min-width: 32px;
+                min-height: 32px;
+                padding: 8px;
+            }
+
+            /* Links in task info */
+            .task-card a,
+            .url-item a {
+                padding: 8px;
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+            }
+
+            /* Priority badges - larger */
+            .priority-badge {
+                min-width: 28px;
+                min-height: 22px;
+                padding: 4px 8px;
+            }
+        }
+
+        /* iOS Safari specific fixes */
+        @supports (-webkit-touch-callout: none) {
+            .kanban-column-body,
+            .scrollable {
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Fix position fixed issues in iOS */
+            .modal-overlay {
+                position: fixed;
+                -webkit-transform: translateZ(0);
             }
         }
 
@@ -2728,11 +2930,20 @@
             padding: 12px;
             cursor: pointer;
             transition: all var(--transition-fast);
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(246, 146, 29, 0.1);
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         .task-card:hover {
             border-color: var(--solaria-orange);
             transform: translateY(-2px);
+        }
+
+        .task-card:active {
+            transform: scale(0.98);
+            opacity: 0.9;
         }
 
         .task-card-header {
@@ -2947,6 +3158,9 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+            touch-action: pan-y;
         }
 
         .kanban-add-btn {
@@ -3001,6 +3215,14 @@
             align-items: center;
             padding: 8px 0;
             border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(246, 146, 29, 0.1);
+            transition: background var(--transition-fast);
+        }
+
+        .gantt-row:active {
+            background: var(--bg-tertiary);
         }
 
         .gantt-row-label {
@@ -3079,8 +3301,19 @@
             border-bottom: 1px solid var(--border-color);
         }
 
+        .list-table tbody tr {
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: rgba(246, 146, 29, 0.1);
+            transition: background var(--transition-fast);
+        }
+
         .list-table tr:hover {
             background: var(--bg-hover);
+        }
+
+        .list-table tbody tr:active {
+            background: var(--bg-tertiary);
         }
 
         /* ============================================
@@ -4924,9 +5157,40 @@
                 this.initSocket();
                 this.initNotifications();
 
-                // Prevent default touch behaviors that cause bounce
+                // Prevent default touch behaviors that cause bounce - but allow scrolling in containers
                 document.body.addEventListener('touchmove', (e) => {
-                    if (e.target.closest('.scrollable') || e.target.closest('.projects-slider')) return;
+                    // Allow scrolling in all these scrollable containers
+                    const scrollableSelectors = [
+                        '.scrollable',
+                        '.projects-slider',
+                        '.kanban-column-body',
+                        '.modal-content',
+                        '.edit-modal',
+                        '.list-table',
+                        '.gantt-container',
+                        '.memories-container',
+                        '[style*="overflow-y: auto"]',
+                        '[style*="overflow-x: auto"]',
+                        'select',
+                        'input',
+                        'textarea'
+                    ];
+
+                    // Check if target is inside any scrollable container
+                    const isScrollable = scrollableSelectors.some(selector => e.target.closest(selector));
+                    if (isScrollable) return;
+
+                    // Also allow if the element has CSS overflow set to auto/scroll
+                    let el = e.target;
+                    while (el && el !== document.body) {
+                        const style = getComputedStyle(el);
+                        if (style.overflowY === 'auto' || style.overflowY === 'scroll' ||
+                            style.overflowX === 'auto' || style.overflowX === 'scroll') {
+                            return;
+                        }
+                        el = el.parentElement;
+                    }
+
                     e.preventDefault();
                 }, { passive: false });
 
@@ -9027,6 +9291,262 @@
                 console.log(`✅ Kanban: Removed task ${data.id}`);
             },
 
+            // ============================================
+            // UNIFIED REAL-TIME HANDLERS FOR ALL VIEWS
+            // ============================================
+
+            // Update internal state with new/updated task
+            updateStateTask(taskData, action = 'upsert') {
+                if (!this.state.currentTasks) this.state.currentTasks = [];
+
+                const transformedTask = this.transformTasksFromAPI([taskData])[0];
+                if (!transformedTask) return null;
+
+                if (action === 'delete') {
+                    this.state.currentTasks = this.state.currentTasks.filter(t => t.id !== taskData.id);
+                } else {
+                    const idx = this.state.currentTasks.findIndex(t => t.id === taskData.id);
+                    if (idx >= 0) {
+                        this.state.currentTasks[idx] = { ...this.state.currentTasks[idx], ...transformedTask };
+                    } else {
+                        this.state.currentTasks.push(transformedTask);
+                    }
+                }
+                return transformedTask;
+            },
+
+            // Unified handler - calls appropriate view handlers
+            handleTaskRealTimeEvent(data, action) {
+                console.log(`🔄 Real-time ${action}:`, data.id, data.title);
+
+                // Check if task belongs to current project view
+                if (this.state.currentProjectId && data.project_id !== this.state.currentProjectId) {
+                    console.log('   ↳ Task belongs to different project, skipping view update');
+                    return;
+                }
+
+                // Update internal state
+                const task = this.updateStateTask(data, action);
+
+                // Update whichever view is active
+                if (action === 'create') {
+                    this.handleKanbanTaskCreated(data);
+                    this.handleListTaskCreated(data);
+                    this.handleGanttTaskCreated(data);
+                } else if (action === 'update') {
+                    this.handleKanbanTaskUpdated(data);
+                    this.handleListTaskUpdated(data);
+                    this.handleGanttTaskUpdated(data);
+                } else if (action === 'delete') {
+                    this.handleKanbanTaskDeleted(data);
+                    this.handleListTaskDeleted(data);
+                    this.handleGanttTaskDeleted(data);
+                }
+
+                // Update dashboard widgets
+                this.handleDashboardWidgetsUpdate(data, action);
+            },
+
+            // LIST VIEW HANDLERS
+            handleListTaskCreated(data) {
+                const listTable = document.querySelector('.list-table tbody');
+                if (!listTable) return;
+
+                const task = this.transformTasksFromAPI([data])[0];
+                if (!task) return;
+
+                const rowHtml = this.renderListRow(task);
+                listTable.insertAdjacentHTML('afterbegin', rowHtml);
+
+                const newRow = listTable.querySelector(`tr[data-task-id="${task.id}"]`);
+                if (newRow) {
+                    newRow.style.animation = 'fadeIn 0.3s ease';
+                    newRow.style.background = 'rgba(246, 146, 29, 0.1)';
+                    setTimeout(() => { newRow.style.background = ''; }, 2000);
+                }
+                console.log(`✅ List: Added task ${data.id}`);
+            },
+
+            handleListTaskUpdated(data) {
+                const existingRow = document.querySelector(`.list-table tr[data-task-id="${data.id}"]`);
+                if (!existingRow) return;
+
+                const task = this.transformTasksFromAPI([data])[0];
+                if (!task) return;
+
+                const tempDiv = document.createElement('tbody');
+                tempDiv.innerHTML = this.renderListRow(task);
+                const newRow = tempDiv.firstElementChild;
+
+                existingRow.innerHTML = newRow.innerHTML;
+                existingRow.style.animation = 'pulse 0.5s ease';
+                existingRow.style.background = 'rgba(246, 146, 29, 0.05)';
+                setTimeout(() => { existingRow.style.background = ''; }, 1500);
+
+                console.log(`✅ List: Updated task ${data.id}`);
+            },
+
+            handleListTaskDeleted(data) {
+                const row = document.querySelector(`.list-table tr[data-task-id="${data.id}"]`);
+                if (!row) return;
+
+                row.style.animation = 'fadeOut 0.3s ease';
+                row.style.opacity = '0';
+                setTimeout(() => row.remove(), 300);
+                console.log(`✅ List: Removed task ${data.id}`);
+            },
+
+            renderListRow(task) {
+                const priorityColors = { low: '#64748b', medium: '#3b82f6', high: '#f59e0b', critical: '#ef4444' };
+                const statusLabels = { backlog: 'Backlog', todo: 'Por Hacer', doing: 'En Progreso', done: 'Completada' };
+                const statusColors = { backlog: '#64748b', todo: '#f59e0b', doing: '#3b82f6', done: '#22c55e' };
+                const pLabel = task.priorityLabel || this.formatPriority(task.priority);
+                const pColor = priorityColors[task.priority] || '#3b82f6';
+                const dueStr = task.dueDate ? new Date(task.dueDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '-';
+
+                return `
+                    <tr data-task-id="${task.id}" onclick="App.openTaskModal(${task.id})" style="cursor: pointer;">
+                        <td>
+                            <div style="font-weight: 500;">${task.title}</div>
+                            <div style="font-size: 11px; color: var(--text-muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${task.description || ''}</div>
+                        </td>
+                        <td>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColors[task.status]};"></span>
+                                ${statusLabels[task.status] || task.status}
+                            </span>
+                        </td>
+                        <td>
+                            <span style="background: ${pColor}20; color: ${pColor}; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                                ${pLabel}
+                            </span>
+                        </td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <div style="flex: 1; height: 4px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden;">
+                                    <div style="width: ${task.progress || 0}%; height: 100%; background: ${pColor};"></div>
+                                </div>
+                                <span style="font-size: 10px; color: var(--text-muted);">${task.progress || 0}%</span>
+                            </div>
+                        </td>
+                        <td style="font-size: 12px;">${task.assignee || '-'}</td>
+                        <td style="font-size: 12px;">${dueStr}</td>
+                    </tr>
+                `;
+            },
+
+            // GANTT VIEW HANDLERS
+            handleGanttTaskCreated(data) {
+                const ganttBody = document.querySelector('.gantt-body');
+                if (!ganttBody) return;
+                if (data.status === 'completed' || data.status === 'done') return; // Gantt doesn't show completed
+
+                const task = this.transformTasksFromAPI([data])[0];
+                if (!task) return;
+
+                const rowHtml = this.renderGanttRow(task);
+                ganttBody.insertAdjacentHTML('afterbegin', rowHtml);
+
+                const newRow = ganttBody.querySelector(`div.gantt-row[data-task-id="${task.id}"]`);
+                if (newRow) {
+                    newRow.style.animation = 'fadeIn 0.3s ease';
+                }
+                console.log(`✅ Gantt: Added task ${data.id}`);
+            },
+
+            handleGanttTaskUpdated(data) {
+                const existingRow = document.querySelector(`.gantt-row[data-task-id="${data.id}"]`);
+
+                // If task is now completed, remove from Gantt
+                if (data.status === 'completed' || data.status === 'done') {
+                    if (existingRow) {
+                        existingRow.style.animation = 'fadeOut 0.3s ease';
+                        setTimeout(() => existingRow.remove(), 300);
+                    }
+                    return;
+                }
+
+                if (!existingRow) {
+                    // Task wasn't in Gantt, add it
+                    this.handleGanttTaskCreated(data);
+                    return;
+                }
+
+                const task = this.transformTasksFromAPI([data])[0];
+                if (!task) return;
+
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = this.renderGanttRow(task);
+                const newRow = tempDiv.firstElementChild;
+
+                existingRow.outerHTML = newRow.outerHTML;
+                console.log(`✅ Gantt: Updated task ${data.id}`);
+            },
+
+            handleGanttTaskDeleted(data) {
+                const row = document.querySelector(`.gantt-row[data-task-id="${data.id}"]`);
+                if (!row) return;
+
+                row.style.animation = 'fadeOut 0.3s ease';
+                row.style.opacity = '0';
+                setTimeout(() => row.remove(), 300);
+                console.log(`✅ Gantt: Removed task ${data.id}`);
+            },
+
+            renderGanttRow(task) {
+                const priorityColors = { low: '#64748b', medium: '#3b82f6', high: '#f59e0b', critical: '#ef4444' };
+                const pColor = priorityColors[task.priority] || '#3b82f6';
+                const pLabel = task.priorityLabel || this.formatPriority(task.priority);
+
+                // Calculate timeline positioning
+                const today = new Date();
+                const startDate = new Date(today);
+                startDate.setDate(today.getDate() - 14); // 2 weeks back
+                const totalDays = 8 * 7;
+
+                const taskDue = task.dueDate ? new Date(task.dueDate) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+                const taskStart = task.createdAt ? new Date(task.createdAt) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                const startOffset = Math.max(0, Math.floor((taskStart - startDate) / (1000 * 60 * 60 * 24)));
+                const duration = Math.max(5, Math.ceil((taskDue - taskStart) / (1000 * 60 * 60 * 24)));
+                const leftPercent = Math.max(0, Math.min(95, (startOffset / totalDays) * 100));
+                const widthPercent = Math.max(5, Math.min((duration / totalDays) * 100, 100 - leftPercent));
+
+                return `
+                    <div class="gantt-row" data-task-id="${task.id}" onclick="App.openTaskModal(${task.id})" style="cursor: pointer;">
+                        <div class="gantt-row-label" style="display: flex; align-items: center; gap: 8px;">
+                            <span style="background: ${pColor}20; color: ${pColor}; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700;">${pLabel}</span>
+                            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${task.title}</span>
+                        </div>
+                        <div class="gantt-row-bars">
+                            <div class="gantt-bar" style="left: ${leftPercent}%; width: ${widthPercent}%; background: ${pColor}; opacity: 0.85; border-radius: 4px;">
+                                ${task.progress > 0 ? `<div style="position: absolute; left: 0; top: 0; bottom: 0; width: ${task.progress}%; background: ${pColor}; opacity: 1; border-radius: 4px 0 0 4px;"></div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // DASHBOARD WIDGETS HANDLER
+            handleDashboardWidgetsUpdate(data, action) {
+                // Update KPIs card if on dashboard
+                const kpiTasks = document.querySelector('.metric-value[data-metric="tasks"]');
+                if (kpiTasks) {
+                    const current = parseInt(kpiTasks.textContent) || 0;
+                    if (action === 'create') kpiTasks.textContent = current + 1;
+                    if (action === 'delete') kpiTasks.textContent = Math.max(0, current - 1);
+                }
+
+                // Update project cards progress if visible
+                const projectCard = document.querySelector(`.project-card[data-project-id="${data.project_id}"]`);
+                if (projectCard) {
+                    // Refresh project card via API would be overkill, just flash it
+                    projectCard.style.boxShadow = '0 0 0 2px var(--solaria-orange)';
+                    setTimeout(() => { projectCard.style.boxShadow = ''; }, 1500);
+                }
+
+                console.log(`✅ Dashboard: Widgets notified of ${action}`);
+            },
+
             renderGanttView(tasks) {
                 // Generate weeks for the next 8 weeks
                 const weeks = [];
@@ -9985,8 +10505,8 @@
                         taskId: data.id,
                         timestamp: new Date().toISOString()
                     });
-                    // Real-time Kanban update
-                    this.handleKanbanTaskCreated(data);
+                    // Real-time update ALL views (Kanban, List, Gantt, Widgets)
+                    this.handleTaskRealTimeEvent(data, 'create');
                 });
 
                 this.socket.on('task_updated', (data) => {
@@ -9999,8 +10519,8 @@
                         taskId: data.id,
                         timestamp: new Date().toISOString()
                     });
-                    // Real-time Kanban update
-                    this.handleKanbanTaskUpdated(data);
+                    // Real-time update ALL views (Kanban, List, Gantt, Widgets)
+                    this.handleTaskRealTimeEvent(data, 'update');
                 });
 
                 this.socket.on('task_deleted', (data) => {
@@ -10013,8 +10533,8 @@
                         taskId: data.id,
                         timestamp: new Date().toISOString()
                     });
-                    // Real-time Kanban update
-                    this.handleKanbanTaskDeleted(data);
+                    // Real-time update ALL views (Kanban, List, Gantt, Widgets)
+                    this.handleTaskRealTimeEvent(data, 'delete');
                 });
 
                 this.socket.on('task_completed', (data) => {
@@ -10038,8 +10558,8 @@
                         priority: data.priority || 'medium',
                         completed_at: new Date().toISOString()
                     });
-                    // Also update Kanban (move to done column)
-                    this.handleKanbanTaskUpdated({ ...data, status: 'completed' });
+                    // Real-time update ALL views with completed status
+                    this.handleTaskRealTimeEvent({ ...data, status: 'completed' }, 'update');
                 });
 
                 this.socket.on('project_updated', (data) => {
