@@ -1,6 +1,7 @@
 class OfficeDashboard {
   constructor() {
     this.apiBase = '/api'
+    this.officeBusinessName = 'Solaria Agency'
     this.token = localStorage.getItem('solaria_office_token')
     this.user = null
     this.projects = []
@@ -245,9 +246,12 @@ class OfficeDashboard {
         this.fetchWithAuth(`${this.apiBase}/tasks`),
       ])
 
-      this.tasks = Array.isArray(tasksResponse) ? tasksResponse : tasksResponse?.tasks || []
+      const allTasks = Array.isArray(tasksResponse) ? tasksResponse : tasksResponse?.tasks || []
       const projects = projectResponse.projects || []
-      this.projects = OfficeUtils.mergeTasksIntoProjects(projects, this.tasks)
+      const scopedProjects = OfficeUtils.filterOfficeProjects(projects, this.officeBusinessName)
+      const scopedProjectIds = new Set(scopedProjects.map((p) => p.id))
+      this.tasks = allTasks.filter((task) => scopedProjectIds.has(task.project_id || task.projectId))
+      this.projects = OfficeUtils.mergeTasksIntoProjects(scopedProjects, this.tasks)
 
       this.renderProjectFilters()
       this.renderProjectsTable()
@@ -262,6 +266,15 @@ class OfficeDashboard {
 
   renderProjectsTable() {
     const filteredProjects = this.applyProjectFilters(this.projects)
+
+    if (!filteredProjects.length) {
+      this.projectTable.innerHTML = `
+        <div class="panel">
+          <p class="muted">Solo se muestran proyectos compartidos explícitamente con OFFICE (${this.officeBusinessName}). Marca <strong>office_visible</strong> o crea el proyecto desde office.solaria.agency para habilitarlo aquí.</p>
+        </div>
+      `
+      return
+    }
 
     const rows = filteredProjects
       .map((project) => {

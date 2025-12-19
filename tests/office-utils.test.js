@@ -1,6 +1,12 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { calculateBudgetSegments, mergeTasksIntoProjects, summarizeProjectsByClient, statusClass } = require('../dashboard/public/office/office-utils')
+const {
+  calculateBudgetSegments,
+  mergeTasksIntoProjects,
+  summarizeProjectsByClient,
+  statusClass,
+  filterOfficeProjects,
+} = require('../dashboard/public/office/office-utils')
 
 const SAMPLE_PROJECTS = [
   { id: 1, name: 'Alpha', budget: 10000, completion_percentage: 50, status: 'in_progress', client: 'Solaris' },
@@ -52,4 +58,20 @@ test('statusClass normalizes statuses to UI-friendly keys', () => {
   assert.strictEqual(statusClass('in_progress'), 'progress')
   assert.strictEqual(statusClass('blocked'), 'risk')
   assert.strictEqual(statusClass('completed'), 'completed')
+})
+
+test('filterOfficeProjects keeps only office-eligible or explicitly shared projects', () => {
+  const projects = [
+    { id: 1, name: 'Visible', client: 'Solaria Agency', office_visible: true },
+    { id: 2, name: 'Office origin', office_origin: 'office', client: 'Solaria Agency' },
+    { id: 3, name: 'Tagged office', tags: ['office'] },
+    { id: 4, name: 'Scoped by code', code: 'OFFICE-123' },
+    { id: 5, name: 'Business only', client: 'Solaria Agency' },
+    { id: 6, name: 'Hidden even if flagged', office_visible: true, office_hidden: true, client: 'Solaria Agency' },
+  ]
+
+  const filtered = filterOfficeProjects(projects, 'Solaria Agency')
+  const ids = filtered.map((p) => p.id)
+
+  assert.deepStrictEqual(ids.sort((a, b) => a - b), [1, 2, 3, 4])
 })

@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS projects (
     name VARCHAR(200) NOT NULL,
     code VARCHAR(10) NOT NULL DEFAULT 'PRJ',
     client VARCHAR(200),
+    office_origin ENUM('dfo', 'office') DEFAULT 'dfo',
+    office_visible TINYINT(1) DEFAULT 0,
     description TEXT,
     status ENUM('planning', 'development', 'testing', 'deployment', 'completed', 'on_hold', 'cancelled') DEFAULT 'planning',
     priority ENUM('low', 'medium', 'high', 'critical') DEFAULT 'medium',
@@ -43,6 +45,10 @@ CREATE TABLE IF NOT EXISTS projects (
     INDEX idx_code (code),
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Opt-in flags for Office visibility (safe for idempotent re-runs)
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS office_origin ENUM('dfo', 'office') DEFAULT 'dfo';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS office_visible TINYINT(1) DEFAULT 0;
 
 -- AI Agents table
 CREATE TABLE IF NOT EXISTS ai_agents (

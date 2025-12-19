@@ -207,6 +207,7 @@ Tarea creada en proyecto PRILABSA Website (aislado de otros proyectos)
 - Contraste con `dfo.solaria.agency`: DFO es táctico para producción/dark mode; OFFICE es estratégico y "cara al cliente".
 - Servicio: el contenedor `office` (puerto 3030) expone este frontend + API ya existente.
 - Funcionalidad: login reutilizando `/api/auth/login`, vistas de cartera con presupuestos desglosados, clientes consolidados y assets por proyecto desde Design Hub.
+- Alcance: OFFICE solo muestra proyectos compartidos explícitamente (campo `office_visible=1` o creados con `office_origin=office`). Los proyectos creados desde OFFICE siguen visibles en DFO, y desde DFO puedes activar la visibilidad hacia OFFICE con `PUT /api/projects/:id { office_visible: true }`.
 - **Usuario:** carlosjperez
 - **Password:** bypass
 

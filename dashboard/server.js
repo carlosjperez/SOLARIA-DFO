@@ -854,17 +854,26 @@ class SolariaDashboardServer {
                 priority = 'medium',
                 budget,
                 start_date,
-                deadline
+                deadline,
+                office_visible,
+                office_origin,
+                origin
             } = req.body;
+
+            const normalizedOrigin = (office_origin || origin || req.headers['x-solaria-portal'] || '').toLowerCase() === 'office'
+                ? 'office'
+                : 'dfo';
+            const normalizedVisibility = office_visible === true || office_visible === 1 || String(office_visible).toLowerCase() === 'true';
+            const officeVisible = normalizedOrigin === 'office' ? 1 : normalizedVisibility ? 1 : 0;
 
             const [result] = await this.db.execute(`
                 INSERT INTO projects (
-                    name, client, description, priority, budget, 
-                    start_date, deadline, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    name, client, description, priority, budget,
+                    start_date, deadline, created_by, office_origin, office_visible
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 name, client, description, priority, budget,
-                start_date, deadline, req.user.userId
+                start_date, deadline, req.user.userId, normalizedOrigin, officeVisible
             ]);
 
             // Log de creación
@@ -907,6 +916,16 @@ class SolariaDashboardServer {
             if (updates.deadline !== undefined) { fields.push('deadline = ?'); values.push(updates.deadline); }
             if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
             if (updates.completion_percentage !== undefined) { fields.push('completion_percentage = ?'); values.push(updates.completion_percentage); }
+            if (updates.office_origin !== undefined || updates.origin !== undefined) {
+                const normalizedOrigin = (updates.office_origin || updates.origin || '').toLowerCase() === 'office' ? 'office' : 'dfo';
+                fields.push('office_origin = ?');
+                values.push(normalizedOrigin);
+            }
+            if (updates.office_visible !== undefined) {
+                const normalizedVisibility = updates.office_visible === true || updates.office_visible === 1 || String(updates.office_visible).toLowerCase() === 'true';
+                fields.push('office_visible = ?');
+                values.push(normalizedVisibility ? 1 : 0);
+            }
 
             if (fields.length === 0) {
                 return res.status(400).json({ error: 'No fields to update' });
