@@ -127,3 +127,351 @@ h1, h2, h3 { margin: 0; color: var(--text); }
 .asset-tag { display: inline-flex; padding: 4px 8px; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-weight: 700; font-size: 12px; }
 
 .muted { color: var(--muted); }
+
+/* ===========================================
+   DESIGN SYSTEM SECTION
+   =========================================== */
+.design-system-content {
+  display: grid;
+  gap: 24px;
+}
+
+.design-system-scroll {
+  display: grid;
+  gap: 32px;
+  padding-bottom: 40px;
+}
+
+.ds-section {
+  display: grid;
+  gap: 16px;
+}
+
+.ds-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent);
+  display: inline-block;
+  width: fit-content;
+}
+
+.ds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.ds-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.ds-card h4 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+/* Logo Container */
+.ds-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #fef7ed 0%, #fff 100%);
+  border-radius: 12px;
+}
+
+.ds-logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+/* Color Swatches */
+.ds-color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.ds-color-swatch {
+  height: 56px;
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.ds-color-label {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* Typography */
+.ds-typography {
+  display: grid;
+  gap: 16px;
+}
+
+.ds-type-header {
+  display: grid;
+  gap: 4px;
+}
+
+.ds-type-header h4 {
+  margin: 0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+.ds-type-header p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ds-type-samples {
+  display: grid;
+  gap: 12px;
+}
+
+.ds-type-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 10px;
+  gap: 16px;
+}
+
+.ds-type-spec {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Component Groups */
+.ds-component-group {
+  display: grid;
+  gap: 12px;
+}
+
+.ds-component-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ds-component-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Phase Badges */
+.ds-phase-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ds-phase-badge.planning {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.ds-phase-badge.development {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.ds-phase-badge.testing {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.ds-phase-badge.production {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+/* Progress Segments */
+.ds-progress-segments {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.ds-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.ds-progress-labels {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.ds-progress-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.ds-progress-label .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Mini Trello */
+.ds-mini-trello {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.ds-trello-column {
+  display: grid;
+  gap: 8px;
+}
+
+.ds-trello-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.ds-trello-slots {
+  display: grid;
+  gap: 4px;
+  min-height: 80px;
+}
+
+.ds-slot {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.ds-slot.filled {
+  background: currentColor;
+}
+
+.ds-trello-count {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Stats Demo */
+.ds-stats-demo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 16px;
+  text-align: center;
+}
+
+.ds-stat-item {
+  display: grid;
+  gap: 4px;
+}
+
+.ds-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.ds-stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Budget Graph */
+.ds-budget-graph {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 80px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+
+.ds-bar {
+  flex: 1;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+}
+
+/* Footer */
+.ds-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+}
+
+.ds-footer-logo {
+  width: 32px;
+  height: 32px;
+}
+
+.ds-footer span {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ds-mini-trello {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ds-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -35,6 +35,7 @@ class OfficeDashboard {
     this.clientsTable = document.getElementById('clientsTable')
     this.agentsTable = document.getElementById('agentsTable')
     this.designHub = document.getElementById('designHub')
+    this.designSystemContent = document.getElementById('designSystemContent')
     this.miniKPIs = document.getElementById('miniKPIs')
     this.userName = document.getElementById('userName')
     this.userRole = document.getElementById('userRole')
@@ -589,6 +590,288 @@ class OfficeDashboard {
     }
   }
 
+  renderDesignSystem() {
+    if (!this.designSystemContent) return
+
+    this.designSystemContent.innerHTML = `
+      <div class="design-system-scroll">
+        <!-- BRAND IDENTITY -->
+        <div class="ds-section">
+          <h3 class="ds-section-title"><i class="fas fa-star"></i> Brand Identity</h3>
+          <div class="ds-grid cols-3">
+            <div class="ds-card">
+              <h4>Logo</h4>
+              <div class="ds-logo-container">
+                <img src="/solaria-logo.png" alt="SOLARIA Logo" class="ds-logo">
+              </div>
+              <p class="muted">Logo oficial SOLARIA Agency</p>
+            </div>
+            <div class="ds-card">
+              <h4>Brand Colors</h4>
+              <div class="ds-color-grid">
+                <div class="ds-color-swatch" style="background: #f6921d;" title="SOLARIA Orange">
+                  <span class="ds-color-label">#f6921d</span>
+                </div>
+                <div class="ds-color-swatch" style="background: #d97706;" title="Orange Dark">
+                  <span class="ds-color-label">#d97706</span>
+                </div>
+                <div class="ds-color-swatch" style="background: #0a0a0a; color: #fff;" title="Background Dark">
+                  <span class="ds-color-label">#0a0a0a</span>
+                </div>
+                <div class="ds-color-swatch" style="background: #141414; color: #fff;" title="Secondary BG">
+                  <span class="ds-color-label">#141414</span>
+                </div>
+              </div>
+            </div>
+            <div class="ds-card">
+              <h4>Phase Colors</h4>
+              <div class="ds-color-grid">
+                <div class="ds-color-swatch" style="background: #a855f7;" title="Planning">
+                  <span class="ds-color-label">Planning</span>
+                </div>
+                <div class="ds-color-swatch" style="background: #22d3ee;" title="Development">
+                  <span class="ds-color-label">Dev</span>
+                </div>
+                <div class="ds-color-swatch" style="background: #14b8a6;" title="Testing">
+                  <span class="ds-color-label">Test</span>
+                </div>
+                <div class="ds-color-swatch" style="background: #22c55e;" title="Production">
+                  <span class="ds-color-label">Prod</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TYPOGRAPHY -->
+        <div class="ds-section">
+          <h3 class="ds-section-title"><i class="fas fa-font"></i> Typography</h3>
+          <div class="ds-card ds-typography">
+            <div class="ds-type-header">
+              <span class="ds-type-label">Font Family</span>
+              <div class="ds-type-name">Inter</div>
+            </div>
+            <div class="ds-type-samples">
+              <div class="ds-type-row">
+                <span style="font-size: 32px; font-weight: 700;">Heading H1</span>
+                <span class="ds-type-spec">32px / 700</span>
+              </div>
+              <div class="ds-type-row">
+                <span style="font-size: 24px; font-weight: 600;">Heading H2</span>
+                <span class="ds-type-spec">24px / 600</span>
+              </div>
+              <div class="ds-type-row">
+                <span style="font-size: 18px; font-weight: 600;">Heading H3</span>
+                <span class="ds-type-spec">18px / 600</span>
+              </div>
+              <div class="ds-type-row">
+                <span style="font-size: 14px; font-weight: 500;">Body Text</span>
+                <span class="ds-type-spec">14px / 500</span>
+              </div>
+              <div class="ds-type-row">
+                <span style="font-size: 12px; color: var(--text-muted);">Small / Muted</span>
+                <span class="ds-type-spec">12px / 400</span>
+              </div>
+              <div class="ds-type-row">
+                <span style="font-size: 10px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">LABEL UPPERCASE</span>
+                <span class="ds-type-spec">10px / 600 / Uppercase</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAGS & BADGES -->
+        <div class="ds-section">
+          <h3 class="ds-section-title"><i class="fas fa-tags"></i> Tags & Badges</h3>
+          <div class="ds-card">
+            <div class="ds-component-group">
+              <span class="ds-component-label">Status Badges</span>
+              <div class="ds-component-row">
+                <span class="status progress">En progreso</span>
+                <span class="status risk">Riesgo</span>
+                <span class="status paused">Pausado</span>
+                <span class="status completed">Completado</span>
+              </div>
+            </div>
+            <div class="ds-component-group">
+              <span class="ds-component-label">Project Tags</span>
+              <div class="ds-component-row">
+                <span class="chip">SaaS</span>
+                <span class="chip">Platform</span>
+                <span class="chip">React</span>
+                <span class="chip">Node.js</span>
+              </div>
+            </div>
+            <div class="ds-component-group">
+              <span class="ds-component-label">Phase Indicators</span>
+              <div class="ds-component-row">
+                <span class="ds-phase-badge planning">Planificación</span>
+                <span class="ds-phase-badge development">Desarrollo</span>
+                <span class="ds-phase-badge testing">Testing</span>
+                <span class="ds-phase-badge production">Producción</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROGRESS BARS -->
+        <div class="ds-section">
+          <h3 class="ds-section-title"><i class="fas fa-chart-bar"></i> Progress Bars</h3>
+          <div class="ds-card">
+            <div class="ds-component-group">
+              <span class="ds-component-label">Standard Progress</span>
+              <div class="progress-bar ds-progress-demo"><span style="width: 65%"></span></div>
+              <span class="muted">65% completado</span>
+            </div>
+            <div class="ds-component-group">
+              <span class="ds-component-label">Segmented Progress (Phases)</span>
+              <div class="ds-progress-segments">
+                <div class="ds-segment" style="background: #a855f7;" title="Planning 100%"></div>
+                <div class="ds-segment" style="background: #22d3ee;" title="Development 100%"></div>
+                <div class="ds-segment" style="background: #14b8a6; opacity: 0.6;" title="Testing 60%"></div>
+                <div class="ds-segment" style="background: #1e1e1e;" title="Production 0%"></div>
+              </div>
+              <div class="ds-progress-labels">
+                <span class="ds-progress-label completed">Plan</span>
+                <span class="ds-progress-label completed">Dev</span>
+                <span class="ds-progress-label active">Test</span>
+                <span class="ds-progress-label">Prod</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MINI TRELLO / EQUALIZER -->
+        <div class="ds-section">
+          <h3 class="ds-section-title"><i class="fas fa-columns"></i> Mini Trello (Equalizer)</h3>
+          <div class="ds-card">
+            <div class="ds-mini-trello">
+              <div class="ds-trello-column">
+                <span class="ds-trello-label">BL</span>
+                <div class="ds-trello-slots">
+                  <div class="ds-slot filled" style="background: #64748b;"></div>
+                  <div class="ds-slot filled" style="background: #64748b;"></div>
+                  <div class="ds-slot filled" style="background: #64748b;"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                </div>
+                <span class="ds-trello-count">3</span>
+              </div>
+              <div class="ds-trello-column">
+                <span class="ds-trello-label">TD</span>
+                <div class="ds-trello-slots">
+                  <div class="ds-slot filled" style="background: #f59e0b;"></div>
+                  <div class="ds-slot filled" style="background: #f59e0b;"></div>
+                  <div class="ds-slot filled" style="background: #f59e0b;"></div>
+                  <div class="ds-slot filled" style="background: #f59e0b;"></div>
+                  <div class="ds-slot filled" style="background: #f59e0b;"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                </div>
+                <span class="ds-trello-count">5</span>
+              </div>
+              <div class="ds-trello-column">
+                <span class="ds-trello-label">DO</span>
+                <div class="ds-trello-slots">
+                  <div class="ds-slot filled" style="background: #3b82f6;"></div>
+                  <div class="ds-slot filled" style="background: #3b82f6;"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                  <div class="ds-slot"></div>
+                </div>
+                <span class="ds-trello-count">2</span>
+              </div>
+              <div class="ds-trello-column">
+                <span class="ds-trello-label">DN</span>
+                <div class="ds-trello-slots">
+                  <div class="ds-slot filled" style="background: #22c55e;"></div>
+                  <div class="ds-slot filled" style="background: #22c55e;"></div>
+                  <div class="ds-slot filled" style="background: #22c55e;"></div>
+                  <div class="ds-slot filled" style="background: #22c55e;"></div>
+                  <div class="ds-slot filled" style="background: #22c55e;"></div>
+                  <div class="ds-slot filled" style="background: #22c55e;"></div>
+                  <div class="ds-slot filled" style="background: #22c55e;"></div>
+                  <div class="ds-slot"></div>
+                </div>
+                <span class="ds-trello-count">7</span>
+              </div>
+            </div>
+            <p class="muted" style="margin-top: 12px;">BL=Backlog, TD=To Do, DO=Doing, DN=Done</p>
+          </div>
+        </div>
+
+        <!-- CARDS -->
+        <div class="ds-section">
+          <h3 class="ds-section-title"><i class="fas fa-square"></i> Cards</h3>
+          <div class="ds-grid cols-3">
+            <div class="ds-card">
+              <h4>KPI Card</h4>
+              <div class="kpi-card ds-kpi-demo">
+                <span class="kpi-label">Proyectos activos</span>
+                <span class="kpi-value">12</span>
+              </div>
+            </div>
+            <div class="ds-card">
+              <h4>Stats Summary</h4>
+              <div class="ds-stats-demo">
+                <div class="ds-stat-item">
+                  <div class="ds-stat-value" style="color: #60a5fa;">25</div>
+                  <div class="ds-stat-label">Total</div>
+                </div>
+                <div class="ds-stat-item">
+                  <div class="ds-stat-value" style="color: #fbbf24;">6</div>
+                  <div class="ds-stat-label">Pend</div>
+                </div>
+                <div class="ds-stat-item">
+                  <div class="ds-stat-value" style="color: #4ade80;">19</div>
+                  <div class="ds-stat-label">Comp</div>
+                </div>
+              </div>
+            </div>
+            <div class="ds-card">
+              <h4>Budget Graph</h4>
+              <div class="ds-budget-graph">
+                <div class="ds-bar" style="height: 25%;"></div>
+                <div class="ds-bar" style="height: 40%;"></div>
+                <div class="ds-bar" style="height: 55%;"></div>
+                <div class="ds-bar" style="height: 70%;"></div>
+                <div class="ds-bar" style="height: 60%;"></div>
+                <div class="ds-bar" style="height: 85%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BUTTONS -->
+        <div class="ds-section">
+          <h3 class="ds-section-title"><i class="fas fa-hand-pointer"></i> Buttons</h3>
+          <div class="ds-card">
+            <div class="ds-component-row" style="gap: 12px;">
+              <button class="primary">Primary</button>
+              <button class="ghost">Ghost / Secondary</button>
+              <button class="chip">Chip Button</button>
+              <span class="pill">Pill Badge</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="ds-footer">
+          <img src="/solaria-logo.png" alt="SOLARIA" class="ds-footer-logo">
+          <p>SOLARIA Agency Design System v1.0</p>
+          <p class="muted">Componentes UI para dashboards y aplicaciones internas</p>
+        </div>
+      </div>
+    `
+  }
+
   summarizeTaskStatuses(tasks = []) {
     return tasks.reduce((acc, task) => {
       const key = task.status || 'pending'
@@ -607,6 +890,11 @@ class OfficeDashboard {
     document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'))
     btn.classList.add('active')
     this.updateBreadcrumb(btn.textContent)
+
+    // Render Design System when that section is shown
+    if (section === 'design-system') {
+      this.renderDesignSystem()
+    }
   }
 
   updateBreadcrumb(text) {
