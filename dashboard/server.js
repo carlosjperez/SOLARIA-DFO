@@ -2271,9 +2271,8 @@ class SolariaDashboardServer {
             let query = `
                 SELECT t.*,
                        p.name as project_name,
-                       p.slug as project_slug,
                        aa.name as agent_name,
-                       CONCAT(p.slug, '-', LPAD(t.task_number, 3, '0')) as code
+                       CONCAT('PROJ-', LPAD(t.project_id, 2, '0'), '-', LPAD(t.task_number, 3, '0')) as code
                 FROM tasks t
                 JOIN task_tag_assignments tta ON t.id = tta.task_id
                 JOIN task_tags tt ON tta.tag_id = tt.id
