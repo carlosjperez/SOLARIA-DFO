@@ -2472,29 +2472,61 @@ class SolariaDashboardServer {
                 status = 'pending'
             } = req.body;
 
+            const effectiveProjectId = project_id || 1;
+
+            // Get next task_number for this project (same logic as createTask)
+            const [maxTask] = await this.db.execute(
+                'SELECT COALESCE(MAX(task_number), 0) + 1 as next_number FROM tasks WHERE project_id = ?',
+                [effectiveProjectId]
+            );
+            const taskNumber = maxTask[0].next_number;
+
             // Convert undefined to null for MySQL compatibility
             const [result] = await this.db.execute(`
-                INSERT INTO tasks (title, description, project_id, assigned_agent_id, priority, estimated_hours, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tasks (title, description, project_id, assigned_agent_id, task_number, priority, estimated_hours, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 title,
                 description,
-                project_id || 1,
+                effectiveProjectId,
                 agent_id ?? null,
+                taskNumber,
                 priority,
                 estimated_hours ?? null,
                 status
             ]);
 
+            // Get project code for response
+            let taskCode = `#${taskNumber}`;
+            const [projects] = await this.db.execute(
+                'SELECT code FROM projects WHERE id = ?',
+                [effectiveProjectId]
+            );
+            if (projects.length > 0 && projects[0].code) {
+                taskCode = `${projects[0].code}-${String(taskNumber).padStart(3, '0')}`;
+            }
+
             await this.db.execute(`
                 INSERT INTO activity_logs (project_id, agent_id, action, details, category, level)
                 VALUES (?, ?, 'task_created_by_agent', ?, 'development', 'info')
-            `, [project_id || 1, agent_id, JSON.stringify({ task_id: result.insertId, title })]);
+            `, [effectiveProjectId, agent_id, JSON.stringify({ task_id: result.insertId, task_code: taskCode, title })]);
+
+            // Emit notification with task code
+            this.io.to('notifications').emit('task_created', {
+                id: result.insertId,
+                task_code: taskCode,
+                task_number: taskNumber,
+                title,
+                project_id: effectiveProjectId,
+                priority
+            });
 
             res.status(201).json({
                 success: true,
                 task_id: result.insertId,
-                message: `Task '${title}' created successfully`
+                task_code: taskCode,
+                task_number: taskNumber,
+                message: `Task '${title}' (${taskCode}) created successfully`
             });
         } catch (error) {
             console.error('Add task from agent error:', error);
