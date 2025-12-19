@@ -8282,6 +8282,25 @@
                 return priorityMap[priority] || 'P2';
             },
 
+            // Get relative time string (e.g., "2h", "3d", "1w")
+            getRelativeTime(date) {
+                const now = new Date();
+                const diffMs = now - date;
+                const diffSecs = Math.floor(diffMs / 1000);
+                const diffMins = Math.floor(diffSecs / 60);
+                const diffHours = Math.floor(diffMins / 60);
+                const diffDays = Math.floor(diffHours / 24);
+                const diffWeeks = Math.floor(diffDays / 7);
+                const diffMonths = Math.floor(diffDays / 30);
+
+                if (diffMins < 1) return 'ahora';
+                if (diffMins < 60) return `${diffMins}m`;
+                if (diffHours < 24) return `${diffHours}h`;
+                if (diffDays < 7) return `${diffDays}d`;
+                if (diffWeeks < 4) return `${diffWeeks}sem`;
+                return `${diffMonths}mes`;
+            },
+
             transformTasksFromAPI(apiTasks) {
                 return apiTasks.map(t => ({
                     id: t.id,
@@ -8496,11 +8515,68 @@
                 const pLabel = task.priorityLabel || priorityLabels[task.priority] || 'P2';
                 const pColor = priorityColors[task.priority] || '#3b82f6';
 
-                // Progress bar for in_progress tasks
+                // Progress bar with percentage text
                 const progressBar = task.progress > 0 ? `
-                    <div style="width: 100%; height: 3px; background: var(--bg-tertiary); border-radius: 2px; margin-top: 6px; overflow: hidden;">
-                        <div style="width: ${task.progress}%; height: 100%; background: ${pColor}; border-radius: 2px;"></div>
+                    <div class="task-progress-container" style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+                        <div style="flex: 1; height: 3px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden;">
+                            <div style="width: ${task.progress}%; height: 100%; background: ${pColor}; border-radius: 2px; transition: width 0.3s ease;"></div>
+                        </div>
+                        <span style="font-size: 9px; color: ${task.progress >= 100 ? '#22c55e' : 'var(--text-muted)'}; font-weight: 600; min-width: 28px;">${task.progress}%</span>
                     </div>
+                ` : '';
+
+                // Project badge (for cross-project views)
+                const projectBadge = task.project_name ? `
+                    <span class="task-project-badge" style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 3px;
+                        font-size: 9px;
+                        color: var(--solaria-orange);
+                        background: rgba(246, 146, 29, 0.1);
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        max-width: 120px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    ">
+                        <i class="fas fa-folder"></i>
+                        ${task.project_code || task.project_name.substring(0, 15)}
+                    </span>
+                ` : '';
+
+                // Creation date (relative time)
+                const createdDate = task.createdAt ? new Date(task.createdAt) : null;
+                const createdAgo = createdDate ? this.getRelativeTime(createdDate) : '';
+                const createdBadge = createdAgo ? `
+                    <span class="task-created-badge" style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 3px;
+                        font-size: 9px;
+                        color: var(--text-muted);
+                    ">
+                        <i class="fas fa-clock"></i>
+                        ${createdAgo}
+                    </span>
+                ` : '';
+
+                // Estimated hours badge
+                const hoursBadge = task.estimatedHours > 0 ? `
+                    <span class="task-hours-badge" style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 3px;
+                        font-size: 9px;
+                        color: var(--text-muted);
+                        background: var(--bg-tertiary);
+                        padding: 2px 5px;
+                        border-radius: 4px;
+                    ">
+                        <i class="fas fa-hourglass-half"></i>
+                        ${task.estimatedHours}h
+                    </span>
                 ` : '';
 
                 // Status chip for original status
@@ -8529,18 +8605,23 @@
                 ` : '';
 
                 return `
-                    <div class="task-card" onclick="App.openTaskModal(${task.id})">
+                    <div class="task-card" onclick="App.openTaskModal(${task.id})" data-task-id="${task.id}">
                         <div class="task-card-header">
                             <span class="task-card-title">${task.task_code ? `<span style="color: var(--solaria-orange); font-weight: 600; margin-right: 6px;">${task.task_code}</span>` : ''}${task.title}</span>
-                            <div style="display: flex; align-items: center; gap: 4px;">
+                            <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                                 <span class="priority-badge" style="background: ${pColor}20; color: ${pColor}; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700;">
                                     ${pLabel}
                                 </span>
                                 ${checklistBadge}
+                                ${hoursBadge}
                             </div>
                         </div>
                         <p class="task-card-desc">${task.description || ''}</p>
                         ${progressBar}
+                        <div class="task-card-info" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
+                            ${projectBadge}
+                            ${createdBadge}
+                        </div>
                         <div class="task-card-footer">
                             <div class="task-card-meta">
                                 <span class="task-card-assignee" style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-muted);">
