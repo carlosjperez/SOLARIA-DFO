@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOLARIA OFFICE - Gestión de proyectos y clientes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/solaria-logo.png">
+  <link rel="stylesheet" href="./office.css">
+</head>
+<body>
+  <div id="officeApp" class="app-shell">
+    <section id="officeLogin" class="full-screen center" aria-label="Office login">
+      <div class="login-card">
+        <div class="logo-stack">
+          <img src="/solaria-logo.png" alt="Solaria" class="logo">
+          <div class="wordmark">
+            <span class="office">OFFICE</span>
+            <span class="agency">SOLARIA.AGENCY</span>
+          </div>
+        </div>
+        <p class="subtitle">Panel de gestión para Project Managers y Account Managers</p>
+        <form id="officeLoginForm" class="form">
+          <label class="field">
+            <span>Usuario o email</span>
+            <input id="officeUser" type="text" placeholder="carlosjperez" required autocomplete="username">
+          </label>
+          <label class="field">
+            <span>Contraseña</span>
+            <input id="officePassword" type="password" placeholder="bypass" required autocomplete="current-password">
+          </label>
+          <button class="primary" type="submit">Entrar</button>
+          <p id="officeLoginError" class="error" role="alert"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="officeLayout" class="hidden app-grid" aria-label="Office dashboard">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="badge">OFFICE</div>
+          <div class="sidebar-title">Gestión de cuentas</div>
+        </div>
+        <nav class="nav" aria-label="Navegación principal">
+          <button class="nav-item active" data-section="overview">Dashboard</button>
+          <button class="nav-item" data-section="projects">Proyectos</button>
+          <button class="nav-item" data-section="clients">Clientes</button>
+          <button class="nav-item" data-section="agents">Agentes</button>
+          <button class="nav-item" data-section="design">Design Hub</button>
+          <button class="nav-item" data-section="reports">Reportes</button>
+        </nav>
+      </aside>
+
+      <div class="main">
+        <header class="topbar">
+          <div class="breadcrumbs" id="officeBreadcrumbs">Dashboard</div>
+          <div class="topbar-actions">
+            <div class="project-switcher">
+              <label for="projectSelector">Proyecto</label>
+              <select id="projectSelector"></select>
+            </div>
+            <div class="kpi-mini" id="miniKPIs"></div>
+            <div class="user-chip" id="userChip">
+              <div class="avatar" id="userAvatar">PM</div>
+              <div>
+                <div class="user-name" id="userName">-</div>
+                <div class="user-role" id="userRole">Project Manager</div>
+              </div>
+            </div>
+            <button class="ghost" id="officeLogout">Salir</button>
+          </div>
+        </header>
+
+        <main class="content">
+          <section id="section-overview" class="section">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Visión ejecutiva</p>
+                <h1>Estado general de la cartera</h1>
+              </div>
+              <div class="pill">Light mode</div>
+            </div>
+            <div class="grid kpi-grid" id="overviewKPI"></div>
+            <div class="panel" id="budgetSnapshot"></div>
+          </section>
+
+          <section id="section-projects" class="section hidden">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Proyectos</p>
+                <h2>Portafolio con foco en presupuesto</h2>
+              </div>
+              <div class="legend">
+                <span class="dot green"></span> En progreso
+                <span class="dot amber"></span> Riesgo
+                <span class="dot gray"></span> Pausa
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head">
+                <h3>Resumen macro</h3>
+                <div class="tags" id="projectFilters"></div>
+              </div>
+              <div class="table" id="projectTable"></div>
+            </div>
+            <div class="panel" id="projectDetail" aria-live="polite"></div>
+          </section>
+
+          <section id="section-clients" class="section hidden">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Clientes</p>
+                <h2>Cartera y salud de cuentas</h2>
+              </div>
+            </div>
+            <div class="panel" id="clientsTable"></div>
+          </section>
+
+          <section id="section-agents" class="section hidden">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Agentes</p>
+                <h2>Humanos e IA en proyectos</h2>
+              </div>
+            </div>
+            <div class="panel" id="agentsTable"></div>
+          </section>
+
+          <section id="section-design" class="section hidden">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Design Hub</p>
+                <h2>Assets por proyecto</h2>
+              </div>
+            </div>
+            <div class="panel" id="designHub"></div>
+          </section>
+
+          <section id="section-reports" class="section hidden">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Reportes</p>
+                <h2>Exportes rápidos para clientes</h2>
+              </div>
+            </div>
+            <div class="panel">
+              <p class="muted">Próximamente: PDFs y envíos automáticos. Utiliza los datos en las secciones actuales para responder a clientes.</p>
+            </div>
+          </section>
+        </main>
+      </div>
+    </section>
+  </div>
+  <script src="./office-utils.js"></script>
+  <script src="./office.js"></script>
+</body>
+</html>

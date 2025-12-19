@@ -198,6 +198,15 @@ Tarea creada en proyecto PRILABSA Website (aislado de otros proyectos)
 ## Dashboard
 
 - **URL:** https://dfo.solaria.agency
+
+## SOLARIA OFFICE
+
+`office.solaria.agency` es el dashboard de gestión orientado a Project Managers y Account Managers.
+
+- Enfoque: visión macro de proyectos, clientes y presupuestos con modo claro fijo.
+- Contraste con `dfo.solaria.agency`: DFO es táctico para producción/dark mode; OFFICE es estratégico y "cara al cliente".
+- Servicio: el contenedor `office` (puerto 3030) expone este frontend + API ya existente.
+- Funcionalidad: login reutilizando `/api/auth/login`, vistas de cartera con presupuestos desglosados, clientes consolidados y assets por proyecto desde Design Hub.
 - **Usuario:** carlosjperez
 - **Password:** bypass
 

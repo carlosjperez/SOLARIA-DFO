@@ -130,6 +130,11 @@ class SolariaDashboardServer {
     }
 
     initializeRoutes() {
+        // SOLARIA Office frontend (light mode)
+        this.app.get(['/office', '/office/*'], (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'office', 'index.html'))
+        })
+
         // Autenticación para C-suite
         this.app.post('/api/auth/login', this.handleLogin.bind(this));
         this.app.post('/api/auth/logout', this.handleLogout.bind(this));
