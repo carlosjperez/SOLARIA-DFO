@@ -5130,16 +5130,16 @@
                 this.loadPageContent(page);
             },
 
-            // Programmatic navigation (for onclick handlers)
+            // Programmatic navigation (used by onclick handlers in stat-cards)
             navigateTo(page) {
                 const navItem = document.querySelector(`[data-page="${page}"]`);
                 if (navItem) {
-                    this.elements.navItems.forEach(nav => nav.classList.remove('active'));
+                    App.elements.navItems.forEach(nav => nav.classList.remove('active'));
                     navItem.classList.add('active');
                 }
-                this.state.currentPage = page;
+                App.state.currentPage = page;
                 history.pushState({ page }, '', `#${page}`);
-                this.loadPageContent(page);
+                App.loadPageContent(page);
             },
 
             handleInitialRoute() {
@@ -5196,11 +5196,12 @@
             },
 
             // Deep link navigation methods
+            // NOTE: Using App. instead of this. because these methods are called from onclick handlers
             async showTaskDetail(taskId) {
                 console.log('Navigating to task:', taskId);
 
                 // Try to find task in current state first
-                let task = this.state.currentTasks?.find(t => t.id === taskId || t.id === parseInt(taskId));
+                let task = App.state.currentTasks?.find(t => t.id === taskId || t.id === parseInt(taskId));
 
                 if (!task) {
                     // Fetch from API if not in state
@@ -5208,8 +5209,8 @@
                         const response = await API.getTasks();
                         if (response && response.tasks) {
                             const rawTasks = response.tasks;
-                            this.state.currentTasks = this.transformTasksFromAPI(rawTasks);
-                            task = this.state.currentTasks.find(t => t.id === taskId || t.id === parseInt(taskId));
+                            App.state.currentTasks = App.transformTasksFromAPI(rawTasks);
+                            task = App.state.currentTasks.find(t => t.id === taskId || t.id === parseInt(taskId));
                         }
                     } catch (error) {
                         console.error('Failed to fetch task:', error);
@@ -5218,13 +5219,13 @@
 
                 if (task) {
                     // Navigate to tareas page and open modal
-                    this.setActiveNav('tareas');
-                    this.state.currentPage = 'tareas';
-                    await this.renderTareasPage();
+                    App.setActiveNav('tareas');
+                    App.state.currentPage = 'tareas';
+                    await App.renderTareasPage();
                     // Open the task modal
-                    this.openTaskModal(task.id);
+                    App.openTaskModal(task.id);
                 } else {
-                    this.showNotification({
+                    App.showNotification({
                         title: 'Tarea no encontrada',
                         message: `No se encontro la tarea #${taskId}`,
                         type: 'error'
@@ -5236,9 +5237,9 @@
                 console.log('Navigating to project:', projectId);
 
                 // Navigate to projects page
-                this.setActiveNav('proyectos');
-                this.state.currentPage = 'proyectos';
-                await this.renderProjectsPage();
+                App.setActiveNav('proyectos');
+                App.state.currentPage = 'proyectos';
+                await App.renderProjectsPage();
 
                 // Find and scroll to the project card
                 setTimeout(() => {
@@ -5257,7 +5258,7 @@
                     }
                 }, 300);
 
-                this.showNotification({
+                App.showNotification({
                     title: 'Proyecto',
                     message: `Navegando a proyecto #${projectId}`,
                     type: 'info'
