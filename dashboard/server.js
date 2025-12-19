@@ -1861,6 +1861,7 @@ class SolariaDashboardServer {
             if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
             if (updates.priority !== undefined) { fields.push('priority = ?'); values.push(updates.priority); }
             if (updates.progress !== undefined) { fields.push('progress = ?'); values.push(updates.progress); }
+            if (updates.project_id !== undefined) { fields.push('project_id = ?'); values.push(updates.project_id); }
 
             // Auto-set progress to 100% when task is marked as completed (if not explicitly provided)
             if (updates.status === 'completed' && updates.progress === undefined) {
