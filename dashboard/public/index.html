@@ -5222,7 +5222,7 @@
                     // They're viewed in context of projects or via modal from any page
                     App.openTaskModal(task.id);
                 } else {
-                    App.showNotification({
+                    App.addNotification({
                         title: 'Tarea no encontrada',
                         message: `No se encontro la tarea #${taskId}`,
                         type: 'error'
@@ -5260,7 +5260,7 @@
                     }
                 }, 300);
 
-                App.showNotification({
+                App.addNotification({
                     title: 'Proyecto',
                     message: `Navegando a proyecto #${projectId}`,
                     type: 'info'
