@@ -98,6 +98,12 @@ services:
       - ./scripts/install-mcp-remote.sh:/etc/nginx/install-mcp-remote.sh:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - certbot_webroot:/var/www/certbot
+      # PRILABSA static files (external volumes from prilabsa-production)
+      - prilabsa_frontend:/usr/share/nginx/prilabsa/frontend:ro
+      - prilabsa_dashboard:/usr/share/nginx/prilabsa/dashboard:ro
+      - prilabsa_landing:/usr/share/nginx/prilabsa/landing:ro
+      - prilabsa_uploads:/usr/share/nginx/prilabsa/uploads:ro
+      - prilabsa_wp_uploads:/usr/share/nginx/prilabsa/wp-uploads:ro
     depends_on:
       office:
         condition: service_healthy
@@ -121,6 +127,22 @@ volumes:
     driver: local
   certbot_webroot:
     driver: local
+  # PRILABSA external volumes (created by prilabsa-production stack)
+  prilabsa_frontend:
+    external: true
+    name: prilabsa-production_frontend_dist
+  prilabsa_dashboard:
+    external: true
+    name: prilabsa-production_dashboard_dist
+  prilabsa_landing:
+    external: true
+    name: prilabsa-production_landing_dist
+  prilabsa_uploads:
+    external: true
+    name: prilabsa-production_api_uploads
+  prilabsa_wp_uploads:
+    external: true
+    name: prilabsa-production_wordpress_uploads
 
 networks:
   solaria-dfo-network:
