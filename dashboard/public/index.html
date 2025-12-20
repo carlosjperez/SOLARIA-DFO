@@ -10013,8 +10013,138 @@
                 }
             },
 
-            createNewTask(status = 'backlog') {
-                alert(`Crear nueva tarea en columna: ${status}\n\n(Esta funcionalidad se conectara con la API)`);
+            async createNewTask(status = 'backlog') {
+                // Get current project
+                const projectId = this.state.currentProject?.id || 1;
+                const projectCode = this.state.currentProject?.code || 'DFO';
+
+                // Show create task modal
+                const modalHtml = `
+                    <div id="createTaskModal" class="modal-overlay" onclick="if(event.target === this) App.closeCreateTaskModal()">
+                        <div class="modal-content" style="max-width: 500px;" onclick="event.stopPropagation()">
+                            <div class="modal-header">
+                                <h2><i class="fas fa-plus-circle"></i> Nueva Tarea</h2>
+                                <button class="modal-close" onclick="App.closeCreateTaskModal()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <div class="modal-body" style="padding: 24px;">
+                                <div class="form-group" style="margin-bottom: 16px;">
+                                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+                                        Titulo <span style="color: #ef4444;">*</span>
+                                    </label>
+                                    <input type="text" id="newTaskTitle" placeholder="Titulo de la tarea..."
+                                        style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;
+                                        background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;"
+                                        onkeydown="if(event.key === 'Enter') App.submitNewTask()">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 16px;">
+                                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+                                        Descripcion
+                                    </label>
+                                    <textarea id="newTaskDescription" placeholder="Descripcion opcional..." rows="3"
+                                        style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;
+                                        background: var(--bg-secondary); color: var(--text-primary); font-size: 14px; resize: vertical;"></textarea>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                    <div class="form-group">
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+                                            Prioridad
+                                        </label>
+                                        <select id="newTaskPriority"
+                                            style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;
+                                            background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
+                                            <option value="low">Baja</option>
+                                            <option value="medium" selected>Media</option>
+                                            <option value="high">Alta</option>
+                                            <option value="critical">Critica</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+                                            Horas Estimadas
+                                        </label>
+                                        <input type="number" id="newTaskHours" placeholder="8" min="0" step="0.5"
+                                            style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;
+                                            background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
+                                    </div>
+                                </div>
+                                <input type="hidden" id="newTaskStatus" value="${status}">
+                                <input type="hidden" id="newTaskProjectId" value="${projectId}">
+                            </div>
+                            <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; justify-content: flex-end;">
+                                <button onclick="App.closeCreateTaskModal()"
+                                    style="padding: 10px 20px; border: 1px solid var(--border-color); border-radius: 8px;
+                                    background: transparent; color: var(--text-primary); cursor: pointer;">
+                                    Cancelar
+                                </button>
+                                <button onclick="App.submitNewTask()"
+                                    style="padding: 10px 20px; border: none; border-radius: 8px;
+                                    background: var(--primary-color); color: white; cursor: pointer; font-weight: 600;">
+                                    <i class="fas fa-plus"></i> Crear Tarea
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                document.getElementById('newTaskTitle').focus();
+            },
+
+            closeCreateTaskModal() {
+                const modal = document.getElementById('createTaskModal');
+                if (modal) modal.remove();
+            },
+
+            async submitNewTask() {
+                const title = document.getElementById('newTaskTitle').value.trim();
+                const description = document.getElementById('newTaskDescription').value.trim();
+                const priority = document.getElementById('newTaskPriority').value;
+                const estimatedHours = document.getElementById('newTaskHours').value;
+                const status = document.getElementById('newTaskStatus').value;
+                const projectId = parseInt(document.getElementById('newTaskProjectId').value);
+
+                if (!title) {
+                    alert('El titulo es requerido');
+                    document.getElementById('newTaskTitle').focus();
+                    return;
+                }
+
+                try {
+                    const taskData = {
+                        title,
+                        description: description || null,
+                        priority,
+                        status: status === 'backlog' ? 'pending' : status,
+                        project_id: projectId
+                    };
+
+                    if (estimatedHours) {
+                        taskData.estimated_hours = parseFloat(estimatedHours);
+                    }
+
+                    const response = await API.createTask(taskData);
+
+                    if (response && (response.id || response.task)) {
+                        this.closeCreateTaskModal();
+
+                        // Show success notification
+                        this.showNotification(`Tarea ${response.task_code || ''} creada exitosamente`, 'success');
+
+                        // Refresh current view
+                        if (this.state.currentProject) {
+                            await this.openTasksDetail(this.state.currentProject);
+                        } else {
+                            await this.loadDataFromAPI();
+                        }
+                    } else {
+                        throw new Error(response?.error || 'Error desconocido');
+                    }
+                } catch (error) {
+                    console.error('Error creating task:', error);
+                    this.showNotification('Error al crear tarea: ' + error.message, 'error');
+                }
             },
 
             async openTaskModal(taskId) {
