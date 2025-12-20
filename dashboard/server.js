@@ -1967,8 +1967,8 @@ class SolariaDashboardServer {
             // Delete associated task_items first (foreign key constraint)
             await this.db.execute('DELETE FROM task_items WHERE task_id = ?', [id]);
 
-            // Delete associated task_tags
-            await this.db.execute('DELETE FROM task_tags WHERE task_id = ?', [id]);
+            // Delete associated task_tag_assignments (not task_tags - that's tag definitions)
+            await this.db.execute('DELETE FROM task_tag_assignments WHERE task_id = ?', [id]);
 
             // Delete the task
             const [result] = await this.db.execute('DELETE FROM tasks WHERE id = ?', [id]);
