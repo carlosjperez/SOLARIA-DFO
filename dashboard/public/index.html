@@ -9748,6 +9748,10 @@
             handleTaskRealTimeEvent(data, action) {
                 console.log(`🔄 Real-time ${action}:`, data.id, data.title);
 
+                // Store old status for delta calculation (for updates)
+                const oldTask = this.state.currentTasks?.find(t => t.id === data.id || t.id === data.task_id);
+                const oldStatus = oldTask?.status;
+
                 // Check if task belongs to current project view
                 if (this.state.currentProjectId && data.project_id !== this.state.currentProjectId) {
                     console.log('   ↳ Task belongs to different project, skipping view update');
@@ -9774,6 +9778,160 @@
 
                 // Update dashboard widgets
                 this.handleDashboardWidgetsUpdate(data, action);
+
+                // Update project stats and detail view (NEW)
+                this.handleProjectStatsUpdate(data, action, oldStatus);
+
+                // Update task count badges in headers (NEW)
+                this.handleTaskCountBadgesUpdate();
+            },
+
+            // Update project stats in PROJECTS_DATA and re-render if viewing project detail
+            handleProjectStatsUpdate(data, action, oldStatus) {
+                const projectId = data.project_id;
+                if (!projectId) return;
+
+                const project = PROJECTS_DATA.find(p => p.id === projectId);
+                if (!project || !project.stats) return;
+
+                const newStatus = data.status;
+
+                // Update stats based on action
+                if (action === 'create') {
+                    project.stats.tasks = (project.stats.tasks || 0) + 1;
+                    if (newStatus === 'pending') project.stats.pending = (project.stats.pending || 0) + 1;
+                    else if (newStatus === 'in_progress') project.stats.inProgress = (project.stats.inProgress || 0) + 1;
+                    else if (newStatus === 'completed') project.stats.completed = (project.stats.completed || 0) + 1;
+                    // Update board counts
+                    if (project.board) {
+                        if (newStatus === 'pending') project.board.todo = (project.board.todo || 0) + 1;
+                        else if (newStatus === 'in_progress') project.board.doing = (project.board.doing || 0) + 1;
+                        else if (newStatus === 'completed') project.board.done = (project.board.done || 0) + 1;
+                    }
+                } else if (action === 'update' && oldStatus && newStatus && oldStatus !== newStatus) {
+                    // Decrement old status
+                    if (oldStatus === 'pending') project.stats.pending = Math.max(0, (project.stats.pending || 0) - 1);
+                    else if (oldStatus === 'in_progress') project.stats.inProgress = Math.max(0, (project.stats.inProgress || 0) - 1);
+                    else if (oldStatus === 'completed') project.stats.completed = Math.max(0, (project.stats.completed || 0) - 1);
+                    // Increment new status
+                    if (newStatus === 'pending') project.stats.pending = (project.stats.pending || 0) + 1;
+                    else if (newStatus === 'in_progress') project.stats.inProgress = (project.stats.inProgress || 0) + 1;
+                    else if (newStatus === 'completed') project.stats.completed = (project.stats.completed || 0) + 1;
+                    // Update board counts
+                    if (project.board) {
+                        const oldCol = oldStatus === 'pending' ? 'todo' : oldStatus === 'in_progress' ? 'doing' : 'done';
+                        const newCol = newStatus === 'pending' ? 'todo' : newStatus === 'in_progress' ? 'doing' : 'done';
+                        project.board[oldCol] = Math.max(0, (project.board[oldCol] || 0) - 1);
+                        project.board[newCol] = (project.board[newCol] || 0) + 1;
+                    }
+                } else if (action === 'delete') {
+                    project.stats.tasks = Math.max(0, (project.stats.tasks || 0) - 1);
+                    const status = oldStatus || newStatus || 'pending';
+                    if (status === 'pending') project.stats.pending = Math.max(0, (project.stats.pending || 0) - 1);
+                    else if (status === 'in_progress') project.stats.inProgress = Math.max(0, (project.stats.inProgress || 0) - 1);
+                    else if (status === 'completed') project.stats.completed = Math.max(0, (project.stats.completed || 0) - 1);
+                }
+
+                // Re-render project detail if currently viewing this project
+                if (this.state.currentProjectId === projectId && this.state.currentProject) {
+                    this.state.currentProject = project;
+                    // Update just the tasks card to avoid full re-render
+                    this.updateProjectDetailTasksCard(project);
+                }
+
+                // Also update project cards in the projects list view
+                this.updateProjectListCard(project);
+
+                console.log(`✅ Project stats updated for project ${projectId}:`, project.stats);
+            },
+
+            // Update project card in the projects list view
+            updateProjectListCard(project) {
+                const projectCard = document.querySelector(`.project-card[data-id="${project.id}"]`);
+                if (!projectCard) return;
+
+                // Update metric values in the card
+                const metricValues = projectCard.querySelectorAll('.metric-value');
+                if (metricValues.length >= 3) {
+                    // Find and update task-related metrics
+                    metricValues.forEach(mv => {
+                        const label = mv.previousElementSibling?.textContent?.toLowerCase() || '';
+                        if (label.includes('tarea')) mv.textContent = project.stats.tasks || 0;
+                        else if (label.includes('pend')) mv.textContent = project.stats.pending || 0;
+                        else if (label.includes('done') || label.includes('completada')) mv.textContent = project.stats.completed || 0;
+                    });
+                }
+
+                // Update mini-trello slots
+                const trelloColumns = projectCard.querySelectorAll('.trello-column');
+                if (trelloColumns.length >= 4 && project.board) {
+                    const columns = ['backlog', 'todo', 'doing', 'done'];
+                    trelloColumns.forEach((col, idx) => {
+                        const count = project.board[columns[idx]] || 0;
+                        const slots = col.querySelectorAll('.trello-slot');
+                        slots.forEach((slot, i) => {
+                            if (i < count) slot.classList.add('filled');
+                            else slot.classList.remove('filled');
+                        });
+                    });
+                }
+
+                // Flash animation
+                projectCard.style.animation = 'pulse 0.5s ease';
+                setTimeout(() => { projectCard.style.animation = ''; }, 500);
+
+                console.log(`✅ Project list card updated for project ${project.id}`);
+            },
+
+            // Update the tasks card in project detail view
+            updateProjectDetailTasksCard(project) {
+                const tasksCard = document.querySelector('.clickable-card[onclick*="openTasksDetail"]');
+                if (!tasksCard) return;
+
+                const stats = project.stats || {};
+                const board = project.board || { backlog: 0, todo: 0, doing: 0, done: 0 };
+
+                // Update summary values
+                const summaryItems = tasksCard.querySelectorAll('.tasks-summary-value');
+                if (summaryItems.length >= 4) {
+                    summaryItems[0].textContent = stats.tasks || 0;
+                    summaryItems[1].textContent = stats.pending || 0;
+                    summaryItems[2].textContent = stats.inProgress || 0;
+                    summaryItems[3].textContent = stats.completed || 0;
+                }
+
+                // Flash animation for visual feedback
+                tasksCard.style.animation = 'pulse 0.5s ease';
+                tasksCard.style.boxShadow = '0 0 0 2px var(--solaria-orange)';
+                setTimeout(() => {
+                    tasksCard.style.animation = '';
+                    tasksCard.style.boxShadow = '';
+                }, 500);
+
+                console.log('✅ Project detail tasks card updated');
+            },
+
+            // Update task count badges in view headers
+            handleTaskCountBadgesUpdate() {
+                const tasks = this.state.currentTasks || [];
+                const pending = tasks.filter(t => t.status === 'pending' || t.status === 'todo' || t.status === 'backlog').length;
+                const inProgress = tasks.filter(t => t.status === 'in_progress' || t.status === 'doing').length;
+                const completed = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
+                const total = tasks.length;
+
+                // Update any task count badges in the current view
+                const countBadge = document.querySelector('.tasks-count-badge, [data-tasks-count]');
+                if (countBadge) {
+                    countBadge.textContent = total;
+                }
+
+                // Update header subtitle if showing task counts
+                const headerSubtitle = document.querySelector('.section-subtitle');
+                if (headerSubtitle && headerSubtitle.textContent.includes('tarea')) {
+                    headerSubtitle.textContent = `${total} tareas (${pending} pendientes, ${inProgress} en progreso, ${completed} completadas)`;
+                }
+
+                console.log(`✅ Task count badges updated: ${total} total`);
             },
 
             // LIST VIEW HANDLERS
