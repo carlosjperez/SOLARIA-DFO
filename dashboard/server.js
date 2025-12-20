@@ -3184,7 +3184,7 @@ class SolariaDashboardServer {
                 INSERT INTO tasks (title, description, project_id, assigned_agent_id, task_number, priority, estimated_hours, status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `, [
-                title,
+                title ?? 'Nueva tarea',
                 description ?? null,
                 effectiveProjectId,
                 agent_id ?? null,
@@ -3207,7 +3207,7 @@ class SolariaDashboardServer {
             await this.db.execute(`
                 INSERT INTO activity_logs (project_id, agent_id, action, details, category, level)
                 VALUES (?, ?, 'task_created_by_agent', ?, 'development', 'info')
-            `, [effectiveProjectId, agent_id, JSON.stringify({ task_id: result.insertId, task_code: taskCode, title })]);
+            `, [effectiveProjectId, agent_id ?? null, JSON.stringify({ task_id: result.insertId, task_code: taskCode, title: title ?? 'Task' })]);
 
             // Emit notification with task code
             this.io.to('notifications').emit('task_created', {
