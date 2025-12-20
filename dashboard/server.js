@@ -2216,11 +2216,13 @@ class SolariaDashboardServer {
             const { notes, actual_minutes, agent_id } = req.body;
 
             // Toggle completion
+            // NOTE: MySQL SET evaluates left-to-right, so after toggling is_completed,
+            // the CASE statements see the NEW value. When completing (0→1), is_completed=1
             await this.db.execute(`
                 UPDATE task_items
                 SET is_completed = NOT is_completed,
-                    completed_at = CASE WHEN is_completed = 0 THEN NOW() ELSE NULL END,
-                    completed_by_agent_id = CASE WHEN is_completed = 0 THEN ? ELSE NULL END,
+                    completed_at = CASE WHEN is_completed = 1 THEN NOW() ELSE NULL END,
+                    completed_by_agent_id = CASE WHEN is_completed = 1 THEN ? ELSE NULL END,
                     notes = COALESCE(?, notes),
                     actual_minutes = COALESCE(?, actual_minutes)
                 WHERE id = ? AND task_id = ?
