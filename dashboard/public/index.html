@@ -1058,6 +1058,91 @@
             font-size: 10px;
             color: var(--text-muted);
             margin-left: 4px;
+            transition: transform var(--transition-fast);
+        }
+
+        .user-menu.active i.fa-chevron-down {
+            transform: rotate(180deg);
+        }
+
+        /* User Dropdown Panel */
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 240px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            z-index: 1001;
+            display: none;
+            overflow: hidden;
+        }
+
+        .user-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease;
+        }
+
+        .user-dropdown-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+        }
+
+        .user-dropdown-header .user-email {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .user-dropdown-menu {
+            padding: 8px;
+        }
+
+        .user-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-primary);
+            text-decoration: none;
+            cursor: pointer;
+            transition: background var(--transition-fast);
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .user-dropdown-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .user-dropdown-item i {
+            width: 18px;
+            color: var(--text-muted);
+        }
+
+        .user-dropdown-item.logout {
+            color: var(--color-negative);
+            border-top: 1px solid var(--border-color);
+            margin-top: 8px;
+            padding-top: 16px;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .user-dropdown-item.logout i {
+            color: var(--color-negative);
+        }
+
+        .user-dropdown-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 8px 0;
         }
 
         /* Content Area */
@@ -4322,17 +4407,50 @@
                         </div>
                     </div>
 
-                    <!-- User Menu -->
-                    <button class="user-menu" id="userMenu">
-                        <div class="user-avatar">
-                            <img src="https://avatars.githubusercontent.com/u/carlosjperez" alt="Carlos J. Perez" onerror="this.style.display='none'; this.parentElement.innerHTML='CJ';">
+                    <!-- User Menu Container -->
+                    <div class="user-menu-container" style="position: relative;">
+                        <button class="user-menu" id="userMenu">
+                            <div class="user-avatar" id="userAvatar">
+                                <span>CJ</span>
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name" id="userName">Carlos J. Perez</span>
+                                <span class="user-role" id="userRole">CEO / Founder</span>
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+
+                        <!-- User Dropdown Panel -->
+                        <div class="user-dropdown" id="userDropdown">
+                            <div class="user-dropdown-header">
+                                <div class="user-name" id="dropdownUserName">Carlos J. Perez</div>
+                                <div class="user-email" id="dropdownUserEmail">charlie@solaria.agency</div>
+                            </div>
+                            <div class="user-dropdown-menu">
+                                <button class="user-dropdown-item" onclick="App.showUserProfile()">
+                                    <i class="fas fa-user"></i>
+                                    <span>Mi Perfil</span>
+                                </button>
+                                <button class="user-dropdown-item" onclick="App.showSettings()">
+                                    <i class="fas fa-cog"></i>
+                                    <span>Configuracion</span>
+                                </button>
+                                <div class="user-dropdown-divider"></div>
+                                <button class="user-dropdown-item" onclick="App.showDocs()">
+                                    <i class="fas fa-book"></i>
+                                    <span>Documentacion</span>
+                                </button>
+                                <button class="user-dropdown-item" onclick="App.showSupport()">
+                                    <i class="fas fa-question-circle"></i>
+                                    <span>Ayuda & Soporte</span>
+                                </button>
+                                <button class="user-dropdown-item logout" onclick="App.handleLogout()">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>Cerrar Sesion</span>
+                                </button>
+                            </div>
                         </div>
-                        <div class="user-info">
-                            <span class="user-name">Carlos J. Perez</span>
-                            <span class="user-role">CEO / Founder</span>
-                        </div>
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
+                    </div>
                 </div>
             </header>
 
@@ -4521,9 +4639,9 @@
                 return this.request('/health');
             },
 
-            // Task Tags (DFO-036)
+            // Task Tags (DFO-036) - Public endpoint, no auth required
             async getTags() {
-                return this.request('/tags');
+                return this.request('/public/tags');
             },
 
             async getTaskTags(taskId) {
@@ -5144,7 +5262,13 @@
                 notificationBadge: document.getElementById('notificationBadge'),
                 notificationsPanel: document.getElementById('notificationsPanel'),
                 notificationsList: document.getElementById('notificationsList'),
-                clearNotifications: document.getElementById('clearNotifications')
+                clearNotifications: document.getElementById('clearNotifications'),
+                // User menu elements
+                userMenu: document.getElementById('userMenu'),
+                userDropdown: document.getElementById('userDropdown'),
+                userName: document.getElementById('userName'),
+                userRole: document.getElementById('userRole'),
+                userAvatar: document.getElementById('userAvatar')
             },
 
             state: {
@@ -5160,7 +5284,9 @@
                 darkMode: localStorage.getItem('theme') !== 'light',
                 // Notifications state
                 notifications: JSON.parse(localStorage.getItem('dfo_notifications') || '[]'),
-                notificationsPanelOpen: false
+                notificationsPanelOpen: false,
+                // User dropdown state
+                userDropdownOpen: false
             },
 
             socket: null,
@@ -5179,6 +5305,7 @@
                 // Initialize Socket.IO and notifications
                 this.initSocket();
                 this.initNotifications();
+                this.initUserMenu();
 
                 // Prevent default touch behaviors that cause bounce - but allow scrolling in containers
                 document.body.addEventListener('touchmove', (e) => {
@@ -10819,6 +10946,111 @@
                 });
             },
 
+            // ============================================
+            // USER MENU DROPDOWN
+            // ============================================
+
+            initUserMenu() {
+                // Update user info from stored data
+                this.updateUserDisplay();
+
+                // User menu click to toggle dropdown
+                this.elements.userMenu?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleUserDropdown();
+                });
+
+                // Close dropdown on outside click
+                document.addEventListener('click', (e) => {
+                    if (this.state.userDropdownOpen &&
+                        !this.elements.userDropdown?.contains(e.target) &&
+                        !this.elements.userMenu?.contains(e.target)) {
+                        this.closeUserDropdown();
+                    }
+                });
+            },
+
+            updateUserDisplay() {
+                const user = API.getUser();
+                if (user) {
+                    // Update header user info
+                    if (this.elements.userName) {
+                        this.elements.userName.textContent = user.name || user.username || 'Usuario';
+                    }
+                    if (this.elements.userRole) {
+                        this.elements.userRole.textContent = user.role || 'Usuario';
+                    }
+                    if (this.elements.userAvatar) {
+                        const initials = (user.name || user.username || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                        this.elements.userAvatar.innerHTML = `<span>${initials}</span>`;
+                    }
+                    // Update dropdown info
+                    const dropdownName = document.getElementById('dropdownUserName');
+                    const dropdownEmail = document.getElementById('dropdownUserEmail');
+                    if (dropdownName) dropdownName.textContent = user.name || user.username || 'Usuario';
+                    if (dropdownEmail) dropdownEmail.textContent = user.email || '';
+                }
+            },
+
+            toggleUserDropdown() {
+                this.state.userDropdownOpen = !this.state.userDropdownOpen;
+                this.elements.userDropdown?.classList.toggle('show', this.state.userDropdownOpen);
+                this.elements.userMenu?.classList.toggle('active', this.state.userDropdownOpen);
+
+                // Close notifications panel if open
+                if (this.state.userDropdownOpen && this.state.notificationsPanelOpen) {
+                    this.closeNotificationsPanel();
+                }
+            },
+
+            closeUserDropdown() {
+                this.state.userDropdownOpen = false;
+                this.elements.userDropdown?.classList.remove('show');
+                this.elements.userMenu?.classList.remove('active');
+            },
+
+            handleLogout() {
+                if (confirm('¿Estas seguro que deseas cerrar sesion?')) {
+                    API.logout();
+                    this.addNotification({
+                        title: 'Sesion cerrada',
+                        message: 'Has cerrado sesion correctamente',
+                        type: 'info'
+                    });
+                    this.closeUserDropdown();
+                    // Reload to show login state
+                    setTimeout(() => window.location.reload(), 500);
+                }
+            },
+
+            showUserProfile() {
+                this.closeUserDropdown();
+                this.addNotification({
+                    title: 'Perfil',
+                    message: 'La pagina de perfil estara disponible pronto',
+                    type: 'info'
+                });
+            },
+
+            showSettings() {
+                this.closeUserDropdown();
+                this.addNotification({
+                    title: 'Configuracion',
+                    message: 'La pagina de configuracion estara disponible pronto',
+                    type: 'info'
+                });
+            },
+
+            showDocs() {
+                this.closeUserDropdown();
+                window.open('https://github.com/SOLARIA-AGENCY/solaria-digital-field--operations#readme', '_blank');
+            },
+
+            showSupport() {
+                this.closeUserDropdown();
+                window.open('mailto:support@solaria.agency?subject=SOLARIA DFO Support', '_blank');
+            },
+
             addNotification(notification) {
                 const newNotif = {
                     id: Date.now(),
@@ -10877,6 +11109,11 @@
                 this.state.notificationsPanelOpen = true;
                 this.elements.notificationsPanel?.classList.add('show');
                 this.elements.notificationsBtn?.classList.add('active');
+
+                // Close user dropdown if open
+                if (this.state.userDropdownOpen) {
+                    this.closeUserDropdown();
+                }
 
                 // Mark all as read when opening
                 this.state.notifications.forEach(n => n.read = true);

@@ -152,6 +152,7 @@ class SolariaDashboardServer {
         this.app.get('/api/public/dashboard/overview', this.getDashboardOverview.bind(this));
         this.app.get('/api/public/tasks/recent-completed', this.getRecentCompletedTasks.bind(this));
         this.app.get('/api/public/tasks/recent-by-project', this.getRecentTasksByProject.bind(this));
+        this.app.get('/api/public/tags', this.getTaskTags.bind(this));
 
         // Middleware de autenticación
         this.app.use('/api/', this.authenticateToken.bind(this));
