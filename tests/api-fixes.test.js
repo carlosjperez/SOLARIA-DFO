@@ -6,7 +6,7 @@
  * - Tag assignment functionality
  */
 
-const API_BASE = process.env.API_BASE || 'http://localhost:3030/api';
+const API_BASE = process.env.DASHBOARD_API_URL || process.env.API_BASE || 'http://localhost:3030/api';
 const PUBLIC_API = `${API_BASE}/public`;
 const AUTH_CREDENTIALS = { username: 'carlosjperez', password: 'bypass' };
 

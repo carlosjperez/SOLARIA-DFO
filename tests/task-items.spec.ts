@@ -13,7 +13,7 @@
 
 import { test, expect } from '@playwright/test';
 
-const API_URL = process.env.API_URL || 'http://localhost:3030';
+const API_URL = process.env.DASHBOARD_API_URL?.replace('/api', '') || process.env.DFO_BASE_URL || 'http://localhost:3030';
 let authToken = '';
 
 // Helper function for API calls with response status

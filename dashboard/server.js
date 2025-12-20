@@ -198,12 +198,13 @@ class SolariaDashboardServer {
         this.app.delete('/api/tasks/:id', this.deleteTask.bind(this));
 
         // Task Items (Subtasks/Checklist)
+        // NOTE: Routes with literal paths MUST be registered BEFORE parameterized routes
         this.app.get('/api/tasks/:id/items', this.getTaskItems.bind(this));
         this.app.post('/api/tasks/:id/items', this.createTaskItems.bind(this));
+        this.app.put('/api/tasks/:id/items/reorder', this.reorderTaskItems.bind(this)); // Must be before :itemId
         this.app.put('/api/tasks/:id/items/:itemId', this.updateTaskItem.bind(this));
         this.app.delete('/api/tasks/:id/items/:itemId', this.deleteTaskItem.bind(this));
         this.app.put('/api/tasks/:id/items/:itemId/complete', this.toggleTaskItemComplete.bind(this));
-        this.app.put('/api/tasks/:id/items/reorder', this.reorderTaskItems.bind(this));
 
         // Task Tags (DFO-036)
         this.app.get('/api/tags', this.getTaskTags.bind(this));
