@@ -3,6 +3,27 @@ import { useAuthStore } from '@/store/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+// Convert snake_case to camelCase
+function snakeToCamel(str: string): string {
+    return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+// Recursively transform object keys from snake_case to camelCase
+function transformKeys(obj: unknown): unknown {
+    if (Array.isArray(obj)) {
+        return obj.map(transformKeys);
+    }
+    if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
+        const result: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+            const camelKey = snakeToCamel(key);
+            result[camelKey] = transformKeys(value);
+        }
+        return result;
+    }
+    return obj;
+}
+
 export const api = axios.create({
     baseURL: API_BASE_URL,
     headers: {
@@ -22,9 +43,15 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle auth errors
+// Response interceptor to transform snake_case to camelCase and handle auth errors
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // Transform response data from snake_case to camelCase
+        if (response.data) {
+            response.data = transformKeys(response.data);
+        }
+        return response;
+    },
     (error) => {
         if (error.response?.status === 401) {
             useAuthStore.getState().logout();
