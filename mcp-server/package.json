@@ -7,11 +7,17 @@
   "scripts": {
     "start": "node server.js",
     "start:http": "node http-server.js",
-    "dev": "node --watch server.js",
-    "dev:http": "node --watch http-server.js",
+    "start:ts": "node dist/http-server.js",
+    "dev": "tsx watch server.ts",
+    "dev:js": "node --watch server.js",
+    "dev:http": "tsx watch http-server.ts",
+    "dev:http:js": "node --watch http-server.js",
     "test": "node tests/smoke.cjs",
+    "test:ts": "tsx tests/handlers.test.ts",
     "test:isolation": "node tests/isolation.cjs",
-    "test:all": "node tests/smoke.cjs && node tests/isolation.cjs"
+    "test:all": "node tests/smoke.cjs && node tests/isolation.cjs && tsx tests/handlers.test.ts",
+    "build:ts": "tsc",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.24.3",
@@ -26,5 +32,12 @@
     "project-management"
   ],
   "author": "SOLARIA Agency",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
 }

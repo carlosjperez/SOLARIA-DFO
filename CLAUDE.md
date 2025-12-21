@@ -1,7 +1,7 @@
 # SOLARIA Digital Field Operations - Oficina de Construcción en Campo
 
-**Versión:** 3.2.0
-**Última actualización:** 2025-12-14
+**Versión:** 3.3.0
+**Última actualización:** 2025-12-21
 
 ---
 
@@ -11,7 +11,8 @@
 
 | Recurso | URL |
 |---------|-----|
-| Dashboard | https://dfo.solaria.agency |
+| Dashboard (Original) | https://dfo.solaria.agency |
+| Dashboard (React v2) | https://dfo.solaria.agency/v2/ |
 | API (Auth) | https://dfo.solaria.agency/api |
 | API Publica | https://dfo.solaria.agency/api/public |
 | MCP HTTP | https://dfo.solaria.agency/mcp |
@@ -28,6 +29,77 @@
 - Password: `bypass`
 
 **Servidor VPS:** 148.230.118.124 (Hostinger)
+
+---
+
+## Acceso SSH al Servidor
+
+**Conexión directa:**
+```bash
+ssh -i ~/.ssh/id_ed25519 root@148.230.118.124
+```
+
+| Parámetro | Valor |
+|-----------|-------|
+| Host | 148.230.118.124 |
+| Usuario | root |
+| Clave SSH | `~/.ssh/id_ed25519` |
+| Provider | Hostinger VPS |
+
+**Claves SSH disponibles en ~/.ssh/:**
+- `id_ed25519` ✓ (FUNCIONA para este servidor)
+- `id_nemesis_server`
+- `nemesis_cmdr_key`
+
+---
+
+## Certificados SSL (Let's Encrypt)
+
+**Ubicación:** `/etc/letsencrypt/live/`
+
+| Dominio | Ruta | Estado |
+|---------|------|--------|
+| dfo.solaria.agency | `/etc/letsencrypt/live/dfo.solaria.agency/` | ✓ Activo |
+| office.solaria.agency | `/etc/letsencrypt/live/office.solaria.agency/` | ✓ Activo |
+| prilabsa.solaria.agency | `/etc/letsencrypt/live/prilabsa.solaria.agency/` | ✓ Activo |
+
+**Archivos por dominio:**
+- `fullchain.pem` - Cadena completa
+- `privkey.pem` - Clave privada
+- `cert.pem` - Certificado
+- `chain.pem` - Cadena intermedia
+
+---
+
+## React Dashboard v2
+
+**URL:** https://dfo.solaria.agency/v2/
+
+| Componente | Ubicación |
+|------------|-----------|
+| Build output | `/var/www/dfo-v2/` |
+| Nginx mount | `/usr/share/nginx/v2` |
+| Config | `/var/www/solaria-dfo/infrastructure/nginx/nginx.unified.conf` |
+
+**Deploy desde local:**
+```bash
+cd dashboard/app
+pnpm build
+rsync -avz --delete dist/ root@148.230.118.124:/var/www/dfo-v2/
+ssh -i ~/.ssh/id_ed25519 root@148.230.118.124 "docker exec solaria-dfo-nginx nginx -s reload"
+```
+
+**Docker nginx con todos los volúmenes:**
+```bash
+docker run -d --name solaria-dfo-nginx \
+  --network solaria-dfo_solaria-dfo-network \
+  -p 80:80 -p 443:443 \
+  -v /var/www/solaria-dfo/infrastructure/nginx/nginx.unified.conf:/etc/nginx/nginx.conf:ro \
+  -v /etc/letsencrypt:/etc/letsencrypt:ro \
+  -v /var/www/dfo-v2:/usr/share/nginx/v2:ro \
+  --restart unless-stopped \
+  nginx:alpine
+```
 
 ---
 
@@ -580,7 +652,36 @@ curl -X POST https://dfo.solaria.agency/mcp \
 
 ---
 
+## 📚 Lecciones Aprendidas
+
+> Sección de aprendizajes capturados durante el desarrollo. Cada lección también está guardada en el sistema de memorias MCP.
+
+### L-001: Verificar tareas in_progress antes de pending
+
+**Fecha:** 2025-12-20
+**Contexto:** Migración de stack DFO-054
+**Memoria ID:** 10
+
+**Problema:** Al buscar tareas con `list_tasks({ status: "pending" })` se omiten las tareas que ya están en progreso.
+
+**Solución:**
+```javascript
+// Flujo correcto de inicio de sesión:
+// 1. Establecer contexto
+set_project_context({ project_id: X })
+
+// 2. Ver qué hay en progreso PRIMERO
+list_tasks({ status: "in_progress" })
+
+// 3. Luego ver pendientes
+list_tasks({ status: "pending" })
+```
+
+**Regla:** SIEMPRE verificar `in_progress` antes de `pending` para no perder tareas activas.
+
+---
+
 **SOLARIA Digital Field Operations**
-**Oficina de Construcción en Campo v3.1.0**
+**Oficina de Construcción en Campo v3.2.0**
 
 © 2024-2025 SOLARIA AGENCY
