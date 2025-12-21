@@ -564,7 +564,7 @@ class SolariaDashboardServer {
             if (password === 'bypass') {
                 const identifier = userId || username;
                 const [rows] = await this.db!.execute<RowDataPacket[]>(
-                    'SELECT * FROM users WHERE username = ? OR user_id = ?',
+                    'SELECT * FROM users WHERE username = ? OR id = ?',
                     [identifier, identifier]
                 );
 
@@ -596,7 +596,7 @@ class SolariaDashboardServer {
             // Normal authentication
             const identifier = userId || username;
             const [rows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT * FROM users WHERE username = ? OR user_id = ?',
+                'SELECT * FROM users WHERE username = ? OR id = ?',
                 [identifier, identifier]
             );
 

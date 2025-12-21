@@ -465,7 +465,7 @@ class SolariaDashboardServer {
             // Bypass mode for development
             if (password === 'bypass') {
                 const identifier = userId || username;
-                const [rows] = await this.db.execute('SELECT * FROM users WHERE username = ? OR user_id = ?', [identifier, identifier]);
+                const [rows] = await this.db.execute('SELECT * FROM users WHERE username = ? OR id = ?', [identifier, identifier]);
                 if (rows.length === 0) {
                     res.status(401).json({ error: 'User not found' });
                     return;
@@ -486,7 +486,7 @@ class SolariaDashboardServer {
             }
             // Normal authentication
             const identifier = userId || username;
-            const [rows] = await this.db.execute('SELECT * FROM users WHERE username = ? OR user_id = ?', [identifier, identifier]);
+            const [rows] = await this.db.execute('SELECT * FROM users WHERE username = ? OR id = ?', [identifier, identifier]);
             if (rows.length === 0) {
                 res.status(401).json({ error: 'Invalid credentials' });
                 return;
