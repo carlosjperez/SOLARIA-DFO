@@ -1301,7 +1301,39 @@
     text-transform: uppercase;
 }
 
-/* Trello Column Header */
+/* ============================================
+   MINI TRELLO / EQUALIZER
+   ============================================ */
+
+.mini-trello {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border-radius: 10px;
+}
+
+.mini-trello.compact {
+    padding: 8px;
+    gap: 4px;
+}
+
+.trello-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.trello-label {
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 .trello-column-header {
     font-size: 8px;
     font-weight: 700;
@@ -1311,10 +1343,272 @@
     margin-bottom: 4px;
 }
 
-.trello-slot.filled.backlog { background: #6b7280; }
-.trello-slot.filled.todo { background: #f59e0b; }
-.trello-slot.filled.doing { background: #3b82f6; }
-.trello-slot.filled.done { background: #22c55e; }
+.trello-slots {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+    min-height: 56px;
+}
+
+.trello-slot {
+    width: 100%;
+    height: 5px;
+    border-radius: 2px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+.trello-slot.filled {
+    border-color: transparent;
+}
+
+.trello-column.backlog .trello-slot.filled { background: #6b7280; }
+.trello-column.todo .trello-slot.filled { background: #f59e0b; }
+.trello-column.doing .trello-slot.filled { background: #3b82f6; }
+.trello-column.done .trello-slot.filled { background: #22c55e; }
+
+.trello-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* Tasks Summary (above mini-trello) */
+.tasks-summary {
+    display: flex;
+    justify-content: space-around;
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 8px;
+}
+
+.tasks-summary-item {
+    text-align: center;
+}
+
+.tasks-summary-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.tasks-summary-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* ============================================
+   PROJECT DETAIL PAGE
+   ============================================ */
+
+.project-detail-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 24px;
+    height: 100%;
+    overflow: hidden;
+}
+
+.project-detail-main {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.project-detail-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Project Header Card */
+.project-header-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 24px;
+}
+
+.project-header-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.project-header-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--solaria-orange), var(--solaria-orange-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.project-header-icon svg {
+    width: 32px;
+    height: 32px;
+    color: white;
+}
+
+.project-header-info {
+    flex: 1;
+}
+
+.project-header-info h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 8px 0;
+}
+
+.project-header-info p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.project-header-tags {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+/* Phase Progress Bar */
+.phase-progress {
+    margin-top: 20px;
+}
+
+.phase-progress-track {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.phase-progress-segment {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-tertiary);
+    transition: background 0.3s ease;
+}
+
+.phase-progress-segment.active {
+    background: var(--phase-development);
+}
+
+.phase-progress-segment.completed {
+    background: var(--color-positive);
+}
+
+.phase-progress-segment.planning.active { background: var(--phase-planning); }
+.phase-progress-segment.development.active { background: var(--phase-development); }
+.phase-progress-segment.testing.active { background: var(--phase-testing); }
+.phase-progress-segment.production.active { background: var(--phase-production); }
+
+.phase-progress-labels {
+    display: flex;
+    justify-content: space-between;
+}
+
+.phase-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.phase-label.active {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Quick Access Cards Grid */
+.quick-access-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.quick-access-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.quick-access-card:hover {
+    border-color: var(--solaria-orange);
+    box-shadow: 0 4px 12px rgba(246, 146, 29, 0.15);
+}
+
+.quick-access-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.quick-access-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quick-access-card-icon.tasks { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.quick-access-card-icon.urls { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+.quick-access-card-icon.docs { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+.quick-access-card-icon.team { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+
+.quick-access-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* URLs List */
+.urls-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.url-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.url-item:hover {
+    background: var(--bg-hover);
+    color: var(--solaria-orange);
+}
+
+.url-item svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
 
 /* Progress Segment Active */
 .progress-segment.active { background: linear-gradient(90deg, #0891b2, #22d3ee); }
@@ -1955,18 +2249,14 @@
 }
 
 /* ============================================
-   PROJECT DETAIL PAGE
+   PROJECT DETAIL PAGE (Single Column Layout - Original Design)
    ============================================ */
 .project-detail-layout {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 24px;
-}
-
-@media (max-width: 1200px) {
-    .project-detail-layout {
-        grid-template-columns: 1fr;
-    }
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 .project-detail-main {
@@ -1975,10 +2265,20 @@
     gap: 20px;
 }
 
-.project-detail-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+/* Priority Gradients for Gantt Bars */
+.gantt-bar-critical { background: linear-gradient(to right, rgb(239 68 68), rgb(220 38 38)) !important; }
+.gantt-bar-high { background: linear-gradient(to right, rgb(249 115 22), rgb(234 88 12)) !important; }
+.gantt-bar-medium { background: linear-gradient(to right, #f6921d, #d97b0d) !important; }
+.gantt-bar-low { background: linear-gradient(to right, rgb(107 114 128), rgb(75 85 99)) !important; }
+
+/* Recent update animation */
+@keyframes recent-update {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 0 3px rgba(246, 146, 29, 0.4); }
+}
+
+.recently-updated {
+    animation: recent-update 1s ease-in-out 3;
 }
 
 /* Project Header */

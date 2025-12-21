@@ -32,11 +32,23 @@ export interface Project {
     tasksTotal?: number;
     tasksCompleted?: number;
     activeAgents?: number;
+    // Optional URL fields
+    productionUrl?: string;
+    stagingUrl?: string;
+    localUrl?: string;
+    repoUrl?: string;
+    // Optional client info
+    client?: {
+        name: string;
+        logo?: string;
+    };
 }
 
 export interface Task {
     id: number;
     projectId: number;
+    epicId?: number;
+    sprintId?: number;
     taskNumber: number;
     title: string;
     description?: string;
@@ -61,6 +73,13 @@ export interface Task {
     agentName?: string;
     itemsTotal?: number;
     itemsCompleted?: number;
+    // Epic/Sprint names from joins
+    epicName?: string;
+    epicNumber?: number;
+    sprintName?: string;
+    sprintNumber?: number;
+    // Tags
+    tags?: TaskTag[];
 }
 
 export interface TaskItem {
@@ -77,6 +96,53 @@ export interface TaskItem {
     notes?: string;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface TaskTag {
+    id: number;
+    name: string;
+    description?: string;
+    color: string;
+    icon?: string;
+    usageCount: number;
+    createdAt?: string;
+}
+
+export interface Epic {
+    id: number;
+    projectId: number;
+    epicNumber: number;
+    name: string;
+    description?: string;
+    color: string;
+    status: 'open' | 'in_progress' | 'completed' | 'cancelled';
+    startDate?: string;
+    targetDate?: string;
+    createdBy?: number;
+    createdAt: string;
+    updatedAt: string;
+    // Extended fields
+    tasksTotal?: number;
+    tasksCompleted?: number;
+}
+
+export interface Sprint {
+    id: number;
+    projectId: number;
+    sprintNumber: number;
+    name: string;
+    goal?: string;
+    status: 'planned' | 'active' | 'completed' | 'cancelled';
+    startDate?: string;
+    endDate?: string;
+    velocity: number;
+    capacity: number;
+    createdBy?: number;
+    createdAt: string;
+    updatedAt: string;
+    // Extended fields
+    tasksTotal?: number;
+    tasksCompleted?: number;
 }
 
 export interface Agent {

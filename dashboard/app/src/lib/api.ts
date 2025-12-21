@@ -50,6 +50,25 @@ export const projectsApi = {
     create: (data: Record<string, unknown>) => api.post('/projects', data),
     update: (id: number, data: Record<string, unknown>) => api.put(`/projects/${id}`, data),
     delete: (id: number) => api.delete(`/projects/${id}`),
+    checkCode: (code: string) => api.get(`/projects/check-code/${code}`),
+};
+
+// Epics API
+export const epicsApi = {
+    getByProject: (projectId: number) => api.get(`/projects/${projectId}/epics`),
+    create: (projectId: number, data: Record<string, unknown>) =>
+        api.post(`/projects/${projectId}/epics`, data),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/epics/${id}`, data),
+    delete: (id: number) => api.delete(`/epics/${id}`),
+};
+
+// Sprints API
+export const sprintsApi = {
+    getByProject: (projectId: number) => api.get(`/projects/${projectId}/sprints`),
+    create: (projectId: number, data: Record<string, unknown>) =>
+        api.post(`/projects/${projectId}/sprints`, data),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/sprints/${id}`, data),
+    delete: (id: number) => api.delete(`/sprints/${id}`),
 };
 
 // Tasks API
@@ -64,6 +83,18 @@ export const tasksApi = {
     createItems: (taskId: number, items: unknown[]) => api.post(`/tasks/${taskId}/items`, { items }),
     completeItem: (taskId: number, itemId: number, data?: Record<string, unknown>) =>
         api.put(`/tasks/${taskId}/items/${itemId}/complete`, data),
+    // Tags API
+    getTags: (taskId: number) => api.get(`/tasks/${taskId}/tags`),
+    addTag: (taskId: number, tagId: number) => api.post(`/tasks/${taskId}/tags`, { tag_id: tagId }),
+    addTagByName: (taskId: number, tagName: string) => api.post(`/tasks/${taskId}/tags`, { tag_name: tagName }),
+    removeTag: (taskId: number, tagId: number) => api.delete(`/tasks/${taskId}/tags/${tagId}`),
+};
+
+// Tags API
+export const tagsApi = {
+    getAll: () => api.get('/tags'),
+    getTasksByTag: (tagName: string, params?: Record<string, unknown>) =>
+        api.get(`/tasks/by-tag/${tagName}`, { params }),
 };
 
 // Agents API

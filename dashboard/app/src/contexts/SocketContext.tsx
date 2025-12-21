@@ -71,35 +71,91 @@ export function SocketProvider({ children }: SocketProviderProps) {
             setIsConnected(false);
         });
 
-        // Real-time data events
-        socket.on('agent:status', () => {
-            // Invalidate agents query to refresh data
+        // Real-time data events with granular invalidation
+
+        // AGENTS
+        socket.on('agent:status', (data: { agentId?: number }) => {
             queryClient.invalidateQueries({ queryKey: ['agents'] });
+            if (data?.agentId) {
+                queryClient.invalidateQueries({ queryKey: ['agents', data.agentId] });
+            }
         });
 
-        socket.on('task:updated', () => {
+        // TASKS - Granular updates
+        socket.on('task:updated', (data: { taskId?: number; projectId?: number }) => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            if (data?.taskId) {
+                queryClient.invalidateQueries({ queryKey: ['tasks', data.taskId] });
+            }
+            if (data?.projectId) {
+                queryClient.invalidateQueries({ queryKey: ['projects', data.projectId, 'tasks'] });
+                queryClient.invalidateQueries({ queryKey: ['projects', data.projectId] });
+            }
         });
 
-        socket.on('task:created', () => {
+        socket.on('task:created', (data: { projectId?: number }) => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            if (data?.projectId) {
+                queryClient.invalidateQueries({ queryKey: ['projects', data.projectId, 'tasks'] });
+            }
         });
 
-        socket.on('project:updated', () => {
+        socket.on('task:completed', (data: { taskId?: number; projectId?: number }) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            if (data?.taskId) {
+                queryClient.invalidateQueries({ queryKey: ['tasks', data.taskId] });
+            }
+            if (data?.projectId) {
+                queryClient.invalidateQueries({ queryKey: ['projects', data.projectId, 'tasks'] });
+                queryClient.invalidateQueries({ queryKey: ['projects', data.projectId] });
+            }
+        });
+
+        socket.on('task:deleted', (data: { projectId?: number }) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            if (data?.projectId) {
+                queryClient.invalidateQueries({ queryKey: ['projects', data.projectId, 'tasks'] });
+            }
+        });
+
+        // PROJECTS
+        socket.on('project:updated', (data: { projectId?: number }) => {
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            if (data?.projectId) {
+                queryClient.invalidateQueries({ queryKey: ['projects', data.projectId] });
+            }
         });
 
+        socket.on('project:progress', (data: { projectId?: number; progress?: number }) => {
+            if (data?.projectId) {
+                queryClient.invalidateQueries({ queryKey: ['projects', data.projectId] });
+                queryClient.invalidateQueries({ queryKey: ['projects'] });
+            }
+        });
+
+        // MEMORIES
         socket.on('memory:created', () => {
             queryClient.invalidateQueries({ queryKey: ['memories'] });
         });
 
-        socket.on('alert:critical', () => {
-            queryClient.invalidateQueries({ queryKey: ['dashboard', 'alerts'] });
+        socket.on('memory:updated', (data: { memoryId?: number }) => {
+            queryClient.invalidateQueries({ queryKey: ['memories'] });
+            if (data?.memoryId) {
+                queryClient.invalidateQueries({ queryKey: ['memories', data.memoryId] });
+            }
         });
 
-        // TaskItem events for real-time subtask updates
+        // ALERTS
+        socket.on('alert:critical', () => {
+            queryClient.invalidateQueries({ queryKey: ['dashboard', 'alerts'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        });
+
+        // TASK ITEMS - Subtask updates
         socket.on('taskItem:completed', (data: { taskId: number }) => {
             if (data?.taskId) {
                 queryClient.invalidateQueries({ queryKey: ['tasks', data.taskId, 'items'] });
@@ -115,6 +171,14 @@ export function SocketProvider({ children }: SocketProviderProps) {
             }
         });
 
+        socket.on('taskItem:updated', (data: { taskId: number }) => {
+            if (data?.taskId) {
+                queryClient.invalidateQueries({ queryKey: ['tasks', data.taskId, 'items'] });
+                queryClient.invalidateQueries({ queryKey: ['tasks', data.taskId] });
+            }
+        });
+
+        // ACTIVITY
         socket.on('activity:new', () => {
             queryClient.invalidateQueries({ queryKey: ['activity'] });
         });
@@ -205,4 +269,91 @@ export function useSocketNotifications() {
     }, []);
 
     return { notifications, clearNotifications, isConnected };
+}
+
+// Hook for tracking recently updated entities (for visual feedback)
+export function useRecentlyUpdated(entityType: 'task' | 'project' | 'agent' | 'memory', entityId: number, duration = 3000) {
+    const { on, isConnected } = useSocketContext();
+    const [isRecent, setIsRecent] = useState(false);
+
+    useEffect(() => {
+        if (!isConnected) return;
+
+        const eventMap: Record<string, string[]> = {
+            task: ['task:updated', 'task:completed'],
+            project: ['project:updated', 'project:progress'],
+            agent: ['agent:status'],
+            memory: ['memory:updated'],
+        };
+
+        const events = eventMap[entityType] || [];
+        const cleanups: (() => void)[] = [];
+
+        events.forEach((event) => {
+            const cleanup = on(event, (data: unknown) => {
+                const d = data as { taskId?: number; projectId?: number; agentId?: number; memoryId?: number };
+                const idKey = `${entityType}Id` as keyof typeof d;
+                if (d[idKey] === entityId) {
+                    setIsRecent(true);
+                    setTimeout(() => setIsRecent(false), duration);
+                }
+            });
+            cleanups.push(cleanup);
+        });
+
+        return () => {
+            cleanups.forEach((cleanup) => cleanup());
+        };
+    }, [on, isConnected, entityType, entityId, duration]);
+
+    return isRecent;
+}
+
+// Hook for subscribing to project-specific updates
+export function useProjectUpdates(projectId: number) {
+    const { on, isConnected } = useSocketContext();
+    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+    useEffect(() => {
+        if (!isConnected || !projectId) return;
+
+        const cleanups = [
+            on('task:updated', (data: unknown) => {
+                const d = data as { projectId?: number };
+                if (d?.projectId === projectId) {
+                    setLastUpdate(new Date());
+                }
+            }),
+            on('task:created', (data: unknown) => {
+                const d = data as { projectId?: number };
+                if (d?.projectId === projectId) {
+                    setLastUpdate(new Date());
+                }
+            }),
+            on('task:completed', (data: unknown) => {
+                const d = data as { projectId?: number };
+                if (d?.projectId === projectId) {
+                    setLastUpdate(new Date());
+                }
+            }),
+            on('project:updated', (data: unknown) => {
+                const d = data as { projectId?: number };
+                if (d?.projectId === projectId) {
+                    setLastUpdate(new Date());
+                }
+            }),
+            on('project:progress', (data: unknown) => {
+                const d = data as { projectId?: number };
+                if (d?.projectId === projectId) {
+                    setLastUpdate(new Date());
+                }
+            }),
+        ];
+
+        return () => {
+            cleanups.forEach((cleanup) => cleanup());
+        };
+    }, [on, isConnected, projectId]);
+
+    return lastUpdate;
 }

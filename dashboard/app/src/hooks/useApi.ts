@@ -2,12 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     projectsApi,
     tasksApi,
+    tagsApi,
     agentsApi,
     memoriesApi,
     dashboardApi,
     authApi,
+    epicsApi,
+    sprintsApi,
 } from '@/lib/api';
-import type { Project, Task, TaskItem, Agent, Memory, ActivityLog, DashboardStats } from '@/types';
+import type { Project, Task, TaskItem, TaskTag, Agent, Memory, ActivityLog, DashboardStats, Epic, Sprint } from '@/types';
 
 // Auth hooks
 export function useVerifyAuth() {
@@ -334,6 +337,81 @@ export function useCompleteTaskItem() {
 }
 
 // ============================================================
+// Task Tags hooks
+// ============================================================
+
+export function useAllTags() {
+    return useQuery({
+        queryKey: ['tags'],
+        queryFn: async () => {
+            const { data } = await tagsApi.getAll();
+            // API returns { tags: [...] }
+            return (data.tags || data.data || data || []) as TaskTag[];
+        },
+        staleTime: 1000 * 60 * 5, // Tags change infrequently, cache for 5 min
+    });
+}
+
+export function useTaskTags(taskId: number) {
+    return useQuery({
+        queryKey: ['tasks', taskId, 'tags'],
+        queryFn: async () => {
+            const { data } = await tasksApi.getTags(taskId);
+            // API returns { task_id, tags: [...] }
+            return (data.tags || data.data || data || []) as TaskTag[];
+        },
+        enabled: !!taskId,
+    });
+}
+
+export function useAddTaskTag() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ taskId, tagId }: { taskId: number; tagId: number }) =>
+            tasksApi.addTag(taskId, tagId),
+        onSuccess: (_, { taskId }) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks', taskId, 'tags'] });
+            queryClient.invalidateQueries({ queryKey: ['tags'] }); // Update usage count
+        },
+    });
+}
+
+export function useAddTaskTagByName() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ taskId, tagName }: { taskId: number; tagName: string }) =>
+            tasksApi.addTagByName(taskId, tagName),
+        onSuccess: (_, { taskId }) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks', taskId, 'tags'] });
+            queryClient.invalidateQueries({ queryKey: ['tags'] }); // Update usage count
+        },
+    });
+}
+
+export function useRemoveTaskTag() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ taskId, tagId }: { taskId: number; tagId: number }) =>
+            tasksApi.removeTag(taskId, tagId),
+        onSuccess: (_, { taskId }) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks', taskId, 'tags'] });
+            queryClient.invalidateQueries({ queryKey: ['tags'] }); // Update usage count
+        },
+    });
+}
+
+export function useTasksByTag(tagName: string, enabled = true) {
+    return useQuery({
+        queryKey: ['tasks', 'by-tag', tagName],
+        queryFn: async () => {
+            const { data } = await tagsApi.getTasksByTag(tagName);
+            return (data.tasks || data.data || data || []) as Task[];
+        },
+        enabled: enabled && !!tagName,
+    });
+}
+
+// ============================================================
 // Activity hooks
 // ============================================================
 
@@ -393,5 +471,119 @@ export function useProjectAgents(projectId: number) {
         },
         enabled: !!projectId,
         refetchInterval: 10000,
+    });
+}
+
+// ============================================================
+// Project Code Validation hooks
+// ============================================================
+
+export function useCheckProjectCode(code: string) {
+    return useQuery({
+        queryKey: ['projects', 'check-code', code],
+        queryFn: async () => {
+            const { data } = await projectsApi.checkCode(code);
+            return data as { available: boolean; code: string; message: string };
+        },
+        enabled: code.length === 3 && /^[A-Za-z]{3}$/.test(code),
+        staleTime: 1000 * 30, // Cache for 30 seconds
+    });
+}
+
+// ============================================================
+// Epics hooks
+// ============================================================
+
+export function useProjectEpics(projectId: number) {
+    return useQuery({
+        queryKey: ['projects', projectId, 'epics'],
+        queryFn: async () => {
+            const { data } = await epicsApi.getByProject(projectId);
+            return (data.epics || data.data || data || []) as Epic[];
+        },
+        enabled: !!projectId,
+    });
+}
+
+export function useCreateEpic() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ projectId, data }: { projectId: number; data: Partial<Epic> }) =>
+            epicsApi.create(projectId, data as Record<string, unknown>),
+        onSuccess: (_, { projectId }) => {
+            queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'epics'] });
+        },
+    });
+}
+
+export function useUpdateEpic() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; projectId: number; data: Partial<Epic> }) =>
+            epicsApi.update(id, data as Record<string, unknown>),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['projects', variables.projectId, 'epics'] });
+        },
+    });
+}
+
+export function useDeleteEpic() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id }: { id: number; projectId: number }) =>
+            epicsApi.delete(id),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['projects', variables.projectId, 'epics'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] }); // Tasks may have epic assignments
+        },
+    });
+}
+
+// ============================================================
+// Sprints hooks
+// ============================================================
+
+export function useProjectSprints(projectId: number) {
+    return useQuery({
+        queryKey: ['projects', projectId, 'sprints'],
+        queryFn: async () => {
+            const { data } = await sprintsApi.getByProject(projectId);
+            return (data.sprints || data.data || data || []) as Sprint[];
+        },
+        enabled: !!projectId,
+    });
+}
+
+export function useCreateSprint() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ projectId, data }: { projectId: number; data: Partial<Sprint> }) =>
+            sprintsApi.create(projectId, data as Record<string, unknown>),
+        onSuccess: (_, { projectId }) => {
+            queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'sprints'] });
+        },
+    });
+}
+
+export function useUpdateSprint() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; projectId: number; data: Partial<Sprint> }) =>
+            sprintsApi.update(id, data as Record<string, unknown>),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['projects', variables.projectId, 'sprints'] });
+        },
+    });
+}
+
+export function useDeleteSprint() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id }: { id: number; projectId: number }) =>
+            sprintsApi.delete(id),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['projects', variables.projectId, 'sprints'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] }); // Tasks may have sprint assignments
+        },
     });
 }

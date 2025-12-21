@@ -6,6 +6,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ProjectsPage } from '@/pages/ProjectsPage';
 import { ProjectDetailPage } from '@/pages/ProjectDetailPage';
+import { ProjectTasksPage } from '@/pages/ProjectTasksPage';
 import { TasksPage } from '@/pages/TasksPage';
 import { AgentsPage } from '@/pages/AgentsPage';
 import { BusinessesPage } from '@/pages/BusinessesPage';
@@ -51,6 +52,7 @@ function App() {
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="projects" element={<ProjectsPage />} />
                 <Route path="projects/:id" element={<ProjectDetailPage />} />
+                <Route path="projects/:id/tasks" element={<ProjectTasksPage />} />
                 <Route path="tasks" element={<TasksPage />} />
                 <Route path="agents" element={<AgentsPage />} />
                 <Route path="businesses" element={<BusinessesPage />} />
