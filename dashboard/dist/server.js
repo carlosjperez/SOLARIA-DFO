@@ -12,6 +12,7 @@ const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
 const socket_io_1 = require("socket.io");
 const promise_1 = __importDefault(require("mysql2/promise"));
+const ioredis_1 = __importDefault(require("ioredis"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const cors_1 = __importDefault(require("cors"));
@@ -29,9 +30,11 @@ class SolariaDashboardServer {
     io;
     port;
     db;
+    redis;
     connectedClients;
     repoPath;
     _dbHealthInterval;
+    workerUrl;
     constructor() {
         this.app = (0, express_1.default)();
         this.server = http_1.default.createServer(this.app);
@@ -40,13 +43,16 @@ class SolariaDashboardServer {
         });
         this.port = parseInt(process.env.PORT || '3000', 10);
         this.db = null;
+        this.redis = null;
         this.connectedClients = new Map();
         this._dbHealthInterval = null;
+        this.workerUrl = process.env.WORKER_URL || 'http://worker:3032';
         // Trust proxy for rate limiting behind nginx
         this.app.set('trust proxy', true);
         this.repoPath = process.env.REPO_PATH || path_1.default.resolve(__dirname, '..', '..');
         this.initializeMiddleware();
         this.initializeDatabase();
+        this.initializeRedis();
         this.initializeRoutes();
         this.initializeSocketIO();
     }
@@ -129,6 +135,81 @@ class SolariaDashboardServer {
         }, 30000);
     }
     // ========================================================================
+    // Redis Connection for Embedding Queue
+    // ========================================================================
+    initializeRedis() {
+        const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+        try {
+            this.redis = new ioredis_1.default(redisUrl);
+            this.redis.on('connect', () => {
+                console.log('Redis connected successfully');
+            });
+            this.redis.on('error', (err) => {
+                console.error('Redis connection error:', err.message);
+            });
+        }
+        catch (error) {
+            console.error('Failed to initialize Redis:', error);
+            // Non-fatal - embeddings will be generated lazily
+        }
+    }
+    /**
+     * Queue an embedding generation job for a memory
+     */
+    async queueEmbeddingJob(memoryId) {
+        if (!this.redis) {
+            console.warn('Redis not available, embedding job not queued');
+            return;
+        }
+        const job = {
+            id: `emb_${memoryId}_${Date.now()}`,
+            type: 'generate_embedding',
+            payload: { memory_id: memoryId },
+            created_at: new Date().toISOString()
+        };
+        await this.redis.rpush('solaria:embeddings', JSON.stringify(job));
+        console.log(`Queued embedding job for memory #${memoryId}`);
+    }
+    /**
+     * Get embedding for a query text from the worker
+     */
+    async getQueryEmbedding(text) {
+        try {
+            const response = await fetch(`${this.workerUrl}/embed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+            if (!response.ok) {
+                console.error('Worker embed request failed:', response.status);
+                return null;
+            }
+            const data = await response.json();
+            return data.embedding;
+        }
+        catch (error) {
+            console.error('Failed to get query embedding:', error);
+            return null;
+        }
+    }
+    /**
+     * Calculate cosine similarity between two embeddings
+     */
+    cosineSimilarity(a, b) {
+        if (!a || !b || a.length !== b.length)
+            return 0;
+        let dotProduct = 0;
+        let normA = 0;
+        let normB = 0;
+        for (let i = 0; i < a.length; i++) {
+            dotProduct += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+        const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+        return denominator === 0 ? 0 : dotProduct / denominator;
+    }
+    // ========================================================================
     // Route Initialization
     // ========================================================================
     initializeRoutes() {
@@ -160,6 +241,8 @@ class SolariaDashboardServer {
         this.app.get('/api/docs', this.getDocs.bind(this));
         // Projects
         this.app.get('/api/projects', this.getProjects.bind(this));
+        // IMPORTANT: Specific routes MUST come before parameterized routes
+        this.app.get('/api/projects/check-code/:code', this.checkProjectCode.bind(this));
         this.app.get('/api/projects/:id', this.getProject.bind(this));
         this.app.post('/api/projects', this.createProject.bind(this));
         this.app.put('/api/projects/:id', this.updateProject.bind(this));
@@ -174,6 +257,16 @@ class SolariaDashboardServer {
         this.app.post('/api/projects/:id/requests', this.createProjectRequest.bind(this));
         this.app.put('/api/projects/:id/requests/:reqId', this.updateProjectRequest.bind(this));
         this.app.delete('/api/projects/:id/requests/:reqId', this.deleteProjectRequest.bind(this));
+        // Epics
+        this.app.get('/api/projects/:id/epics', this.getProjectEpics.bind(this));
+        this.app.post('/api/projects/:id/epics', this.createEpic.bind(this));
+        this.app.put('/api/epics/:id', this.updateEpic.bind(this));
+        this.app.delete('/api/epics/:id', this.deleteEpic.bind(this));
+        // Sprints
+        this.app.get('/api/projects/:id/sprints', this.getProjectSprints.bind(this));
+        this.app.post('/api/projects/:id/sprints', this.createSprint.bind(this));
+        this.app.put('/api/sprints/:id', this.updateSprint.bind(this));
+        this.app.delete('/api/sprints/:id', this.deleteSprint.bind(this));
         // Agents
         this.app.get('/api/agents', this.getAgents.bind(this));
         this.app.get('/api/agents/:id', this.getAgent.bind(this));
@@ -232,6 +325,7 @@ class SolariaDashboardServer {
         // Memory API
         this.app.get('/api/memories', this.getMemories.bind(this));
         this.app.get('/api/memories/search', this.searchMemories.bind(this));
+        this.app.get('/api/memories/semantic-search', this.semanticSearchMemories.bind(this));
         this.app.get('/api/memories/tags', this.getMemoryTags.bind(this));
         this.app.get('/api/memories/stats', this.getMemoryStats.bind(this));
         this.app.get('/api/memories/:id', this.getMemory.bind(this));
@@ -541,7 +635,17 @@ class SolariaDashboardServer {
                 SELECT
                     t.id,
                     t.task_number,
-                    CONCAT(COALESCE(p.code, 'TSK'), '-', LPAD(COALESCE(t.task_number, t.id), 3, '0')) as task_code,
+                    CONCAT(
+                        COALESCE(p.code, 'TSK'), '-',
+                        LPAD(COALESCE(t.task_number, t.id), 3, '0'),
+                        CASE
+                            WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
+                            WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
+                            ELSE ''
+                        END
+                    ) as task_code,
                     t.title,
                     t.status,
                     t.priority,
@@ -551,11 +655,15 @@ class SolariaDashboardServer {
                     p.id as project_id,
                     p.name as project_name,
                     p.code as project_code,
+                    e.epic_number, e.name as epic_name,
+                    sp.sprint_number, sp.name as sprint_name,
                     aa.id as agent_id,
                     aa.name as agent_name,
                     aa.role as agent_role
                 FROM tasks t
                 LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN epics e ON t.epic_id = e.id
+                LEFT JOIN sprints sp ON t.sprint_id = sp.id
                 LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
                 WHERE t.status = 'completed'
                 ORDER BY COALESCE(t.completed_at, t.updated_at) DESC
@@ -576,7 +684,17 @@ class SolariaDashboardServer {
                 SELECT
                     t.id,
                     t.task_number,
-                    CONCAT(COALESCE(p.code, 'TSK'), '-', LPAD(COALESCE(t.task_number, t.id), 3, '0')) as task_code,
+                    CONCAT(
+                        COALESCE(p.code, 'TSK'), '-',
+                        LPAD(COALESCE(t.task_number, t.id), 3, '0'),
+                        CASE
+                            WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
+                            WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
+                            ELSE ''
+                        END
+                    ) as task_code,
                     t.title,
                     t.status,
                     t.priority,
@@ -586,11 +704,15 @@ class SolariaDashboardServer {
                     p.id as project_id,
                     p.name as project_name,
                     p.code as project_code,
+                    e.epic_number, e.name as epic_name,
+                    sp.sprint_number, sp.name as sprint_name,
                     aa.id as agent_id,
                     aa.name as agent_name,
                     aa.role as agent_role
                 FROM tasks t
                 LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN epics e ON t.epic_id = e.id
+                LEFT JOIN sprints sp ON t.sprint_id = sp.id
                 LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
                 WHERE t.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
                 ORDER BY t.created_at DESC
@@ -787,7 +909,7 @@ class SolariaDashboardServer {
     }
     async createProject(req, res) {
         try {
-            const { name, client, description, priority = 'medium', budget, start_date, deadline, office_visible, office_origin, origin } = req.body;
+            const { name, code, client, description, priority = 'medium', budget, start_date, deadline, office_visible, office_origin, origin } = req.body;
             if (!name) {
                 res.status(400).json({ error: 'Project name is required' });
                 return;
@@ -797,13 +919,59 @@ class SolariaDashboardServer {
                 : 'dfo';
             const normalizedVisibility = office_visible === true || office_visible === 1 || String(office_visible).toLowerCase() === 'true';
             const officeVisible = normalizedOrigin === 'office' ? 1 : normalizedVisibility ? 1 : 0;
-            // Generate unique project code
-            const [maxCode] = await this.db.execute(`
-                SELECT MAX(CAST(SUBSTRING(code, 5) AS UNSIGNED)) as max_num
-                FROM projects WHERE code LIKE 'PRJ-%'
-            `);
-            const nextNum = (maxCode[0]?.max_num || 0) + 1;
-            const projectCode = `PRJ-${String(nextNum).padStart(3, '0')}`;
+            // Validate or generate project code (3 uppercase letters)
+            let projectCode;
+            if (code) {
+                // Validate provided code
+                const upperCode = code.toUpperCase().trim();
+                if (!/^[A-Z]{3}$/.test(upperCode)) {
+                    res.status(400).json({ error: 'Project code must be exactly 3 uppercase letters (A-Z)' });
+                    return;
+                }
+                // Check if reserved
+                const [reserved] = await this.db.execute('SELECT code FROM reserved_project_codes WHERE code = ?', [upperCode]);
+                if (reserved.length > 0) {
+                    res.status(400).json({ error: `Code '${upperCode}' is reserved and cannot be used` });
+                    return;
+                }
+                // Check if already in use
+                const [existing] = await this.db.execute('SELECT id FROM projects WHERE code = ?', [upperCode]);
+                if (existing.length > 0) {
+                    res.status(409).json({ error: `Code '${upperCode}' is already in use by another project` });
+                    return;
+                }
+                projectCode = upperCode;
+            }
+            else {
+                // Auto-generate from project name (first 3 consonants or letters)
+                const consonants = name.toUpperCase().replace(/[^A-Z]/g, '').replace(/[AEIOU]/g, '');
+                const letters = name.toUpperCase().replace(/[^A-Z]/g, '');
+                let baseCode = consonants.length >= 3 ? consonants.slice(0, 3) : letters.slice(0, 3);
+                if (baseCode.length < 3) {
+                    baseCode = baseCode.padEnd(3, 'X');
+                }
+                // Ensure uniqueness by appending a number suffix if needed
+                let candidate = baseCode;
+                let suffix = 1;
+                while (true) {
+                    const [existing] = await this.db.execute('SELECT id FROM projects WHERE code = ?', [candidate]);
+                    const [reserved] = await this.db.execute('SELECT code FROM reserved_project_codes WHERE code = ?', [candidate]);
+                    if (existing.length === 0 && reserved.length === 0) {
+                        break;
+                    }
+                    // Try next variant: ABC -> AB1 -> AB2 -> A12 -> etc
+                    candidate = baseCode.slice(0, 2) + String(suffix).slice(-1);
+                    suffix++;
+                    if (suffix > 9) {
+                        candidate = baseCode.slice(0, 1) + String(suffix).padStart(2, '0').slice(-2);
+                    }
+                    if (suffix > 99) {
+                        res.status(400).json({ error: 'Unable to generate unique project code. Please provide one manually.' });
+                        return;
+                    }
+                }
+                projectCode = candidate;
+            }
             const [result] = await this.db.execute(`
                 INSERT INTO projects (
                     name, code, client, description, priority, budget,
@@ -931,6 +1099,261 @@ class SolariaDashboardServer {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             console.error('Delete project error:', errorMessage);
             res.status(500).json({ error: 'Failed to delete project' });
+        }
+    }
+    // ========================================================================
+    // Project Code Validation
+    // ========================================================================
+    async checkProjectCode(req, res) {
+        try {
+            const { code } = req.params;
+            const upperCode = code.toUpperCase().trim();
+            // Validate format
+            if (!/^[A-Z]{3}$/.test(upperCode)) {
+                res.json({ available: false, reason: 'Code must be exactly 3 uppercase letters' });
+                return;
+            }
+            // Check if reserved
+            const [reserved] = await this.db.execute('SELECT code, reason FROM reserved_project_codes WHERE code = ?', [upperCode]);
+            if (reserved.length > 0) {
+                res.json({ available: false, reason: `Code '${upperCode}' is reserved: ${reserved[0].reason}` });
+                return;
+            }
+            // Check if already in use
+            const [existing] = await this.db.execute('SELECT id, name FROM projects WHERE code = ?', [upperCode]);
+            if (existing.length > 0) {
+                res.json({ available: false, reason: `Code '${upperCode}' is used by project: ${existing[0].name}` });
+                return;
+            }
+            res.json({ available: true, code: upperCode });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Check project code error:', errorMessage);
+            res.status(500).json({ error: 'Failed to check project code' });
+        }
+    }
+    // ========================================================================
+    // Epics CRUD
+    // ========================================================================
+    async getProjectEpics(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.query;
+            let query = `
+                SELECT e.*,
+                    (SELECT COUNT(*) FROM tasks WHERE epic_id = e.id) as tasks_count,
+                    (SELECT COUNT(*) FROM tasks WHERE epic_id = e.id AND status = 'completed') as tasks_completed
+                FROM epics e
+                WHERE e.project_id = ?
+            `;
+            const params = [id];
+            if (status) {
+                query += ' AND e.status = ?';
+                params.push(status);
+            }
+            query += ' ORDER BY e.epic_number ASC';
+            const [epics] = await this.db.execute(query, params);
+            res.json({ epics });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Get project epics error:', errorMessage);
+            res.status(500).json({ error: 'Failed to get epics' });
+        }
+    }
+    async createEpic(req, res) {
+        try {
+            const { id } = req.params; // project_id
+            const { name, description, color, status, start_date, target_date } = req.body;
+            if (!name) {
+                res.status(400).json({ error: 'Epic name is required' });
+                return;
+            }
+            // Get next epic number for this project
+            const [maxNum] = await this.db.execute('SELECT COALESCE(MAX(epic_number), 0) as max_num FROM epics WHERE project_id = ?', [id]);
+            const epicNumber = (maxNum[0]?.max_num || 0) + 1;
+            const [result] = await this.db.execute(`
+                INSERT INTO epics (project_id, epic_number, name, description, color, status, start_date, target_date, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                id,
+                epicNumber,
+                name,
+                description || null,
+                color || '#6366f1',
+                status || 'open',
+                start_date || null,
+                target_date || null,
+                req.user?.userId || null
+            ]);
+            res.status(201).json({
+                id: result.insertId,
+                epic_number: epicNumber,
+                message: 'Epic created successfully'
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Create epic error:', errorMessage);
+            res.status(500).json({ error: 'Failed to create epic' });
+        }
+    }
+    async updateEpic(req, res) {
+        try {
+            const { id } = req.params;
+            const { name, description, color, status, start_date, target_date } = req.body;
+            const [result] = await this.db.execute(`
+                UPDATE epics SET
+                    name = COALESCE(?, name),
+                    description = COALESCE(?, description),
+                    color = COALESCE(?, color),
+                    status = COALESCE(?, status),
+                    start_date = COALESCE(?, start_date),
+                    target_date = COALESCE(?, target_date),
+                    updated_at = NOW()
+                WHERE id = ?
+            `, [name, description, color, status, start_date, target_date, id]);
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Epic not found' });
+                return;
+            }
+            res.json({ message: 'Epic updated successfully' });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Update epic error:', errorMessage);
+            res.status(500).json({ error: 'Failed to update epic' });
+        }
+    }
+    async deleteEpic(req, res) {
+        try {
+            const { id } = req.params;
+            // Tasks with this epic_id will have it set to NULL via FK constraint
+            const [result] = await this.db.execute('DELETE FROM epics WHERE id = ?', [id]);
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Epic not found' });
+                return;
+            }
+            res.json({ message: 'Epic deleted successfully' });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Delete epic error:', errorMessage);
+            res.status(500).json({ error: 'Failed to delete epic' });
+        }
+    }
+    // ========================================================================
+    // Sprints CRUD
+    // ========================================================================
+    async getProjectSprints(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.query;
+            let query = `
+                SELECT s.*,
+                    (SELECT COUNT(*) FROM tasks WHERE sprint_id = s.id) as tasks_count,
+                    (SELECT COUNT(*) FROM tasks WHERE sprint_id = s.id AND status = 'completed') as tasks_completed,
+                    (SELECT SUM(estimated_hours) FROM tasks WHERE sprint_id = s.id) as total_estimated_hours
+                FROM sprints s
+                WHERE s.project_id = ?
+            `;
+            const params = [id];
+            if (status) {
+                query += ' AND s.status = ?';
+                params.push(status);
+            }
+            query += ' ORDER BY s.sprint_number ASC';
+            const [sprints] = await this.db.execute(query, params);
+            res.json({ sprints });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Get project sprints error:', errorMessage);
+            res.status(500).json({ error: 'Failed to get sprints' });
+        }
+    }
+    async createSprint(req, res) {
+        try {
+            const { id } = req.params; // project_id
+            const { name, goal, status, start_date, end_date, velocity, capacity } = req.body;
+            if (!name) {
+                res.status(400).json({ error: 'Sprint name is required' });
+                return;
+            }
+            // Get next sprint number for this project
+            const [maxNum] = await this.db.execute('SELECT COALESCE(MAX(sprint_number), 0) as max_num FROM sprints WHERE project_id = ?', [id]);
+            const sprintNumber = (maxNum[0]?.max_num || 0) + 1;
+            const [result] = await this.db.execute(`
+                INSERT INTO sprints (project_id, sprint_number, name, goal, status, start_date, end_date, velocity, capacity, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                id,
+                sprintNumber,
+                name,
+                goal || null,
+                status || 'planned',
+                start_date || null,
+                end_date || null,
+                velocity || 0,
+                capacity || 0,
+                req.user?.userId || null
+            ]);
+            res.status(201).json({
+                id: result.insertId,
+                sprint_number: sprintNumber,
+                message: 'Sprint created successfully'
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Create sprint error:', errorMessage);
+            res.status(500).json({ error: 'Failed to create sprint' });
+        }
+    }
+    async updateSprint(req, res) {
+        try {
+            const { id } = req.params;
+            const { name, goal, status, start_date, end_date, velocity, capacity } = req.body;
+            const [result] = await this.db.execute(`
+                UPDATE sprints SET
+                    name = COALESCE(?, name),
+                    goal = COALESCE(?, goal),
+                    status = COALESCE(?, status),
+                    start_date = COALESCE(?, start_date),
+                    end_date = COALESCE(?, end_date),
+                    velocity = COALESCE(?, velocity),
+                    capacity = COALESCE(?, capacity),
+                    updated_at = NOW()
+                WHERE id = ?
+            `, [name, goal, status, start_date, end_date, velocity, capacity, id]);
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Sprint not found' });
+                return;
+            }
+            res.json({ message: 'Sprint updated successfully' });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Update sprint error:', errorMessage);
+            res.status(500).json({ error: 'Failed to update sprint' });
+        }
+    }
+    async deleteSprint(req, res) {
+        try {
+            const { id } = req.params;
+            // Tasks with this sprint_id will have it set to NULL via FK constraint
+            const [result] = await this.db.execute('DELETE FROM sprints WHERE id = ?', [id]);
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Sprint not found' });
+                return;
+            }
+            res.json({ message: 'Sprint deleted successfully' });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Delete sprint error:', errorMessage);
+            res.status(500).json({ error: 'Failed to delete sprint' });
         }
     }
     async getProjectClient(req, res) {
@@ -1329,13 +1752,27 @@ class SolariaDashboardServer {
                     t.*,
                     p.name as project_name,
                     p.code as project_code,
-                    CONCAT(COALESCE(p.code, 'TSK'), '-', LPAD(COALESCE(t.task_number, t.id), 3, '0')) as task_code,
+                    e.id as epic_id, e.epic_number, e.name as epic_name,
+                    sp.id as sprint_id, sp.sprint_number, sp.name as sprint_name,
+                    CONCAT(
+                        COALESCE(p.code, 'TSK'), '-',
+                        LPAD(COALESCE(t.task_number, t.id), 3, '0'),
+                        CASE
+                            WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
+                            WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
+                            ELSE ''
+                        END
+                    ) as task_code,
                     aa.name as agent_name,
                     u.username as assigned_by_name,
                     (SELECT COUNT(*) FROM task_items WHERE task_id = t.id) as items_total,
                     (SELECT COUNT(*) FROM task_items WHERE task_id = t.id AND is_completed = 1) as items_completed
                 FROM tasks t
                 LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN epics e ON t.epic_id = e.id
+                LEFT JOIN sprints sp ON t.sprint_id = sp.id
                 LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
                 LEFT JOIN users u ON t.assigned_by = u.id
                 WHERE 1=1
@@ -1370,11 +1807,25 @@ class SolariaDashboardServer {
                     t.*,
                     p.name as project_name,
                     p.code as project_code,
-                    CONCAT(COALESCE(p.code, 'TSK'), '-', LPAD(COALESCE(t.task_number, t.id), 3, '0')) as task_code,
+                    e.id as epic_id, e.epic_number, e.name as epic_name,
+                    sp.id as sprint_id, sp.sprint_number, sp.name as sprint_name,
+                    CONCAT(
+                        COALESCE(p.code, 'TSK'), '-',
+                        LPAD(COALESCE(t.task_number, t.id), 3, '0'),
+                        CASE
+                            WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
+                            WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
+                            ELSE ''
+                        END
+                    ) as task_code,
                     aa.name as agent_name,
                     u.username as assigned_by_name
                 FROM tasks t
                 LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN epics e ON t.epic_id = e.id
+                LEFT JOIN sprints sp ON t.sprint_id = sp.id
                 LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
                 LEFT JOIN users u ON t.assigned_by = u.id
                 WHERE t.id = ?
@@ -1404,7 +1855,7 @@ class SolariaDashboardServer {
     }
     async createTask(req, res) {
         try {
-            const { title, description, project_id, assigned_agent_id, priority = 'medium', estimated_hours, deadline } = req.body;
+            const { title, description, project_id, epic_id, sprint_id, assigned_agent_id, priority = 'medium', estimated_hours, deadline } = req.body;
             // Auto-assign "Claude Code" agent if not specified
             let agentId = assigned_agent_id;
             if (!agentId) {
@@ -1421,13 +1872,15 @@ class SolariaDashboardServer {
             }
             const [result] = await this.db.execute(`
                 INSERT INTO tasks (
-                    title, description, project_id, assigned_agent_id, task_number,
+                    title, description, project_id, epic_id, sprint_id, assigned_agent_id, task_number,
                     priority, estimated_hours, deadline, assigned_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 title || 'Nueva tarea',
                 description ?? null,
                 project_id ?? null,
+                epic_id ?? null,
+                sprint_id ?? null,
                 agentId ?? null,
                 taskNumber,
                 priority || 'medium',
@@ -1435,12 +1888,27 @@ class SolariaDashboardServer {
                 deadline ?? null,
                 req.user?.userId ?? null
             ]);
-            // Get project code for response
+            // Generate task_code with suffix
             let taskCode = `#${taskNumber}`;
+            let suffix = '';
             if (project_id) {
                 const [projects] = await this.db.execute('SELECT code FROM projects WHERE id = ?', [project_id]);
                 if (projects.length > 0 && projects[0].code) {
                     taskCode = `${projects[0].code}-${String(taskNumber).padStart(3, '0')}`;
+                    // Add suffix based on epic or sprint
+                    if (epic_id) {
+                        const [epics] = await this.db.execute('SELECT epic_number FROM epics WHERE id = ?', [epic_id]);
+                        if (epics.length > 0) {
+                            suffix = `-EPIC${String(epics[0].epic_number).padStart(2, '0')}`;
+                        }
+                    }
+                    else if (sprint_id) {
+                        const [sprints] = await this.db.execute('SELECT sprint_number FROM sprints WHERE id = ?', [sprint_id]);
+                        if (sprints.length > 0) {
+                            suffix = `-SP${String(sprints[0].sprint_number).padStart(2, '0')}`;
+                        }
+                    }
+                    taskCode += suffix;
                 }
             }
             // Emit task_created notification
@@ -1498,6 +1966,14 @@ class SolariaDashboardServer {
             if (updates.project_id !== undefined) {
                 fields.push('project_id = ?');
                 values.push(updates.project_id);
+            }
+            if (updates.epic_id !== undefined) {
+                fields.push('epic_id = ?');
+                values.push(updates.epic_id);
+            }
+            if (updates.sprint_id !== undefined) {
+                fields.push('sprint_id = ?');
+                values.push(updates.sprint_id);
             }
             // Auto-set progress to 100% when task is marked as completed
             if (updates.status === 'completed' && updates.progress === undefined) {
@@ -2717,6 +3193,81 @@ class SolariaDashboardServer {
             res.status(500).json({ error: 'Failed to search memories' });
         }
     }
+    /**
+     * Semantic search memories using vector embeddings
+     * Combines cosine similarity (60%) with FULLTEXT score (40%)
+     */
+    async semanticSearchMemories(req, res) {
+        try {
+            const { query, project_id, min_similarity = 0.5, limit = 10, include_fulltext = true } = req.query;
+            if (!query || typeof query !== 'string') {
+                res.status(400).json({ error: 'Query parameter is required' });
+                return;
+            }
+            // Get query embedding from worker
+            const queryEmbedding = await this.getQueryEmbedding(query);
+            if (!queryEmbedding) {
+                // Fallback to FULLTEXT search if embedding service unavailable
+                console.warn('[semantic-search] Embedding service unavailable, falling back to FULLTEXT');
+                return this.searchMemories(req, res);
+            }
+            // Fetch memories with embeddings
+            let sql = `
+                SELECT m.*, p.name as project_name, aa.name as agent_name,
+                       MATCH(m.content) AGAINST(? IN NATURAL LANGUAGE MODE) as fulltext_score
+                FROM memories m
+                LEFT JOIN projects p ON m.project_id = p.id
+                LEFT JOIN ai_agents aa ON m.agent_id = aa.id
+                WHERE m.embedding IS NOT NULL
+            `;
+            const params = [query];
+            if (project_id) {
+                sql += ' AND m.project_id = ?';
+                params.push(Number(project_id));
+            }
+            sql += ' ORDER BY m.importance DESC, m.created_at DESC LIMIT 100';
+            const [memories] = await this.db.execute(sql, params);
+            // Calculate hybrid scores and rank
+            const scoredMemories = memories.map((memory) => {
+                const embedding = memory.embedding ? JSON.parse(memory.embedding) : null;
+                let cosineSim = 0;
+                if (embedding && Array.isArray(embedding)) {
+                    cosineSim = this.cosineSimilarity(queryEmbedding, embedding);
+                }
+                // Normalize fulltext score (typically 0-20+)
+                const normalizedFulltext = Math.min(memory.fulltext_score / 10, 1);
+                // Hybrid score: 60% semantic + 40% keyword
+                const hybridScore = include_fulltext === 'true'
+                    ? (0.6 * cosineSim) + (0.4 * normalizedFulltext)
+                    : cosineSim;
+                return {
+                    ...memory,
+                    tags: memory.tags ? JSON.parse(memory.tags) : [],
+                    metadata: memory.metadata ? JSON.parse(memory.metadata) : {},
+                    embedding: undefined, // Don't return embedding in response
+                    similarity: cosineSim,
+                    fulltext_score: normalizedFulltext,
+                    hybrid_score: hybridScore
+                };
+            });
+            // Filter by minimum similarity and sort by hybrid score
+            const filteredMemories = scoredMemories
+                .filter((m) => m.similarity >= Number(min_similarity))
+                .sort((a, b) => b.hybrid_score - a.hybrid_score)
+                .slice(0, Number(limit));
+            res.json({
+                memories: filteredMemories,
+                count: filteredMemories.length,
+                query,
+                embedding_available: true,
+                search_type: include_fulltext === 'true' ? 'hybrid' : 'semantic'
+            });
+        }
+        catch (error) {
+            console.error('Semantic search error:', error);
+            res.status(500).json({ error: 'Failed to perform semantic search' });
+        }
+    }
     async getMemory(req, res) {
         try {
             const { id } = req.params;
@@ -2769,9 +3320,14 @@ class SolariaDashboardServer {
                 project_id || null,
                 agent_id || null
             ]);
+            // Queue embedding generation job (async, don't wait)
+            this.queueEmbeddingJob(result.insertId).catch(err => {
+                console.warn(`[memory] Failed to queue embedding job for memory #${result.insertId}:`, err.message);
+            });
             res.status(201).json({
                 id: result.insertId,
-                message: 'Memory created successfully'
+                message: 'Memory created successfully',
+                embedding_queued: true
             });
         }
         catch (error) {

@@ -29,6 +29,11 @@ export const memories = mysqlTable('memories', {
     importance: decimal('importance', { precision: 3, scale: 2 }).default('0.50'),
     accessCount: int('access_count').default(0),
     lastAccessed: timestamp('last_accessed'),
+    // Embedding columns (Migration 002)
+    embedding: json('embedding'), // Vector embedding (384 dimensions)
+    embeddingModel: varchar('embedding_model', { length: 100 }),
+    embeddingVersion: int('embedding_version').default(1),
+    embeddingGeneratedAt: timestamp('embedding_generated_at'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
 });
@@ -129,9 +134,67 @@ export const memoryEventsRelations = relations(memoryEvents, ({ one }) => ({
     }),
 }));
 
+// Embedding job status enum
+export const embeddingJobStatusEnum = mysqlEnum('embedding_job_status', [
+    'pending',
+    'processing',
+    'completed',
+    'failed',
+]);
+
+// Embedding jobs table (Migration 002)
+export const embeddingJobs = mysqlTable('embedding_jobs', {
+    id: int('id').primaryKey().autoincrement(),
+    memoryId: int('memory_id')
+        .notNull()
+        .references(() => memories.id, { onDelete: 'cascade' }),
+    status: embeddingJobStatusEnum.default('pending'),
+    attempts: int('attempts').default(0),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at').defaultNow(),
+    startedAt: timestamp('started_at'),
+    completedAt: timestamp('completed_at'),
+});
+
+// Embedding cache table (Migration 002)
+export const embeddingCache = mysqlTable('embedding_cache', {
+    id: int('id').primaryKey().autoincrement(),
+    queryHash: varchar('query_hash', { length: 64 }).notNull().unique(),
+    queryText: varchar('query_text', { length: 512 }).notNull(),
+    embedding: json('embedding').notNull(),
+    hitCount: int('hit_count').default(1),
+    createdAt: timestamp('created_at').defaultNow(),
+    lastAccessed: timestamp('last_accessed').defaultNow().onUpdateNow(),
+});
+
+// Embedding stats table (Migration 002)
+export const embeddingStats = mysqlTable('embedding_stats', {
+    id: int('id').primaryKey().autoincrement(),
+    date: timestamp('date').notNull(),
+    embeddingsGenerated: int('embeddings_generated').default(0),
+    searchesPerformed: int('searches_performed').default(0),
+    cacheHits: int('cache_hits').default(0),
+    avgSimilarity: decimal('avg_similarity', { precision: 5, scale: 4 }).default('0'),
+    avgGenerationMs: int('avg_generation_ms').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+});
+
+// Embedding jobs relations
+export const embeddingJobsRelations = relations(embeddingJobs, ({ one }) => ({
+    memory: one(memories, {
+        fields: [embeddingJobs.memoryId],
+        references: [memories.id],
+    }),
+}));
+
 // Type exports
 export type Memory = typeof memories.$inferSelect;
 export type NewMemory = typeof memories.$inferInsert;
 export type MemoryTag = typeof memoryTags.$inferSelect;
 export type MemoryCrossref = typeof memoryCrossrefs.$inferSelect;
 export type MemoryEvent = typeof memoryEvents.$inferSelect;
+export type EmbeddingJob = typeof embeddingJobs.$inferSelect;
+export type NewEmbeddingJob = typeof embeddingJobs.$inferInsert;
+export type EmbeddingCache = typeof embeddingCache.$inferSelect;
+export type EmbeddingStats = typeof embeddingStats.$inferSelect;

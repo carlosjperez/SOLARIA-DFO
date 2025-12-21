@@ -48,6 +48,7 @@ import type {
   MemoryUpdateParams,
   MemoryDeleteParams,
   MemorySearchParams,
+  MemorySemanticSearchParams,
   MemoryBoostParams,
   MemoryRelatedParams,
   MemoryLinkParams,
@@ -739,6 +740,28 @@ export const toolDefinitions: MCPToolDefinition[] = [
         },
       },
       required: ["source_id", "target_id"],
+    },
+  },
+  {
+    name: "memory_semantic_search",
+    description: "Search memories using vector embeddings for semantic similarity. More powerful than memory_search for finding conceptually related content even with different wording. Uses hybrid scoring: 60% semantic similarity + 40% keyword match.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Natural language search query" },
+        min_similarity: {
+          type: "number",
+          minimum: 0,
+          maximum: 1,
+          description: "Minimum cosine similarity threshold (default: 0.5)",
+        },
+        limit: { type: "number", description: "Max results to return (default: 10)" },
+        include_fulltext: {
+          type: "boolean",
+          description: "Include FULLTEXT keyword scoring in hybrid results (default: true)",
+        },
+      },
+      required: ["query"],
     },
   },
 ];
@@ -1437,6 +1460,16 @@ export async function executeTool(
           relationship_type: params.relationship_type || "related",
         }),
       });
+    }
+
+    case "memory_semantic_search": {
+      const params = (args as unknown) as MemorySemanticSearchParams;
+      const searchParams = [`query=${encodeURIComponent(params.query)}`];
+      if (isIsolated) searchParams.push(`project_id=${context.project_id}`);
+      if (params.min_similarity !== undefined) searchParams.push(`min_similarity=${params.min_similarity}`);
+      if (params.limit !== undefined) searchParams.push(`limit=${params.limit}`);
+      if (params.include_fulltext !== undefined) searchParams.push(`include_fulltext=${params.include_fulltext}`);
+      return apiCall(`/memories/semantic-search?${searchParams.join('&')}`);
     }
 
     default:

@@ -66,27 +66,46 @@ services:
       - solaria-network
 
   # ============================================================================
-  # WORKER: Background Job Processor
+  # WORKER: Background Job Processor + Embedding Service
+  # Includes Transformers.js for local vector embeddings
   # ============================================================================
   worker:
     build:
       context: .
       dockerfile: worker.Dockerfile
+    ports:
+      - "3032:3032"       # Embedding HTTP API
     environment:
       - REDIS_URL=redis://redis:6379
       - DASHBOARD_URL=http://office:3030
+      - DB_HOST=office
+      - DB_PORT=3306
+      - DB_USER=${DB_USER:-solaria_user}
+      - DB_PASSWORD=${DB_PASSWORD:-solaria2024}
+      - DB_NAME=${DB_NAME:-solaria_construction}
+      - EMBEDDING_HTTP_PORT=3032
       - NODE_ENV=${NODE_ENV:-production}
+    volumes:
+      - worker_models:/app/models
+      - worker_cache:/app/.cache
     depends_on:
       office:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
     healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3032/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     networks:
       - solaria-network
 
@@ -117,6 +136,10 @@ volumes:
   office_mysql_data:
     driver: local
   redis_data:
+    driver: local
+  worker_models:
+    driver: local
+  worker_cache:
     driver: local
 
 # ============================================================================

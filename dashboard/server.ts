@@ -8,6 +8,7 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import http from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import mysql, { Connection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import Redis from 'ioredis';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
@@ -59,9 +60,11 @@ class SolariaDashboardServer {
     private io: TypedIOServer;
     private port: number;
     private db: Connection | null;
+    private redis: Redis | null;
     private connectedClients: Map<string, ConnectedClient>;
     private repoPath: string;
     private _dbHealthInterval: ReturnType<typeof setInterval> | null;
+    private workerUrl: string;
 
     constructor() {
         this.app = express();
@@ -72,8 +75,10 @@ class SolariaDashboardServer {
 
         this.port = parseInt(process.env.PORT || '3000', 10);
         this.db = null;
+        this.redis = null;
         this.connectedClients = new Map();
         this._dbHealthInterval = null;
+        this.workerUrl = process.env.WORKER_URL || 'http://worker:3032';
 
         // Trust proxy for rate limiting behind nginx
         this.app.set('trust proxy', true);
@@ -82,6 +87,7 @@ class SolariaDashboardServer {
 
         this.initializeMiddleware();
         this.initializeDatabase();
+        this.initializeRedis();
         this.initializeRoutes();
         this.initializeSocketIO();
     }
@@ -175,6 +181,92 @@ class SolariaDashboardServer {
     }
 
     // ========================================================================
+    // Redis Connection for Embedding Queue
+    // ========================================================================
+
+    private initializeRedis(): void {
+        const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+        try {
+            this.redis = new Redis(redisUrl);
+
+            this.redis.on('connect', () => {
+                console.log('Redis connected successfully');
+            });
+
+            this.redis.on('error', (err) => {
+                console.error('Redis connection error:', err.message);
+            });
+        } catch (error) {
+            console.error('Failed to initialize Redis:', error);
+            // Non-fatal - embeddings will be generated lazily
+        }
+    }
+
+    /**
+     * Queue an embedding generation job for a memory
+     */
+    private async queueEmbeddingJob(memoryId: number): Promise<void> {
+        if (!this.redis) {
+            console.warn('Redis not available, embedding job not queued');
+            return;
+        }
+
+        const job = {
+            id: `emb_${memoryId}_${Date.now()}`,
+            type: 'generate_embedding',
+            payload: { memory_id: memoryId },
+            created_at: new Date().toISOString()
+        };
+
+        await this.redis.rpush('solaria:embeddings', JSON.stringify(job));
+        console.log(`Queued embedding job for memory #${memoryId}`);
+    }
+
+    /**
+     * Get embedding for a query text from the worker
+     */
+    private async getQueryEmbedding(text: string): Promise<number[] | null> {
+        try {
+            const response = await fetch(`${this.workerUrl}/embed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+
+            if (!response.ok) {
+                console.error('Worker embed request failed:', response.status);
+                return null;
+            }
+
+            const data = await response.json();
+            return data.embedding;
+        } catch (error) {
+            console.error('Failed to get query embedding:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Calculate cosine similarity between two embeddings
+     */
+    private cosineSimilarity(a: number[], b: number[]): number {
+        if (!a || !b || a.length !== b.length) return 0;
+
+        let dotProduct = 0;
+        let normA = 0;
+        let normB = 0;
+
+        for (let i = 0; i < a.length; i++) {
+            dotProduct += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+
+        const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+        return denominator === 0 ? 0 : dotProduct / denominator;
+    }
+
+    // ========================================================================
     // Route Initialization
     // ========================================================================
 
@@ -213,13 +305,12 @@ class SolariaDashboardServer {
 
         // Projects
         this.app.get('/api/projects', this.getProjects.bind(this));
+        // IMPORTANT: Specific routes MUST come before parameterized routes
+        this.app.get('/api/projects/check-code/:code', this.checkProjectCode.bind(this));
         this.app.get('/api/projects/:id', this.getProject.bind(this));
         this.app.post('/api/projects', this.createProject.bind(this));
         this.app.put('/api/projects/:id', this.updateProject.bind(this));
         this.app.delete('/api/projects/:id', this.deleteProject.bind(this));
-
-        // Project Code Validation
-        this.app.get('/api/projects/check-code/:code', this.checkProjectCode.bind(this));
 
         // Project Extended Data
         this.app.get('/api/projects/:id/client', this.getProjectClient.bind(this));
@@ -312,6 +403,7 @@ class SolariaDashboardServer {
         // Memory API
         this.app.get('/api/memories', this.getMemories.bind(this));
         this.app.get('/api/memories/search', this.searchMemories.bind(this));
+        this.app.get('/api/memories/semantic-search', this.semanticSearchMemories.bind(this));
         this.app.get('/api/memories/tags', this.getMemoryTags.bind(this));
         this.app.get('/api/memories/stats', this.getMemoryStats.bind(this));
         this.app.get('/api/memories/:id', this.getMemory.bind(this));
@@ -2283,7 +2375,7 @@ class SolariaDashboardServer {
                 LEFT JOIN projects p ON t.project_id = p.id
                 WHERE t.id = ?
             `, [id]);
-            const taskForEmit = taskDataForEmit[0] || {};
+            const taskForEmit: any = taskDataForEmit[0] || {};
             const taskCode = taskForEmit.project_code && taskForEmit.task_number
                 ? `${taskForEmit.project_code}-${String(taskForEmit.task_number).padStart(3, '0')}`
                 : `TASK-${id}`;
@@ -2310,7 +2402,7 @@ class SolariaDashboardServer {
                     WHERE t.id = ?
                 `, [id]);
 
-                const task = taskData[0] || {};
+                const task: any = taskData[0] || {};
                 this.io.to('notifications').emit('task_completed', {
                     id: parseInt(id),
                     title: task.title || `Tarea #${id}`,
@@ -3619,6 +3711,95 @@ class SolariaDashboardServer {
         }
     }
 
+    /**
+     * Semantic search memories using vector embeddings
+     * Combines cosine similarity (60%) with FULLTEXT score (40%)
+     */
+    private async semanticSearchMemories(req: Request, res: Response): Promise<void> {
+        try {
+            const { query, project_id, min_similarity = 0.5, limit = 10, include_fulltext = true } = req.query;
+
+            if (!query || typeof query !== 'string') {
+                res.status(400).json({ error: 'Query parameter is required' });
+                return;
+            }
+
+            // Get query embedding from worker
+            const queryEmbedding = await this.getQueryEmbedding(query);
+
+            if (!queryEmbedding) {
+                // Fallback to FULLTEXT search if embedding service unavailable
+                console.warn('[semantic-search] Embedding service unavailable, falling back to FULLTEXT');
+                return this.searchMemories(req, res);
+            }
+
+            // Fetch memories with embeddings
+            let sql = `
+                SELECT m.*, p.name as project_name, aa.name as agent_name,
+                       MATCH(m.content) AGAINST(? IN NATURAL LANGUAGE MODE) as fulltext_score
+                FROM memories m
+                LEFT JOIN projects p ON m.project_id = p.id
+                LEFT JOIN ai_agents aa ON m.agent_id = aa.id
+                WHERE m.embedding IS NOT NULL
+            `;
+            const params: (string | number)[] = [query];
+
+            if (project_id) {
+                sql += ' AND m.project_id = ?';
+                params.push(Number(project_id));
+            }
+
+            sql += ' ORDER BY m.importance DESC, m.created_at DESC LIMIT 100';
+
+            const [memories] = await this.db!.execute<RowDataPacket[]>(sql, params);
+
+            // Calculate hybrid scores and rank
+            const scoredMemories = memories.map((memory: any) => {
+                const embedding = memory.embedding ? JSON.parse(memory.embedding) : null;
+
+                let cosineSim = 0;
+                if (embedding && Array.isArray(embedding)) {
+                    cosineSim = this.cosineSimilarity(queryEmbedding, embedding);
+                }
+
+                // Normalize fulltext score (typically 0-20+)
+                const normalizedFulltext = Math.min(memory.fulltext_score / 10, 1);
+
+                // Hybrid score: 60% semantic + 40% keyword
+                const hybridScore = include_fulltext === 'true'
+                    ? (0.6 * cosineSim) + (0.4 * normalizedFulltext)
+                    : cosineSim;
+
+                return {
+                    ...memory,
+                    tags: memory.tags ? JSON.parse(memory.tags) : [],
+                    metadata: memory.metadata ? JSON.parse(memory.metadata) : {},
+                    embedding: undefined, // Don't return embedding in response
+                    similarity: cosineSim,
+                    fulltext_score: normalizedFulltext,
+                    hybrid_score: hybridScore
+                };
+            });
+
+            // Filter by minimum similarity and sort by hybrid score
+            const filteredMemories = scoredMemories
+                .filter((m: any) => m.similarity >= Number(min_similarity))
+                .sort((a: any, b: any) => b.hybrid_score - a.hybrid_score)
+                .slice(0, Number(limit));
+
+            res.json({
+                memories: filteredMemories,
+                count: filteredMemories.length,
+                query,
+                embedding_available: true,
+                search_type: include_fulltext === 'true' ? 'hybrid' : 'semantic'
+            });
+        } catch (error) {
+            console.error('Semantic search error:', error);
+            res.status(500).json({ error: 'Failed to perform semantic search' });
+        }
+    }
+
     private async getMemory(req: Request, res: Response): Promise<void> {
         try {
             const { id } = req.params;
@@ -3680,9 +3861,15 @@ class SolariaDashboardServer {
                 agent_id || null
             ]);
 
+            // Queue embedding generation job (async, don't wait)
+            this.queueEmbeddingJob(result.insertId).catch(err => {
+                console.warn(`[memory] Failed to queue embedding job for memory #${result.insertId}:`, err.message);
+            });
+
             res.status(201).json({
                 id: result.insertId,
-                message: 'Memory created successfully'
+                message: 'Memory created successfully',
+                embedding_queued: true
             });
         } catch (error) {
             console.error('Create memory error:', error);

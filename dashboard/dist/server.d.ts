@@ -10,13 +10,28 @@ declare class SolariaDashboardServer {
     private io;
     private port;
     private db;
+    private redis;
     private connectedClients;
     private repoPath;
     private _dbHealthInterval;
+    private workerUrl;
     constructor();
     private initializeMiddleware;
     private initializeDatabase;
     private setupDatabaseHealthCheck;
+    private initializeRedis;
+    /**
+     * Queue an embedding generation job for a memory
+     */
+    private queueEmbeddingJob;
+    /**
+     * Get embedding for a query text from the worker
+     */
+    private getQueryEmbedding;
+    /**
+     * Calculate cosine similarity between two embeddings
+     */
+    private cosineSimilarity;
     private initializeRoutes;
     private initializeSocketIO;
     private startRealTimeUpdates;
@@ -49,6 +64,15 @@ declare class SolariaDashboardServer {
     private createProject;
     private updateProject;
     private deleteProject;
+    private checkProjectCode;
+    private getProjectEpics;
+    private createEpic;
+    private updateEpic;
+    private deleteEpic;
+    private getProjectSprints;
+    private createSprint;
+    private updateSprint;
+    private deleteSprint;
     private getProjectClient;
     private updateProjectClient;
     private getProjectDocuments;
@@ -107,6 +131,11 @@ declare class SolariaDashboardServer {
     private getAgentInstructions;
     private getMemories;
     private searchMemories;
+    /**
+     * Semantic search memories using vector embeddings
+     * Combines cosine similarity (60%) with FULLTEXT score (40%)
+     */
+    private semanticSearchMemories;
     private getMemory;
     private createMemory;
     private updateMemory;

@@ -356,6 +356,13 @@ export interface MemorySearchParams {
   limit?: number;
 }
 
+export interface MemorySemanticSearchParams {
+  query: string;
+  min_similarity?: number;
+  limit?: number;
+  include_fulltext?: boolean;
+}
+
 export interface MemoryBoostParams {
   memory_id: number;
   boost_amount?: number;
@@ -475,6 +482,7 @@ export type ToolParams =
   | MemoryUpdateParams
   | MemoryDeleteParams
   | MemorySearchParams
+  | MemorySemanticSearchParams
   | MemoryBoostParams
   | MemoryRelatedParams
   | MemoryLinkParams
