@@ -20,14 +20,17 @@ Frontend moderno del Dashboard SOLARIA DFO construido con React 19, Vite, TypeSc
 ```
 app/
 ├── src/
-│   ├── components/     # Componentes reutilizables
-│   │   └── layout/     # Layout (Sidebar, Header)
+│   ├── components/
+│   │   ├── common/     # Drawer, modales reutilizables
+│   │   ├── layout/     # Layout, Sidebar, Header
+│   │   ├── projects/   # ProjectHeader, StatsRow, TeamSection, ActivityFeed
+│   │   └── tasks/      # TaskCard, GanttView, GanttRow, TaskDetailDrawer
 │   ├── contexts/       # React Contexts (Socket)
-│   ├── hooks/          # Custom hooks (useApi, useSocket)
+│   ├── hooks/          # useApi, useSocket, useAuthVerification
 │   ├── lib/            # Utilidades (api, utils)
 │   ├── pages/          # Páginas principales
 │   ├── store/          # Zustand stores (auth, ui)
-│   ├── styles/         # CSS globales
+│   ├── styles/         # CSS globales (~1100 líneas)
 │   ├── test/           # Test utilities
 │   └── types/          # TypeScript types
 ├── e2e/                # Tests E2E Playwright
@@ -87,15 +90,43 @@ El servidor de desarrollo proxea `/api` y `/socket.io` al backend (`:3030`).
 | `/login` | LoginPage | Autenticación |
 | `/dashboard` | DashboardPage | KPIs y overview |
 | `/projects` | ProjectsPage | Lista de proyectos |
-| `/tasks` | TasksPage | Kanban de tareas |
+| `/projects/:id` | ProjectDetailPage | Detalle con Kanban/Gantt/Lista |
+| `/tasks` | TasksPage | Kanban, Lista y Gantt views |
 | `/agents` | AgentsPage | Grid de agentes IA |
 | `/memories` | MemoriesPage | Sistema de memoria |
+
+### Vistas de Tareas
+
+- **Kanban**: 5 columnas (Pendiente, En Progreso, Revision, Completado, Bloqueado)
+- **Lista**: Tabla con filtros y ordenamiento
+- **Gantt**: Timeline horizontal con barras de progreso
+
+### TaskDetailDrawer
+
+Panel lateral con:
+- Información completa de la tarea
+- Lista de subtareas (TaskItems) con checkboxes
+- Barra de progreso calculada automáticamente
+- Notas editables
+- Agente asignado
 
 ## Integración con Backend
 
 - **API REST**: Axios con interceptors para JWT
 - **WebSocket**: Socket.IO para actualizaciones en tiempo real
 - **Auth**: JWT almacenado en localStorage con Zustand persist
+
+### Socket.IO Events (Real-time)
+
+| Evento | Acción |
+|--------|--------|
+| `task:updated` | Invalidar queries de tareas |
+| `task:created` | Invalidar lista de tareas |
+| `taskItem:completed` | Actualizar progreso de tarea padre |
+| `taskItem:created` | Agregar subtarea a la lista |
+| `project:updated` | Invalidar proyecto |
+| `agent:status` | Actualizar estado de agente |
+| `activity:new` | Agregar entrada al feed |
 
 ## Colores SOLARIA
 
@@ -107,4 +138,11 @@ El servidor de desarrollo proxea `/api` y `/socket.io` al backend (`:3030`).
 
 ---
 
-**SOLARIA Digital Field Operations** - v3.2.0
+**SOLARIA Digital Field Operations** - v3.3.0
+
+**Changelog v3.3.0:**
+- Kanban, Lista y Gantt views para tareas
+- TaskDetailDrawer con subtareas interactivas
+- ProjectDetailPage con layout 2 columnas
+- Real-time Socket.IO para todos los eventos
+- 14 nuevos componentes React
