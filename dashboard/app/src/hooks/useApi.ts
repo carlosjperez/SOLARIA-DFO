@@ -74,7 +74,8 @@ export function useProject(id: number) {
         queryKey: ['projects', id],
         queryFn: async () => {
             const { data } = await projectsApi.getById(id);
-            return data.data as Project;
+            // API returns { project: {...}, tasks: [...] }
+            return (data.project || data.data || data) as Project;
         },
         enabled: !!id,
     });
