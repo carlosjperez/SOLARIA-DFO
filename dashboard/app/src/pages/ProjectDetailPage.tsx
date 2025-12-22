@@ -24,6 +24,7 @@ import {
 import {
     useProject,
     useProjectTasks,
+    useProjectActivity,
     useCheckProjectCode,
     useUpdateProject,
     useProjectEpics,
@@ -106,31 +107,35 @@ function ProjectInfoCard({
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-muted-foreground">Fase</span>
                     <span className={cn(
-                        'px-3 py-1 rounded-full text-xs font-medium uppercase',
-                        project.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                        project.status === 'planning' ? 'bg-yellow-500/20 text-yellow-400' :
-                        project.status === 'completed' ? 'bg-blue-500/20 text-blue-400' :
-                        'bg-gray-500/20 text-gray-400'
+                        'px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide',
+                        project.status === 'development' ? 'bg-solaria/20 text-solaria border border-solaria/30' :
+                        project.status === 'planning' ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30' :
+                        (project.status === 'completed' || project.status === 'deployment') ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                        project.status === 'on_hold' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                        project.status === 'testing' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                        'bg-gray-500/20 text-gray-400 border border-gray-500/30'
                     )}>
-                        {project.status === 'active' ? 'Desarrollo' :
+                        {project.status === 'development' ? 'Desarrollo' :
                          project.status === 'planning' ? 'Planificacion' :
-                         project.status === 'completed' ? 'Produccion' :
+                         (project.status === 'completed' || project.status === 'deployment') ? 'Produccion' :
+                         project.status === 'on_hold' ? 'Pausado' :
+                         project.status === 'testing' ? 'Testing' :
                          project.status}
                     </span>
                 </div>
 
                 {/* Phase progress bars */}
                 <div className="flex gap-1 mt-2">
-                    <div className={cn('flex-1 h-1.5 rounded-full', project.status !== 'planning' ? 'bg-solaria' : 'bg-secondary')} />
-                    <div className={cn('flex-1 h-1.5 rounded-full', project.status === 'active' || project.status === 'completed' ? 'bg-solaria' : 'bg-secondary')} />
-                    <div className={cn('flex-1 h-1.5 rounded-full', project.status === 'completed' ? 'bg-solaria' : 'bg-secondary')} />
-                    <div className={cn('flex-1 h-1.5 rounded-full', project.status === 'completed' ? 'bg-solaria' : 'bg-secondary')} />
+                    <div className={cn('flex-1 h-2 rounded-full transition-colors', project.status === 'planning' ? 'bg-violet-500' : 'bg-solaria')} />
+                    <div className={cn('flex-1 h-2 rounded-full transition-colors', ['active', 'development', 'testing', 'deployment', 'completed'].includes(project.status) ? 'bg-solaria' : 'bg-secondary')} />
+                    <div className={cn('flex-1 h-2 rounded-full transition-colors', ['testing', 'deployment', 'completed'].includes(project.status) ? 'bg-blue-500' : 'bg-secondary')} />
+                    <div className={cn('flex-1 h-2 rounded-full transition-colors', ['deployment', 'completed'].includes(project.status) ? 'bg-emerald-500' : 'bg-secondary')} />
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>PLAN</span>
-                    <span>DEV</span>
-                    <span>TEST</span>
-                    <span>PROD</span>
+                <div className="flex justify-between text-xs mt-1.5">
+                    <span className={cn('font-medium', project.status === 'planning' ? 'text-violet-400' : 'text-muted-foreground')}>PLAN</span>
+                    <span className={cn('font-medium', ['active', 'development'].includes(project.status) ? 'text-solaria' : 'text-muted-foreground')}>DEV</span>
+                    <span className={cn('font-medium', project.status === 'testing' ? 'text-blue-400' : 'text-muted-foreground')}>TEST</span>
+                    <span className={cn('font-medium', ['completed', 'production'].includes(project.status) ? 'text-emerald-400' : 'text-muted-foreground')}>PROD</span>
                 </div>
             </div>
 
@@ -236,12 +241,19 @@ function TareasCard({
 // ============================================================
 
 function DireccionesCard({
+    project,
     onClick,
 }: {
+    project: Project;
     onClick: () => void;
 }) {
-    // URLs placeholder - can be extended to fetch from project documents
-    const urls: string[] = [];
+    // Get URLs from project
+    const urls = [
+        project.productionUrl && { label: 'Produccion', url: project.productionUrl },
+        project.stagingUrl && { label: 'Staging', url: project.stagingUrl },
+        project.localUrl && { label: 'Local', url: project.localUrl },
+        project.repoUrl && { label: 'Repo', url: project.repoUrl },
+    ].filter(Boolean) as Array<{ label: string; url: string }>;
 
     return (
         <div
@@ -259,13 +271,14 @@ function DireccionesCard({
             {/* URLs list or empty state */}
             {urls.length > 0 ? (
                 <div className="space-y-2">
-                    {urls.slice(0, 3).map((url: string, idx: number) => (
+                    {urls.slice(0, 3).map((item, idx) => (
                         <div
                             key={idx}
                             className="flex items-center gap-2 text-sm text-muted-foreground truncate"
                         >
                             <ExternalLink className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{url}</span>
+                            <span className="text-xs text-solaria">{item.label}:</span>
+                            <span className="truncate">{item.url}</span>
                         </div>
                     ))}
                     {urls.length > 3 && (
@@ -273,7 +286,7 @@ function DireccionesCard({
                     )}
                 </div>
             ) : (
-                <p className="text-sm text-muted-foreground">No hay URLs</p>
+                <p className="text-sm text-muted-foreground">No hay URLs configuradas</p>
             )}
         </div>
     );
@@ -419,6 +432,20 @@ function EpicsCard({
     const [showForm, setShowForm] = useState(false);
     const [newEpicName, setNewEpicName] = useState('');
 
+    // Calculate next epic number for auto-naming
+    const nextEpicNumber = useMemo(() => {
+        if (epics.length === 0) return 1;
+        const maxNumber = Math.max(...epics.map(e => e.epicNumber || 0));
+        return maxNumber + 1;
+    }, [epics]);
+
+    const suggestedEpicName = `EPIC${String(nextEpicNumber).padStart(3, '0')}`;
+
+    const handleShowForm = () => {
+        setNewEpicName(suggestedEpicName);
+        setShowForm(true);
+    };
+
     const handleCreate = () => {
         if (newEpicName.trim()) {
             onCreateEpic(newEpicName.trim());
@@ -479,8 +506,8 @@ function EpicsCard({
                         type="text"
                         value={newEpicName}
                         onChange={(e) => setNewEpicName(e.target.value)}
-                        placeholder="Nombre del epic..."
-                        className="flex-1 px-3 py-1.5 rounded-lg bg-secondary border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-solaria"
+                        placeholder={suggestedEpicName}
+                        className="flex-1 px-3 py-1.5 rounded-lg bg-secondary border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-purple-500 font-mono"
                         autoFocus
                         onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                     />
@@ -500,11 +527,11 @@ function EpicsCard({
                 </div>
             ) : (
                 <button
-                    onClick={() => setShowForm(true)}
+                    onClick={handleShowForm}
                     className="w-full py-1.5 rounded-lg border border-dashed border-border text-muted-foreground text-sm hover:border-purple-500 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
                 >
                     <Plus className="h-4 w-4" />
-                    Crear Epic
+                    Crear Epic ({suggestedEpicName})
                 </button>
             )}
         </div>
@@ -526,6 +553,20 @@ function SprintsCard({
 }) {
     const [showForm, setShowForm] = useState(false);
     const [newSprintName, setNewSprintName] = useState('');
+
+    // Calculate next sprint number for auto-naming
+    const nextSprintNumber = useMemo(() => {
+        if (sprints.length === 0) return 1;
+        const maxNumber = Math.max(...sprints.map(s => s.sprintNumber || 0));
+        return maxNumber + 1;
+    }, [sprints]);
+
+    const suggestedSprintName = `SPRINT${String(nextSprintNumber).padStart(3, '0')}`;
+
+    const handleShowForm = () => {
+        setNewSprintName(suggestedSprintName);
+        setShowForm(true);
+    };
 
     const handleCreate = () => {
         if (newSprintName.trim()) {
@@ -606,8 +647,8 @@ function SprintsCard({
                         type="text"
                         value={newSprintName}
                         onChange={(e) => setNewSprintName(e.target.value)}
-                        placeholder="Nombre del sprint..."
-                        className="flex-1 px-3 py-1.5 rounded-lg bg-secondary border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-solaria"
+                        placeholder={suggestedSprintName}
+                        className="flex-1 px-3 py-1.5 rounded-lg bg-secondary border border-border text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500 font-mono"
                         autoFocus
                         onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
                     />
@@ -627,11 +668,11 @@ function SprintsCard({
                 </div>
             ) : (
                 <button
-                    onClick={() => setShowForm(true)}
+                    onClick={handleShowForm}
                     className="w-full py-1.5 rounded-lg border border-dashed border-border text-muted-foreground text-sm hover:border-yellow-500 hover:text-yellow-400 transition-colors flex items-center justify-center gap-2"
                 >
                     <Plus className="h-4 w-4" />
-                    Crear Sprint
+                    Crear Sprint ({suggestedSprintName})
                 </button>
             )}
         </div>
@@ -934,6 +975,7 @@ export function ProjectDetailPage() {
     const { data: tasks = [] } = useProjectTasks(projectId);
     const { data: epics = [] } = useProjectEpics(projectId);
     const { data: sprints = [] } = useProjectSprints(projectId);
+    const { data: activities = [] } = useProjectActivity(projectId, 10);
 
     // Mutations
     const updateProject = useUpdateProject();
@@ -981,9 +1023,8 @@ export function ProjectDetailPage() {
     }, [navigate, projectId]);
 
     const handleDireccionesClick = useCallback(() => {
-        // TODO: Navigate to URLs page or open modal
-        console.log('Direcciones clicked');
-    }, []);
+        navigate(`/projects/${projectId}/links`);
+    }, [navigate, projectId]);
 
     const handleAddNote = useCallback((note: string) => {
         setProjectNotes((prev) => [note, ...prev]);
@@ -1066,7 +1107,7 @@ export function ProjectDetailPage() {
                         <span className="hidden sm:inline">Info</span>
                     </button>
                     <button
-                        onClick={() => setIsEditModalOpen(true)}
+                        onClick={() => navigate(`/projects/${projectId}/settings`)}
                         className="p-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
                         title="Configuracion"
                     >
@@ -1097,6 +1138,7 @@ export function ProjectDetailPage() {
 
                         {/* DIRECCIONES Card (clickable) */}
                         <DireccionesCard
+                            project={project}
                             onClick={handleDireccionesClick}
                         />
                     </div>
@@ -1120,7 +1162,12 @@ export function ProjectDetailPage() {
                 <div className="space-y-4 sm:space-y-6">
                     {/* Actividad */}
                     <ActividadCard
-                        activities={[]}
+                        activities={activities.map(a => ({
+                            id: a.id,
+                            action: a.action,
+                            description: a.message || a.action,
+                            createdAt: a.createdAt,
+                        }))}
                     />
 
                     {/* Notas */}

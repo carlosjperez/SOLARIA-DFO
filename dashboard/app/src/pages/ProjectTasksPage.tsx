@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useProject, useProjectTasks, useAgents, useCreateTask, useTaskTags, useAllTags, useAddTaskTag, useRemoveTaskTag } from '@/hooks/useApi';
 import { Modal } from '@/components/common/Modal';
+import { TaskItemsList } from '@/components/tasks/TaskItemsList';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import type { Task, Agent, TaskTag } from '@/types';
 
@@ -667,6 +668,15 @@ function TaskDetailModal({
                         </div>
                     </div>
                 )}
+
+                {/* Subtasks */}
+                <div className="border border-border rounded-lg p-4 bg-secondary/30">
+                    <TaskItemsList
+                        taskId={task.id}
+                        editable={task.status !== 'completed'}
+                        showAddForm={task.status !== 'completed'}
+                    />
+                </div>
 
                 {/* Tags */}
                 <div>

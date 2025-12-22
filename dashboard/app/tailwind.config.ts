@@ -48,6 +48,7 @@ const config: Config = {
                 },
                 // SOLARIA brand colors
                 solaria: {
+                    DEFAULT: '#f6921d',
                     orange: '#f6921d',
                     'orange-dark': '#e07d0a',
                     'orange-light': '#ffab47',

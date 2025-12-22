@@ -12,6 +12,24 @@ import {
 } from '@/lib/api';
 import type { Project, Task, TaskItem, TaskTag, Agent, Memory, ActivityLog, DashboardStats, Epic, Sprint } from '@/types';
 
+/**
+ * Transform raw API project data to frontend Project type
+ * Handles both snake_case (raw API) and camelCase (axios interceptor transformed) fields
+ */
+function transformProjectData(p: Record<string, unknown>): Project {
+    const base = p as unknown as Project;
+    return {
+        ...base,
+        tasksTotal: (p.totalTasks ?? p.total_tasks ?? 0) as number,
+        tasksCompleted: (p.completedTasks ?? p.completed_tasks ?? 0) as number,
+        tasksPending: (p.pendingTasks ?? p.pending_tasks ?? 0) as number,
+        activeAgents: (p.agentsAssigned ?? p.agents_assigned ?? 0) as number,
+        // Prefer budgetAllocated, fallback to budget
+        budgetAllocated: (p.budgetAllocated ?? p.budget ?? 0) as number,
+        budgetSpent: (p.actualCost ?? p.actual_cost ?? 0) as number,
+    };
+}
+
 // Auth hooks
 export function useVerifyAuth() {
     return useQuery({
@@ -68,7 +86,10 @@ export function useProjects() {
         queryFn: async () => {
             const { data } = await projectsApi.getAll();
             // API returns { projects: [...] } not { data: [...] }
-            return (data.projects || data.data || []) as Project[];
+            const projects = data.projects || data.data || [];
+            // Map API fields to frontend types
+            // Note: axios interceptor transforms snake_case to camelCase (total_tasks -> totalTasks)
+            return projects.map((p: Record<string, unknown>) => transformProjectData(p));
         },
     });
 }
@@ -79,7 +100,8 @@ export function useProject(id: number) {
         queryFn: async () => {
             const { data } = await projectsApi.getById(id);
             // API returns { project: {...}, tasks: [...] }
-            return (data.project || data.data || data) as Project;
+            const p = data.project || data.data || data;
+            return transformProjectData(p as Record<string, unknown>);
         },
         enabled: !!id,
     });

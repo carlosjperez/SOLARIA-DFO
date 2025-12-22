@@ -13,9 +13,11 @@ interface AuthState {
     user: User | null;
     token: string | null;
     isAuthenticated: boolean;
+    _hasHydrated: boolean;
     login: (user: User, token: string) => void;
     logout: () => void;
     updateUser: (user: Partial<User>) => void;
+    setHasHydrated: (state: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -24,6 +26,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             token: null,
             isAuthenticated: false,
+            _hasHydrated: false,
             login: (user, token) =>
                 set({
                     user,
@@ -40,6 +43,7 @@ export const useAuthStore = create<AuthState>()(
                 set((state) => ({
                     user: state.user ? { ...state.user, ...userData } : null,
                 })),
+            setHasHydrated: (state) => set({ _hasHydrated: state }),
         }),
         {
             name: 'solaria-auth',
@@ -48,6 +52,9 @@ export const useAuthStore = create<AuthState>()(
                 token: state.token,
                 isAuthenticated: state.isAuthenticated,
             }),
+            onRehydrateStorage: () => (state) => {
+                state?.setHasHydrated(true);
+            },
         }
     )
 );

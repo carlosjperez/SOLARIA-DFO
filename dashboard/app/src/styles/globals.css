@@ -2002,6 +2002,223 @@
     cursor: not-allowed;
 }
 
+/* Task Items Header and Body */
+.task-items-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 12px;
+}
+
+.task-items-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 60px;
+}
+
+.task-items-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px dashed var(--border-color);
+}
+
+.task-items-empty p {
+    font-size: 13px;
+    margin: 0;
+}
+
+.task-items-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.task-items-error {
+    padding: 16px;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-negative);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 13px;
+}
+
+/* Add Items Form */
+.task-items-add {
+    margin-top: 16px;
+}
+
+.add-items-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.add-items-trigger:hover {
+    border-color: var(--solaria-orange);
+    color: var(--solaria-orange);
+}
+
+.add-items-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.add-item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.add-item-title {
+    flex: 1;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.add-item-title:focus {
+    outline: none;
+    border-color: var(--solaria-orange);
+}
+
+.add-item-title::placeholder {
+    color: var(--text-muted);
+}
+
+.add-item-minutes {
+    width: 60px;
+    padding: 10px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-primary);
+    text-align: center;
+    transition: border-color 0.2s ease;
+}
+
+.add-item-minutes:focus {
+    outline: none;
+    border-color: #f6921d;
+    box-shadow: 0 0 0 2px rgba(246, 146, 29, 0.15);
+}
+
+.add-item-minutes-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    width: 24px;
+}
+
+.add-item-remove {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.add-item-remove:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--color-negative);
+}
+
+.add-items-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.add-another-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.add-another-btn:hover {
+    border-color: var(--text-primary);
+    color: var(--text-primary);
+}
+
+.submit-items-btn {
+    padding: 8px 20px;
+    background: var(--solaria-orange);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.submit-items-btn:hover {
+    background: var(--solaria-orange-dark);
+}
+
+.submit-items-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cancel-btn {
+    padding: 8px 16px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.cancel-btn:hover {
+    background: var(--bg-hover);
+}
+
 /* ============================================
    GANTT CHART STYLES
    ============================================ */

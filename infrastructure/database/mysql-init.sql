@@ -252,28 +252,67 @@ INSERT INTO projects (name, code, client, description, status, priority, budget,
 ('INMOBILIARIA VIRGEN DEL ROCIO', 'VDR', 'Virgen del Rocio', 'Sistema de gestion inmobiliaria', 'planning', 'high', 75000.00, 0.00, 0, NULL, NULL, 1),
 ('ADEPAC CANARIAS', 'ADP', 'ADEPAC', 'Proyecto ADEPAC Canarias', 'planning', 'high', 50000.00, 0.00, 0, NULL, NULL, 1);
 
--- Insert demo tasks
-INSERT INTO tasks (title, description, project_id, agent_id, assigned_agent_id, status, priority, estimated_hours, actual_hours, progress) VALUES
--- Project 1: SOLARIA DFO
-('Setup Docker infrastructure', 'Configure Docker containers for all services', 1, 8, 8, 'completed', 'high', 8, 6, 100),
-('Implement C-Suite Dashboard', 'Create CEO/CTO/COO/CFO dashboard views', 1, 3, 3, 'in_progress', 'critical', 40, 25, 75),
-('Design database schema', 'Create MySQL schema for construction office', 1, 2, 2, 'completed', 'high', 16, 12, 100),
-('Implement Quick Access', 'Add bypass authentication for development', 1, 3, 3, 'completed', 'medium', 4, 3, 100),
-('Write Playwright tests', 'Create exhaustive E2E tests', 1, 5, 5, 'pending', 'high', 16, 0, 0),
-('Security audit', 'Review authentication and authorization', 1, 10, 10, 'pending', 'high', 8, 0, 0),
--- Project 2: Akademate.com - Milestones
-('P0 Multitenancy Core', 'Dominio→tenant, claims JWT, RLS/hooks en Payload/SDK, theming por tenant, seeds superadmin', 2, NULL, NULL, 'pending', 'critical', 80, 0, 0),
-('P0 API + Logica', 'Endpoints REST/GraphQL (tenants, users, memberships, courses, course_runs, leads), rate limiting por tenant, webhooks, API keys con scopes', 2, NULL, NULL, 'pending', 'critical', 160, 0, 0),
-('P0 Auth & Security', 'Login staff/alumno con cookies httpOnly, MFA para ops, RBAC por tenant, auditoria completa', 2, NULL, NULL, 'pending', 'critical', 80, 0, 0),
-('P1 Billing & Usage', 'Stripe (planes/checkout/portal), metering basico, suspension por impago', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
-('P1 Jobs/Infra logica', 'BullMQ+Redis, colas tenant-aware, reintentos (webhooks/email/search), observabilidad OTEL', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
-('P1 Dashboard Ops', 'Metricas globales, health checks, flags, billing overview, gestion tenants/domains', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
-('P1 Dashboard Cliente', 'CRUD catalogo/convocatorias/sedes, paginas seccionables, blog/FAQ, leads CRM simple, branding/domains, media manager', 2, NULL, NULL, 'pending', 'high', 160, 0, 0),
-('P1 Front Publica Tenant', 'Home/cursos/convocatorias/blog/paginas, SEO+sitemaps/OG/JSON-LD, formularios leads con UTM+captcha, custom domain', 2, NULL, NULL, 'pending', 'high', 120, 0, 0),
-('P1 Campus Virtual', 'Matriculas, modulos/lecciones, materiales, evaluaciones simples, progreso, certificados', 2, NULL, NULL, 'pending', 'high', 160, 0, 0),
-('P2 Storage & Media', 'R2/MinIO, uploads presignados por tenant, thumbs opcional', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0),
-('P2 Feature Flags', 'Rollout % y kill switches tenant-aware', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0),
-('P2 CI/CD & Runbooks', 'GH Actions lint/typecheck/test/build/migrate, pipelines preview, runbooks backup/restore, IaC scaffold', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0);
+-- Insert demo tasks (task_number is required for proper code generation)
+INSERT INTO tasks (task_number, title, description, project_id, agent_id, assigned_agent_id, status, priority, estimated_hours, actual_hours, progress) VALUES
+-- Project 1: SOLARIA DFO (task_number: 1-6)
+(1, 'Setup Docker infrastructure', 'Configure Docker containers for all services', 1, 8, 8, 'completed', 'high', 8, 6, 100),
+(2, 'Implement C-Suite Dashboard', 'Create CEO/CTO/COO/CFO dashboard views', 1, 3, 3, 'in_progress', 'critical', 40, 25, 75),
+(3, 'Design database schema', 'Create MySQL schema for construction office', 1, 2, 2, 'completed', 'high', 16, 12, 100),
+(4, 'Implement Quick Access', 'Add bypass authentication for development', 1, 3, 3, 'completed', 'medium', 4, 3, 100),
+(5, 'Write Playwright tests', 'Create exhaustive E2E tests', 1, 5, 5, 'pending', 'high', 16, 0, 0),
+(6, 'Security audit', 'Review authentication and authorization', 1, 10, 10, 'pending', 'high', 8, 0, 0),
+-- Project 2: Akademate.com - Milestones (task_number: 1-12)
+(1, 'P0 Multitenancy Core', 'Dominio→tenant, claims JWT, RLS/hooks en Payload/SDK, theming por tenant, seeds superadmin', 2, NULL, NULL, 'pending', 'critical', 80, 0, 0),
+(2, 'P0 API + Logica', 'Endpoints REST/GraphQL (tenants, users, memberships, courses, course_runs, leads), rate limiting por tenant, webhooks, API keys con scopes', 2, NULL, NULL, 'pending', 'critical', 160, 0, 0),
+(3, 'P0 Auth & Security', 'Login staff/alumno con cookies httpOnly, MFA para ops, RBAC por tenant, auditoria completa', 2, NULL, NULL, 'pending', 'critical', 80, 0, 0),
+(4, 'P1 Billing & Usage', 'Stripe (planes/checkout/portal), metering basico, suspension por impago', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
+(5, 'P1 Jobs/Infra logica', 'BullMQ+Redis, colas tenant-aware, reintentos (webhooks/email/search), observabilidad OTEL', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
+(6, 'P1 Dashboard Ops', 'Metricas globales, health checks, flags, billing overview, gestion tenants/domains', 2, NULL, NULL, 'pending', 'high', 80, 0, 0),
+(7, 'P1 Dashboard Cliente', 'CRUD catalogo/convocatorias/sedes, paginas seccionables, blog/FAQ, leads CRM simple, branding/domains, media manager', 2, NULL, NULL, 'pending', 'high', 160, 0, 0),
+(8, 'P1 Front Publica Tenant', 'Home/cursos/convocatorias/blog/paginas, SEO+sitemaps/OG/JSON-LD, formularios leads con UTM+captcha, custom domain', 2, NULL, NULL, 'pending', 'high', 120, 0, 0),
+(9, 'P1 Campus Virtual', 'Matriculas, modulos/lecciones, materiales, evaluaciones simples, progreso, certificados', 2, NULL, NULL, 'pending', 'high', 160, 0, 0),
+(10, 'P2 Storage & Media', 'R2/MinIO, uploads presignados por tenant, thumbs opcional', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0),
+(11, 'P2 Feature Flags', 'Rollout % y kill switches tenant-aware', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0),
+(12, 'P2 CI/CD & Runbooks', 'GH Actions lint/typecheck/test/build/migrate, pipelines preview, runbooks backup/restore, IaC scaffold', 2, NULL, NULL, 'pending', 'medium', 40, 0, 0);
+
+-- Insert task items (subtasks) for demo tasks
+-- Task 1: Setup Docker infrastructure (completed)
+INSERT INTO task_items (task_id, title, sort_order, is_completed, completed_at, estimated_minutes, actual_minutes, notes) VALUES
+(1, 'Create docker-compose.yml base structure', 1, TRUE, NOW() - INTERVAL 5 DAY, 30, 25, 'Base structure with office, redis, worker services'),
+(1, 'Configure MariaDB embedded container', 2, TRUE, NOW() - INTERVAL 5 DAY, 45, 40, 'Used official MariaDB image with init scripts'),
+(1, 'Setup Nginx reverse proxy', 3, TRUE, NOW() - INTERVAL 4 DAY, 30, 35, 'SSL termination with Let''s Encrypt'),
+(1, 'Configure volumes and networking', 4, TRUE, NOW() - INTERVAL 4 DAY, 20, 15, 'Named volumes for persistence'),
+(1, 'Test container orchestration', 5, TRUE, NOW() - INTERVAL 4 DAY, 30, 25, 'All services start correctly');
+
+-- Task 2: Implement C-Suite Dashboard (in_progress, 75%)
+INSERT INTO task_items (task_id, title, sort_order, is_completed, completed_at, estimated_minutes, actual_minutes, notes) VALUES
+(2, 'Design dashboard wireframes', 1, TRUE, NOW() - INTERVAL 3 DAY, 60, 45, 'Figma wireframes approved'),
+(2, 'Implement CEO view components', 2, TRUE, NOW() - INTERVAL 2 DAY, 120, 100, 'KPI cards, project overview, financial summary'),
+(2, 'Implement CTO view components', 3, TRUE, NOW() - INTERVAL 2 DAY, 120, 90, 'Agent status, tech metrics, code quality'),
+(2, 'Implement COO view components', 4, TRUE, NOW() - INTERVAL 1 DAY, 90, 85, 'Operations metrics, timeline, resources'),
+(2, 'Create CFO financial dashboard', 5, FALSE, NULL, 90, 30, 'Budget charts, ROI calculations - In progress'),
+(2, 'Add real-time WebSocket updates', 6, FALSE, NULL, 120, 0, 'Socket.IO integration pending'),
+(2, 'Write unit tests for dashboards', 7, FALSE, NULL, 60, 0, NULL),
+(2, 'Documentation and handoff', 8, FALSE, NULL, 45, 0, NULL);
+
+-- Task 3: Design database schema (completed)
+INSERT INTO task_items (task_id, title, sort_order, is_completed, completed_at, estimated_minutes, actual_minutes, notes) VALUES
+(3, 'Define entity relationships', 1, TRUE, NOW() - INTERVAL 6 DAY, 60, 55, 'ER diagram created'),
+(3, 'Create projects table', 2, TRUE, NOW() - INTERVAL 6 DAY, 30, 25, 'With status, budget, dates'),
+(3, 'Create tasks table', 3, TRUE, NOW() - INTERVAL 6 DAY, 30, 30, 'Linked to projects and agents'),
+(3, 'Create agents and metrics tables', 4, TRUE, NOW() - INTERVAL 5 DAY, 45, 40, 'Agent states, performance metrics'),
+(3, 'Add indexes and foreign keys', 5, TRUE, NOW() - INTERVAL 5 DAY, 30, 25, 'Performance optimization'),
+(3, 'Create init script with seed data', 6, TRUE, NOW() - INTERVAL 5 DAY, 45, 40, 'Demo data for testing');
+
+-- Task 5: Write Playwright tests (pending)
+INSERT INTO task_items (task_id, title, sort_order, is_completed, estimated_minutes) VALUES
+(5, 'Setup Playwright configuration', 1, FALSE, 30),
+(5, 'Write login/auth tests', 2, FALSE, 45),
+(5, 'Write dashboard navigation tests', 3, FALSE, 60),
+(5, 'Write project CRUD tests', 4, FALSE, 90),
+(5, 'Write task management tests', 5, FALSE, 90),
+(5, 'Write Kanban board tests', 6, FALSE, 60),
+(5, 'CI/CD integration', 7, FALSE, 45);
 
 -- Insert sample metrics
 INSERT INTO project_metrics (project_id, metric_date, completion_percentage, agent_efficiency, code_quality_score, test_coverage, total_hours_worked, tasks_completed, tasks_pending, budget_used) VALUES

@@ -19,20 +19,22 @@ describe('Sidebar', () => {
 
         expect(screen.getByText('Dashboard')).toBeInTheDocument();
         expect(screen.getByText('Proyectos')).toBeInTheDocument();
-        expect(screen.getByText('Tareas')).toBeInTheDocument();
-        expect(screen.getByText('Agentes')).toBeInTheDocument();
+        expect(screen.getByText('Negocios')).toBeInTheDocument();
+        expect(screen.getByText('Infraestructura')).toBeInTheDocument();
         expect(screen.getByText('Memorias')).toBeInTheDocument();
     });
 
     it('shows logo when sidebar is open', () => {
         renderWithRouter(<Sidebar />);
-        expect(screen.getByText('SOLARIA DFO')).toBeInTheDocument();
+        // Uses getAllByText since SOLARIA appears in both img alt and span text
+        expect(screen.getAllByText(/SOLARIA/i).length).toBeGreaterThan(0);
+        expect(screen.getByText('Digital Field Operations')).toBeInTheDocument();
     });
 
     it('hides text when sidebar is collapsed', () => {
         useUIStore.setState({ sidebarOpen: false });
         renderWithRouter(<Sidebar />);
-        expect(screen.queryByText('SOLARIA DFO')).not.toBeInTheDocument();
+        expect(screen.queryByText('SOLARIA')).not.toBeInTheDocument();
     });
 
     it('toggles sidebar on button click', () => {

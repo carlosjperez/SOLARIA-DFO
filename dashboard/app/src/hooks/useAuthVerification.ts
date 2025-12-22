@@ -4,9 +4,14 @@ import { authApi } from '@/lib/api';
 
 export function useAuthVerification() {
     const [isChecking, setIsChecking] = useState(true);
-    const { token, isAuthenticated, logout, login } = useAuthStore();
+    const { token, isAuthenticated, logout, login, _hasHydrated } = useAuthStore();
 
     useEffect(() => {
+        // Wait for Zustand to hydrate from localStorage
+        if (!_hasHydrated) {
+            return;
+        }
+
         async function verifyToken() {
             if (!token) {
                 setIsChecking(false);
@@ -31,7 +36,7 @@ export function useAuthVerification() {
         }
 
         verifyToken();
-    }, []); // Run once on mount
+    }, [_hasHydrated]); // Run when hydration completes
 
     return { isChecking, isAuthenticated };
 }
