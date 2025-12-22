@@ -185,7 +185,7 @@ class SolariaDashboardServer {
     // ========================================================================
 
     private initializeRedis(): void {
-        const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+        const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
         try {
             this.redis = new Redis(redisUrl);
 
@@ -713,7 +713,7 @@ class SolariaDashboardServer {
 
     private async getAgentStates(): Promise<AgentState[]> {
         const [rows] = await this.db!.execute<RowDataPacket[]>(
-            'SELECT id, name, status, current_task_id, last_active_at FROM agents'
+            'SELECT id, name, status, NULL as current_task_id, last_activity as last_active_at FROM ai_agents'
         );
         return rows as AgentState[];
     }
@@ -939,20 +939,50 @@ class SolariaDashboardServer {
     }
 
     /**
-     * Helper: Log activity to database
+     * Helper: Log activity to database and emit Socket.IO event
      */
-    private async logActivity(data: { action: string; category?: string; level?: string; project_id?: number | null; agent_id?: number | null }): Promise<void> {
+    private async logActivity(data: {
+        action: string;
+        message?: string;
+        category?: string;
+        level?: string;
+        project_id?: number | null;
+        agent_id?: number | null;
+        metadata?: Record<string, unknown>;
+    }): Promise<void> {
         try {
-            await this.db!.execute(`
-                INSERT INTO activity_logs (action, category, level, project_id, agent_id)
-                VALUES (?, ?, ?, ?, ?)
+            const [result] = await this.db!.execute<ResultSetHeader>(`
+                INSERT INTO activity_logs (action, message, category, level, project_id, agent_id, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             `, [
                 data.action,
+                data.message || data.action,
                 data.category || 'system',
                 data.level || 'info',
                 data.project_id || null,
-                data.agent_id || null
+                data.agent_id || null,
+                data.metadata ? JSON.stringify(data.metadata) : null
             ]);
+
+            // Emit Socket.IO event for real-time updates
+            const activityEvent = {
+                id: result.insertId,
+                action: data.action,
+                message: data.message || data.action,
+                category: data.category || 'system',
+                level: data.level || 'info',
+                projectId: data.project_id || null,
+                agentId: data.agent_id || null,
+                metadata: data.metadata || null,
+                createdAt: new Date().toISOString()
+            };
+
+            this.io.to('notifications').emit('activity_logged', activityEvent);
+
+            // Also emit to project-specific room if project_id exists
+            if (data.project_id) {
+                this.io.to(`project:${data.project_id}`).emit('activity_logged', activityEvent);
+            }
         } catch (error) {
             console.error('Error logging activity:', error);
         }
@@ -1058,7 +1088,7 @@ class SolariaDashboardServer {
                     aa.*,
                     COUNT(t.id) as tasks_assigned,
                     COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as tasks_completed
-                FROM agents aa
+                FROM ai_agents aa
                 INNER JOIN tasks t ON aa.id = t.assigned_agent_id
                 WHERE t.project_id = ?
                 GROUP BY aa.id
@@ -1255,6 +1285,34 @@ class SolariaDashboardServer {
                 fields.push('office_visible = ?');
                 values.push(normalizedVisibility ? 1 : 0);
             }
+            // Project URLs (snake_case and camelCase)
+            if (updates.production_url !== undefined || updates.productionUrl !== undefined) {
+                fields.push('production_url = ?');
+                values.push(updates.production_url ?? updates.productionUrl);
+            }
+            if (updates.staging_url !== undefined || updates.stagingUrl !== undefined) {
+                fields.push('staging_url = ?');
+                values.push(updates.staging_url ?? updates.stagingUrl);
+            }
+            if (updates.local_url !== undefined || updates.localUrl !== undefined) {
+                fields.push('local_url = ?');
+                values.push(updates.local_url ?? updates.localUrl);
+            }
+            if (updates.repo_url !== undefined || updates.repoUrl !== undefined) {
+                fields.push('repo_url = ?');
+                values.push(updates.repo_url ?? updates.repoUrl);
+            }
+            // Tags and Stack (stored as JSON strings)
+            if (updates.tags !== undefined) {
+                const tagsValue = Array.isArray(updates.tags) ? JSON.stringify(updates.tags) : updates.tags;
+                fields.push('tags = ?');
+                values.push(tagsValue);
+            }
+            if (updates.stack !== undefined) {
+                const stackValue = Array.isArray(updates.stack) ? JSON.stringify(updates.stack) : updates.stack;
+                fields.push('stack = ?');
+                values.push(stackValue);
+            }
 
             if (fields.length === 0) {
                 res.status(400).json({ error: 'No fields to update' });
@@ -1391,19 +1449,40 @@ class SolariaDashboardServer {
     private async createEpic(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
             const { id } = req.params;  // project_id
+            const projectId = parseInt(id, 10);
             const { name, description, color, status, start_date, target_date } = req.body;
 
+            // Validation: name is required
             if (!name) {
                 res.status(400).json({ error: 'Epic name is required' });
                 return;
             }
 
-            // Get next epic number for this project
+            // Validation: name format for agents (must be descriptive, not random)
+            if (name.length < 3) {
+                res.status(400).json({
+                    error: 'Epic name must be at least 3 characters',
+                    hint: 'Use descriptive names like "User Authentication" or "Payment Integration"'
+                });
+                return;
+            }
+
+            // Validation: status must be valid
+            const validStatuses = ['open', 'in_progress', 'completed', 'cancelled'];
+            if (status && !validStatuses.includes(status)) {
+                res.status(400).json({
+                    error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+                });
+                return;
+            }
+
+            // Get next epic number for this project (auto-numbering)
             const [maxNum] = await this.db!.execute<RowDataPacket[]>(
                 'SELECT COALESCE(MAX(epic_number), 0) as max_num FROM epics WHERE project_id = ?',
                 [id]
             );
             const epicNumber = ((maxNum as any[])[0]?.max_num || 0) + 1;
+            const epicCode = `EPIC${String(epicNumber).padStart(3, '0')}`;
 
             const [result] = await this.db!.execute<ResultSetHeader>(`
                 INSERT INTO epics (project_id, epic_number, name, description, color, status, start_date, target_date, created_by)
@@ -1420,9 +1499,28 @@ class SolariaDashboardServer {
                 req.user?.userId || null
             ]);
 
+            // Log activity and emit Socket.IO event
+            await this.logActivity({
+                action: 'epic_created',
+                message: `Epic ${epicCode} creado: ${name}`,
+                category: 'epic',
+                level: 'info',
+                project_id: projectId,
+                metadata: { epicId: result.insertId, epicNumber, epicCode, name }
+            });
+
+            // Emit epic_created event for real-time updates
+            this.io.to('notifications').emit('epic_created', {
+                id: result.insertId,
+                epicNumber,
+                name,
+                projectId
+            });
+
             res.status(201).json({
                 id: result.insertId,
                 epic_number: epicNumber,
+                epic_code: epicCode,
                 message: 'Epic created successfully'
             });
 
@@ -1527,19 +1625,50 @@ class SolariaDashboardServer {
     private async createSprint(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
             const { id } = req.params;  // project_id
+            const projectId = parseInt(id, 10);
             const { name, goal, status, start_date, end_date, velocity, capacity } = req.body;
 
+            // Validation: name is required
             if (!name) {
                 res.status(400).json({ error: 'Sprint name is required' });
                 return;
             }
 
-            // Get next sprint number for this project
+            // Validation: name format for agents (must be descriptive, not random)
+            if (name.length < 3) {
+                res.status(400).json({
+                    error: 'Sprint name must be at least 3 characters',
+                    hint: 'Use descriptive names like "MVP Release" or "Security Hardening"'
+                });
+                return;
+            }
+
+            // Validation: status must be valid
+            const validStatuses = ['planned', 'active', 'completed', 'cancelled'];
+            if (status && !validStatuses.includes(status)) {
+                res.status(400).json({
+                    error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+                });
+                return;
+            }
+
+            // Validation: velocity and capacity must be non-negative
+            if (velocity !== undefined && velocity < 0) {
+                res.status(400).json({ error: 'Velocity must be non-negative' });
+                return;
+            }
+            if (capacity !== undefined && capacity < 0) {
+                res.status(400).json({ error: 'Capacity must be non-negative' });
+                return;
+            }
+
+            // Get next sprint number for this project (auto-numbering)
             const [maxNum] = await this.db!.execute<RowDataPacket[]>(
                 'SELECT COALESCE(MAX(sprint_number), 0) as max_num FROM sprints WHERE project_id = ?',
                 [id]
             );
             const sprintNumber = ((maxNum as any[])[0]?.max_num || 0) + 1;
+            const sprintCode = `SPRINT${String(sprintNumber).padStart(3, '0')}`;
 
             const [result] = await this.db!.execute<ResultSetHeader>(`
                 INSERT INTO sprints (project_id, sprint_number, name, goal, status, start_date, end_date, velocity, capacity, created_by)
@@ -1557,9 +1686,28 @@ class SolariaDashboardServer {
                 req.user?.userId || null
             ]);
 
+            // Log activity and emit Socket.IO event
+            await this.logActivity({
+                action: 'sprint_created',
+                message: `Sprint ${sprintCode} creado: ${name}`,
+                category: 'sprint',
+                level: 'info',
+                project_id: projectId,
+                metadata: { sprintId: result.insertId, sprintNumber, sprintCode, name, goal }
+            });
+
+            // Emit sprint_created event for real-time updates
+            this.io.to('notifications').emit('sprint_created', {
+                id: result.insertId,
+                sprintNumber,
+                name,
+                projectId
+            });
+
             res.status(201).json({
                 id: result.insertId,
                 sprint_number: sprintNumber,
+                sprint_code: sprintCode,
                 message: 'Sprint created successfully'
             });
 
@@ -1934,7 +2082,7 @@ class SolariaDashboardServer {
                 query += ' WHERE ' + whereConditions.join(' AND ');
             }
 
-            query += ' GROUP BY aa.id ORDER BY aa.last_active_at DESC';
+            query += ' GROUP BY aa.id ORDER BY aa.last_activity DESC';
 
             const offset = (pageNum - 1) * limitNum;
             query += ` LIMIT ${limitNum} OFFSET ${offset}`;
@@ -2011,7 +2159,7 @@ class SolariaDashboardServer {
 
             await this.db!.execute(`
                 UPDATE ai_agents
-                SET status = ?, last_active_at = NOW(), updated_at = NOW()
+                SET status = ?, last_activity = NOW()
                 WHERE id = ?
             `, [status, id]);
 
