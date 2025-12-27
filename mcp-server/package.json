@@ -12,7 +12,7 @@
     "dev:js": "node --watch server.js",
     "dev:http": "tsx watch http-server.ts",
     "dev:http:js": "node --watch http-server.js",
-    "test": "jest",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:unit": "jest --testPathPattern=src/__tests__",
     "test:coverage": "jest --coverage --testPathPattern=src/__tests__",
     "test:smoke": "node tests/smoke.cjs",
