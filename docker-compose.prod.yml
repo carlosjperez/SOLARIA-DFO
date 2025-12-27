@@ -143,6 +143,8 @@ services:
       - ./scripts/install-mcp-remote.sh:/etc/nginx/install-mcp-remote.sh:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - certbot_webroot:/var/www/certbot
+      # Office CRM React app (served as static files)
+      - /var/www/office-app:/var/www/office-app:ro
       # PRILABSA static files (external volumes from prilabsa-production)
       - prilabsa_frontend:/usr/share/nginx/prilabsa/frontend:ro
       - prilabsa_dashboard:/usr/share/nginx/prilabsa/dashboard:ro
