@@ -84,7 +84,7 @@ function CompletedTaskItem({ task, onClick }: { task: CompletedTask; onClick: ()
 function ProjectItem({ project, onClick }: { project: Project; onClick: () => void }) {
     // Map status to phase class for styling
     const phaseClass = project.status === 'completed' ? 'low' :
-                       project.status === 'active' ? 'high' : 'medium';
+                       project.status === 'development' ? 'high' : 'medium';
     const taskCount = project.tasksTotal || 0;
     const completedCount = project.tasksCompleted || 0;
     const progress = taskCount > 0 ? Math.round((completedCount / taskCount) * 100) : project.progress || 0;

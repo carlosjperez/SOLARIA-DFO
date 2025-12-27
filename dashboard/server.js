@@ -138,7 +138,7 @@ class SolariaDashboardServer {
     // Redis Connection for Embedding Queue
     // ========================================================================
     initializeRedis() {
-        const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+        const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
         try {
             this.redis = new ioredis_1.default(redisUrl);
             this.redis.on('connect', () => {
@@ -247,6 +247,8 @@ class SolariaDashboardServer {
         this.app.post('/api/projects', this.createProject.bind(this));
         this.app.put('/api/projects/:id', this.updateProject.bind(this));
         this.app.delete('/api/projects/:id', this.deleteProject.bind(this));
+        this.app.post('/api/projects/:id/archive', this.archiveProject.bind(this));
+        this.app.post('/api/projects/:id/unarchive', this.unarchiveProject.bind(this));
         // Project Extended Data
         this.app.get('/api/projects/:id/client', this.getProjectClient.bind(this));
         this.app.put('/api/projects/:id/client', this.updateProjectClient.bind(this));
@@ -296,7 +298,9 @@ class SolariaDashboardServer {
         // Businesses
         this.app.get('/api/businesses', this.getBusinesses.bind(this));
         this.app.get('/api/businesses/:id', this.getBusiness.bind(this));
+        this.app.post('/api/businesses', this.createBusiness.bind(this));
         this.app.put('/api/businesses/:id', this.updateBusiness.bind(this));
+        this.app.delete('/api/businesses/:id', this.deleteBusiness.bind(this));
         // Logs
         this.app.get('/api/logs', this.getLogs.bind(this));
         this.app.get('/api/logs/audit', this.getAuditLogs.bind(this));
@@ -305,6 +309,7 @@ class SolariaDashboardServer {
         this.app.get('/api/reports/agents', this.getAgentReports.bind(this));
         this.app.get('/api/reports/financial', this.getFinancialReports.bind(this));
         // Docs
+        this.app.get('/api/docs/openapi', this.getOpenAPISpec.bind(this));
         this.app.get('/api/docs/list', this.getDocumentsList.bind(this));
         this.app.get('/api/docs/specs', this.getProjectSpecs.bind(this));
         this.app.get('/api/docs/credentials', this.getProjectCredentials.bind(this));
@@ -581,7 +586,7 @@ class SolariaDashboardServer {
         return rows.length > 0 ? rows[0] : null;
     }
     async getAgentStates() {
-        const [rows] = await this.db.execute('SELECT id, name, status, current_task_id, last_active_at FROM agents');
+        const [rows] = await this.db.execute('SELECT id, name, status, NULL as current_task_id, last_activity as last_active_at FROM ai_agents');
         return rows;
     }
     async getProjectMetrics() {
@@ -604,29 +609,414 @@ class SolariaDashboardServer {
     // Dashboard Handlers (Stubs - will be implemented from server.js)
     // ========================================================================
     async getDashboardOverview(_req, res) {
-        // TODO: Migrate from server.js
-        res.json({ message: 'Not implemented yet' });
+        try {
+            // Active projects with details
+            const [activeProjects] = await this.db.execute(`
+                SELECT
+                    p.id, p.name, p.code, p.status, p.priority,
+                    p.completion_percentage, p.deadline,
+                    (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'in_progress') as active_tasks,
+                    (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'pending') as pending_tasks
+                FROM projects p
+                WHERE p.status = 'active' AND (p.archived = FALSE OR p.archived IS NULL)
+                ORDER BY p.priority DESC, p.deadline ASC
+                LIMIT 10
+            `);
+            // Today's tasks
+            const [todayTasks] = await this.db.execute(`
+                SELECT
+                    t.id, t.title, t.status, t.priority, t.progress,
+                    p.name as project_name, p.code as project_code,
+                    aa.name as agent_name
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+                WHERE DATE(t.updated_at) = CURDATE() OR t.status = 'in_progress'
+                ORDER BY t.priority DESC, t.updated_at DESC
+                LIMIT 15
+            `);
+            // Agent status
+            const [agents] = await this.db.execute(`
+                SELECT
+                    id, name, role, status, last_activity,
+                    (SELECT COUNT(*) FROM tasks WHERE assigned_agent_id = ai_agents.id AND status = 'in_progress') as active_tasks
+                FROM ai_agents
+                ORDER BY status DESC, last_activity DESC
+            `);
+            // Quick stats
+            const [quickStats] = await this.db.execute(`
+                SELECT
+                    (SELECT COUNT(*) FROM projects WHERE status = 'active' AND (archived = FALSE OR archived IS NULL)) as active_projects,
+                    (SELECT COUNT(*) FROM tasks WHERE status = 'in_progress') as tasks_in_progress,
+                    (SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND DATE(completed_at) = CURDATE()) as completed_today,
+                    (SELECT COUNT(*) FROM tasks WHERE priority = 'critical' AND status != 'completed') as critical_tasks,
+                    (SELECT COUNT(*) FROM memories WHERE DATE(created_at) = CURDATE()) as memories_today
+            `);
+            res.json({
+                activeProjects,
+                todayTasks,
+                agents,
+                stats: quickStats[0] || {},
+                generated_at: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            console.error('Error in getDashboardOverview:', error);
+            res.status(500).json({ error: 'Failed to fetch dashboard overview' });
+        }
     }
     async getDashboardMetrics(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+        try {
+            // Velocity metrics (last 7 days)
+            const [velocityData] = await this.db.execute(`
+                SELECT
+                    DATE(completed_at) as date,
+                    COUNT(*) as tasks_completed,
+                    SUM(actual_hours) as hours_worked
+                FROM tasks
+                WHERE status = 'completed'
+                    AND completed_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                GROUP BY DATE(completed_at)
+                ORDER BY date DESC
+            `);
+            // Project completion rates
+            const [projectRates] = await this.db.execute(`
+                SELECT
+                    p.id, p.name, p.code,
+                    p.completion_percentage,
+                    COUNT(t.id) as total_tasks,
+                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
+                FROM projects p
+                LEFT JOIN tasks t ON t.project_id = p.id
+                WHERE p.status = 'active' AND (p.archived = FALSE OR p.archived IS NULL)
+                GROUP BY p.id
+                ORDER BY p.completion_percentage DESC
+                LIMIT 10
+            `);
+            // Task distribution by priority
+            const [priorityDist] = await this.db.execute(`
+                SELECT
+                    priority,
+                    COUNT(*) as count,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
+                FROM tasks
+                GROUP BY priority
+            `);
+            // Epic/Sprint progress
+            const [epicProgress] = await this.db.execute(`
+                SELECT
+                    e.id, e.name, e.epic_number, e.status,
+                    COUNT(t.id) as total_tasks,
+                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
+                    AVG(t.progress) as avg_progress
+                FROM epics e
+                LEFT JOIN tasks t ON t.epic_id = e.id
+                WHERE e.status != 'completed'
+                GROUP BY e.id
+                ORDER BY e.created_at DESC
+                LIMIT 5
+            `);
+            res.json({
+                velocity: velocityData,
+                projectRates,
+                priorityDistribution: priorityDist,
+                epicProgress,
+                generated_at: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            console.error('Error in getDashboardMetrics:', error);
+            res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
+        }
     }
     async getDashboardAlerts(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+        try {
+            // Overdue tasks
+            const [overdueTasks] = await this.db.execute(`
+                SELECT
+                    t.id, t.title, t.deadline, t.priority,
+                    p.name as project_name, p.code as project_code,
+                    DATEDIFF(CURDATE(), t.deadline) as days_overdue
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE t.deadline IS NOT NULL
+                    AND t.deadline < CURDATE()
+                    AND t.status NOT IN ('completed', 'cancelled')
+                ORDER BY t.deadline ASC
+                LIMIT 10
+            `);
+            // Blocked tasks
+            const [blockedTasks] = await this.db.execute(`
+                SELECT
+                    t.id, t.title, t.status, t.priority,
+                    p.name as project_name, p.code as project_code,
+                    t.updated_at
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE t.status = 'blocked'
+                ORDER BY t.priority DESC, t.updated_at DESC
+                LIMIT 10
+            `);
+            // Stale tasks (no update in 7+ days)
+            const [staleTasks] = await this.db.execute(`
+                SELECT
+                    t.id, t.title, t.status, t.priority,
+                    p.name as project_name,
+                    t.updated_at,
+                    DATEDIFF(CURDATE(), t.updated_at) as days_stale
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE t.status = 'in_progress'
+                    AND t.updated_at < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                ORDER BY t.updated_at ASC
+                LIMIT 10
+            `);
+            // Projects approaching deadline
+            const [upcomingDeadlines] = await this.db.execute(`
+                SELECT
+                    id, name, code, deadline, completion_percentage,
+                    DATEDIFF(deadline, CURDATE()) as days_remaining
+                FROM projects
+                WHERE deadline BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 14 DAY)
+                    AND status = 'active'
+                    AND (archived = FALSE OR archived IS NULL)
+                ORDER BY deadline ASC
+            `);
+            // Critical priority pending
+            const [criticalTasks] = await this.db.execute(`
+                SELECT
+                    t.id, t.title, t.status,
+                    p.name as project_name, p.code as project_code,
+                    t.created_at
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE t.priority = 'critical'
+                    AND t.status NOT IN ('completed', 'cancelled')
+                ORDER BY t.created_at DESC
+            `);
+            res.json({
+                overdueTasks,
+                blockedTasks,
+                staleTasks,
+                upcomingDeadlines,
+                criticalTasks,
+                summary: {
+                    overdue_count: overdueTasks.length,
+                    blocked_count: blockedTasks.length,
+                    stale_count: staleTasks.length,
+                    deadline_alerts: upcomingDeadlines.length,
+                    critical_count: criticalTasks.length
+                },
+                generated_at: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            console.error('Error in getDashboardAlerts:', error);
+            res.status(500).json({ error: 'Failed to fetch dashboard alerts' });
+        }
     }
     async getDocs(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+        try {
+            const [docs] = await this.db.execute(`
+                SELECT
+                    pd.id, pd.name, pd.type, pd.description, pd.url,
+                    pd.file_size, pd.uploaded_by,
+                    pd.created_at, pd.updated_at,
+                    p.name as project_name, p.code as project_code
+                FROM project_documents pd
+                LEFT JOIN projects p ON pd.project_id = p.id
+                ORDER BY pd.updated_at DESC
+                LIMIT 50
+            `);
+            res.json({ docs, count: docs.length });
+        }
+        catch (error) {
+            console.error('Error in getDocs:', error);
+            res.status(500).json({ error: 'Failed to fetch documents' });
+        }
     }
-    async getProjectsPublic(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+    async getProjectsPublic(req, res) {
+        try {
+            const { status, priority, limit = '50' } = req.query;
+            let query = `
+                SELECT
+                    p.id,
+                    p.name,
+                    p.code,
+                    p.client,
+                    p.description,
+                    p.status,
+                    p.priority,
+                    p.completion_percentage,
+                    p.start_date,
+                    p.deadline,
+                    p.created_at,
+                    p.updated_at,
+                    (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as total_tasks,
+                    (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks
+                FROM projects p
+                WHERE (p.archived = FALSE OR p.archived IS NULL)
+            `;
+            const params = [];
+            if (status) {
+                query += ' AND p.status = ?';
+                params.push(status);
+            }
+            if (priority) {
+                query += ' AND p.priority = ?';
+                params.push(priority);
+            }
+            query += ` ORDER BY p.updated_at DESC LIMIT ${parseInt(limit, 10)}`;
+            const [projects] = await this.db.execute(query, params);
+            res.json({ projects, count: projects.length });
+        }
+        catch (error) {
+            console.error('Error in getProjectsPublic:', error);
+            res.status(500).json({ error: 'Failed to fetch projects' });
+        }
     }
-    async getBusinessesPublic(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+    async getBusinessesPublic(req, res) {
+        try {
+            const { status, limit = '50' } = req.query;
+            let query = `
+                SELECT
+                    b.id, b.name, b.description, b.website, b.status,
+                    b.revenue, b.expenses, b.profit,
+                    b.created_at, b.updated_at,
+                    (SELECT COUNT(*) FROM projects WHERE client = b.name) as project_count
+                FROM businesses b
+                WHERE 1=1
+            `;
+            const params = [];
+            if (status && status !== 'all') {
+                query += ` AND b.status = ?`;
+                params.push(status);
+            }
+            query += ` ORDER BY b.name ASC LIMIT ${parseInt(limit, 10)}`;
+            const [businesses] = await this.db.execute(query, params);
+            res.json({ businesses, count: businesses.length });
+        }
+        catch (error) {
+            console.error('Error in getBusinessesPublic:', error);
+            res.status(500).json({ error: 'Failed to fetch businesses' });
+        }
     }
-    async getTasksPublic(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+    async getTasksPublic(req, res) {
+        try {
+            const { status, priority, project_id, limit = '100' } = req.query;
+            let query = `
+                SELECT
+                    t.id, t.task_number,
+                    CONCAT(
+                        COALESCE(p.code, 'TSK'), '-',
+                        LPAD(COALESCE(t.task_number, t.id), 3, '0'),
+                        CASE
+                            WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
+                            WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
+                            ELSE ''
+                        END
+                    ) as task_code,
+                    t.title, t.description, t.status, t.priority, t.progress,
+                    t.estimated_hours, t.actual_hours,
+                    t.deadline, t.completed_at,
+                    t.created_at, t.updated_at,
+                    p.id as project_id, p.name as project_name, p.code as project_code,
+                    e.id as epic_id, e.name as epic_name, e.epic_number,
+                    sp.id as sprint_id, sp.name as sprint_name, sp.sprint_number,
+                    aa.id as agent_id, aa.name as agent_name
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN epics e ON t.epic_id = e.id
+                LEFT JOIN sprints sp ON t.sprint_id = sp.id
+                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+                WHERE (p.archived = FALSE OR p.archived IS NULL)
+            `;
+            const params = [];
+            if (status && status !== 'all') {
+                query += ` AND t.status = ?`;
+                params.push(status);
+            }
+            if (priority && priority !== 'all') {
+                query += ` AND t.priority = ?`;
+                params.push(priority);
+            }
+            if (project_id) {
+                query += ` AND t.project_id = ?`;
+                params.push(parseInt(project_id, 10));
+            }
+            query += ` ORDER BY t.updated_at DESC LIMIT ${parseInt(limit, 10)}`;
+            const [tasks] = await this.db.execute(query, params);
+            res.json({ tasks, count: tasks.length });
+        }
+        catch (error) {
+            console.error('Error in getTasksPublic:', error);
+            res.status(500).json({ error: 'Failed to fetch tasks' });
+        }
     }
     async getDashboardPublic(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+        try {
+            // Get project stats
+            const [projectStats] = await this.db.execute(`
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) as on_hold,
+                    SUM(CASE WHEN status = 'planning' THEN 1 ELSE 0 END) as planning,
+                    AVG(completion_percentage) as avg_completion
+                FROM projects
+                WHERE (archived = FALSE OR archived IS NULL)
+            `);
+            // Get task stats
+            const [taskStats] = await this.db.execute(`
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN t.status = 'pending' THEN 1 ELSE 0 END) as pending,
+                    SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN t.status = 'blocked' THEN 1 ELSE 0 END) as blocked,
+                    SUM(CASE WHEN t.priority = 'critical' THEN 1 ELSE 0 END) as critical_count,
+                    SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as high_count
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE (p.archived = FALSE OR p.archived IS NULL)
+            `);
+            // Get agent stats
+            const [agentStats] = await this.db.execute(`
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                    SUM(CASE WHEN status = 'idle' THEN 1 ELSE 0 END) as idle,
+                    SUM(CASE WHEN status = 'busy' THEN 1 ELSE 0 END) as busy
+                FROM ai_agents
+            `);
+            // Get memory stats
+            const [memoryStats] = await this.db.execute(`
+                SELECT
+                    COUNT(*) as total,
+                    AVG(importance) as avg_importance,
+                    SUM(access_count) as total_accesses
+                FROM memories
+            `);
+            // Get recent activity count (last 24h)
+            const [activityStats] = await this.db.execute(`
+                SELECT COUNT(*) as last_24h
+                FROM activity_logs
+                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            `);
+            res.json({
+                projects: projectStats[0] || {},
+                tasks: taskStats[0] || {},
+                agents: agentStats[0] || {},
+                memories: memoryStats[0] || {},
+                activity: activityStats[0] || {},
+                generated_at: new Date().toISOString()
+            });
+        }
+        catch (error) {
+            console.error('Error in getDashboardPublic:', error);
+            res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+        }
     }
     async getRecentCompletedTasks(req, res) {
         try {
@@ -784,20 +1174,39 @@ class SolariaDashboardServer {
         }
     }
     /**
-     * Helper: Log activity to database
+     * Helper: Log activity to database and emit Socket.IO event
      */
     async logActivity(data) {
         try {
-            await this.db.execute(`
-                INSERT INTO activity_logs (action, category, level, project_id, agent_id)
-                VALUES (?, ?, ?, ?, ?)
+            const [result] = await this.db.execute(`
+                INSERT INTO activity_logs (action, message, category, level, project_id, agent_id, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             `, [
                 data.action,
+                data.message || data.action,
                 data.category || 'system',
                 data.level || 'info',
                 data.project_id || null,
-                data.agent_id || null
+                data.agent_id || null,
+                data.metadata ? JSON.stringify(data.metadata) : null
             ]);
+            // Emit Socket.IO event for real-time updates
+            const activityEvent = {
+                id: result.insertId,
+                action: data.action,
+                message: data.message || data.action,
+                category: data.category || 'system',
+                level: data.level || 'info',
+                projectId: data.project_id || null,
+                agentId: data.agent_id || null,
+                metadata: data.metadata || null,
+                createdAt: new Date().toISOString()
+            };
+            this.io.to('notifications').emit('activity_logged', activityEvent);
+            // Also emit to project-specific room if project_id exists
+            if (data.project_id) {
+                this.io.to(`project:${data.project_id}`).emit('activity_logged', activityEvent);
+            }
         }
         catch (error) {
             console.error('Error logging activity:', error);
@@ -808,7 +1217,7 @@ class SolariaDashboardServer {
     // ========================================================================
     async getProjects(req, res) {
         try {
-            const { status, priority, page = '1', limit = '200' } = req.query;
+            const { status, priority, archived, page = '1', limit = '200' } = req.query;
             let query = `
                 SELECT
                     p.*,
@@ -820,6 +1229,14 @@ class SolariaDashboardServer {
             `;
             const whereConditions = [];
             const params = [];
+            // Filter archived by default (archived=false), unless archived=true or archived=all
+            if (archived === 'true' || archived === '1') {
+                whereConditions.push('p.archived = TRUE');
+            }
+            else if (archived !== 'all') {
+                // Default: show only non-archived projects
+                whereConditions.push('(p.archived = FALSE OR p.archived IS NULL)');
+            }
             if (status) {
                 whereConditions.push('p.status = ?');
                 params.push(status);
@@ -838,7 +1255,7 @@ class SolariaDashboardServer {
             query += ` LIMIT ${limitNum} OFFSET ${offset}`;
             const [projects] = await this.db.execute(query, params);
             // Get total for pagination
-            const countQuery = 'SELECT COUNT(*) as total FROM projects' +
+            const countQuery = 'SELECT COUNT(*) as total FROM projects p' +
                 (whereConditions.length > 0 ? ' WHERE ' + whereConditions.join(' AND ') : '');
             const [countResult] = await this.db.execute(countQuery, params);
             res.json({
@@ -873,7 +1290,7 @@ class SolariaDashboardServer {
                     aa.name as agent_name,
                     aa.role as agent_role
                 FROM tasks t
-                LEFT JOIN agents aa ON t.assigned_agent_id = aa.id
+                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
                 WHERE t.project_id = ?
                 ORDER BY t.created_at DESC
             `, [id]);
@@ -883,7 +1300,7 @@ class SolariaDashboardServer {
                     aa.*,
                     COUNT(t.id) as tasks_assigned,
                     COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as tasks_completed
-                FROM agents aa
+                FROM ai_agents aa
                 INNER JOIN tasks t ON aa.id = t.assigned_agent_id
                 WHERE t.project_id = ?
                 GROUP BY aa.id
@@ -1002,6 +1419,13 @@ class SolariaDashboardServer {
                 'management',
                 'info'
             ]);
+            // Emit socket event for real-time notification
+            this.io.emit('project:created', {
+                projectId: result.insertId,
+                name: name,
+                code: projectCode,
+                priority: priority || 'medium'
+            });
             res.status(201).json({
                 id: result.insertId,
                 project_id: result.insertId,
@@ -1064,6 +1488,34 @@ class SolariaDashboardServer {
                 fields.push('office_visible = ?');
                 values.push(normalizedVisibility ? 1 : 0);
             }
+            // Project URLs (snake_case and camelCase)
+            if (updates.production_url !== undefined || updates.productionUrl !== undefined) {
+                fields.push('production_url = ?');
+                values.push(updates.production_url ?? updates.productionUrl);
+            }
+            if (updates.staging_url !== undefined || updates.stagingUrl !== undefined) {
+                fields.push('staging_url = ?');
+                values.push(updates.staging_url ?? updates.stagingUrl);
+            }
+            if (updates.local_url !== undefined || updates.localUrl !== undefined) {
+                fields.push('local_url = ?');
+                values.push(updates.local_url ?? updates.localUrl);
+            }
+            if (updates.repo_url !== undefined || updates.repoUrl !== undefined) {
+                fields.push('repo_url = ?');
+                values.push(updates.repo_url ?? updates.repoUrl);
+            }
+            // Tags and Stack (stored as JSON strings)
+            if (updates.tags !== undefined) {
+                const tagsValue = Array.isArray(updates.tags) ? JSON.stringify(updates.tags) : updates.tags;
+                fields.push('tags = ?');
+                values.push(tagsValue);
+            }
+            if (updates.stack !== undefined) {
+                const stackValue = Array.isArray(updates.stack) ? JSON.stringify(updates.stack) : updates.stack;
+                fields.push('stack = ?');
+                values.push(stackValue);
+            }
             if (fields.length === 0) {
                 res.status(400).json({ error: 'No fields to update' });
                 return;
@@ -1077,6 +1529,13 @@ class SolariaDashboardServer {
                 res.status(404).json({ error: 'Project not found' });
                 return;
             }
+            // Emit socket event for real-time notification
+            this.io.emit('project:updated', {
+                projectId: parseInt(id),
+                name: updates.name,
+                status: updates.status,
+                progress: updates.completion_percentage
+            });
             res.json({ message: 'Project updated successfully' });
         }
         catch (error) {
@@ -1088,17 +1547,84 @@ class SolariaDashboardServer {
     async deleteProject(req, res) {
         try {
             const { id } = req.params;
+            // Get project info before deletion for notification
+            const [projectRows] = await this.db.execute('SELECT name, code FROM projects WHERE id = ?', [id]);
+            const projectInfo = projectRows[0];
             const [result] = await this.db.execute('DELETE FROM projects WHERE id = ?', [id]);
             if (result.affectedRows === 0) {
                 res.status(404).json({ error: 'Project not found' });
                 return;
             }
+            // Emit socket event for real-time notification
+            this.io.emit('project:deleted', {
+                projectId: parseInt(id),
+                name: projectInfo?.name || 'Proyecto',
+                code: projectInfo?.code || ''
+            });
             res.json({ message: 'Project deleted successfully' });
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             console.error('Delete project error:', errorMessage);
             res.status(500).json({ error: 'Failed to delete project' });
+        }
+    }
+    async archiveProject(req, res) {
+        try {
+            const { id } = req.params;
+            // Get project info for notification
+            const [projectRows] = await this.db.execute('SELECT name, code FROM projects WHERE id = ?', [id]);
+            const projectInfo = projectRows[0];
+            if (!projectInfo) {
+                res.status(404).json({ error: 'Project not found' });
+                return;
+            }
+            const [result] = await this.db.execute('UPDATE projects SET archived = TRUE, archived_at = NOW() WHERE id = ?', [id]);
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Project not found' });
+                return;
+            }
+            // Emit socket event for real-time notification
+            this.io.emit('project:archived', {
+                projectId: parseInt(id),
+                name: projectInfo.name,
+                archived: true
+            });
+            res.json({ message: 'Project archived successfully', id: parseInt(id) });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Archive project error:', errorMessage);
+            res.status(500).json({ error: 'Failed to archive project' });
+        }
+    }
+    async unarchiveProject(req, res) {
+        try {
+            const { id } = req.params;
+            // Get project info for notification
+            const [projectRows] = await this.db.execute('SELECT name, code FROM projects WHERE id = ?', [id]);
+            const projectInfo = projectRows[0];
+            if (!projectInfo) {
+                res.status(404).json({ error: 'Project not found' });
+                return;
+            }
+            const [result] = await this.db.execute('UPDATE projects SET archived = FALSE, archived_at = NULL WHERE id = ?', [id]);
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Project not found' });
+                return;
+            }
+            // Emit socket event for real-time notification
+            this.io.emit('project:archived', {
+                projectId: parseInt(id),
+                name: projectInfo.name,
+                archived: false
+            });
+            res.json({ message: 'Project restored from archive', id: parseInt(id) });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Unarchive project error:', errorMessage);
+            res.status(500).json({ error: 'Failed to restore project' });
         }
     }
     // ========================================================================
@@ -1165,14 +1691,33 @@ class SolariaDashboardServer {
     async createEpic(req, res) {
         try {
             const { id } = req.params; // project_id
+            const projectId = parseInt(id, 10);
             const { name, description, color, status, start_date, target_date } = req.body;
+            // Validation: name is required
             if (!name) {
                 res.status(400).json({ error: 'Epic name is required' });
                 return;
             }
-            // Get next epic number for this project
+            // Validation: name format for agents (must be descriptive, not random)
+            if (name.length < 3) {
+                res.status(400).json({
+                    error: 'Epic name must be at least 3 characters',
+                    hint: 'Use descriptive names like "User Authentication" or "Payment Integration"'
+                });
+                return;
+            }
+            // Validation: status must be valid
+            const validStatuses = ['open', 'in_progress', 'completed', 'cancelled'];
+            if (status && !validStatuses.includes(status)) {
+                res.status(400).json({
+                    error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+                });
+                return;
+            }
+            // Get next epic number for this project (auto-numbering)
             const [maxNum] = await this.db.execute('SELECT COALESCE(MAX(epic_number), 0) as max_num FROM epics WHERE project_id = ?', [id]);
             const epicNumber = (maxNum[0]?.max_num || 0) + 1;
+            const epicCode = `EPIC${String(epicNumber).padStart(3, '0')}`;
             const [result] = await this.db.execute(`
                 INSERT INTO epics (project_id, epic_number, name, description, color, status, start_date, target_date, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1187,9 +1732,26 @@ class SolariaDashboardServer {
                 target_date || null,
                 req.user?.userId || null
             ]);
+            // Log activity and emit Socket.IO event
+            await this.logActivity({
+                action: 'epic_created',
+                message: `Epic ${epicCode} creado: ${name}`,
+                category: 'epic',
+                level: 'info',
+                project_id: projectId,
+                metadata: { epicId: result.insertId, epicNumber, epicCode, name }
+            });
+            // Emit epic_created event for real-time updates
+            this.io.to('notifications').emit('epic_created', {
+                id: result.insertId,
+                epicNumber,
+                name,
+                projectId
+            });
             res.status(201).json({
                 id: result.insertId,
                 epic_number: epicNumber,
+                epic_code: epicCode,
                 message: 'Epic created successfully'
             });
         }
@@ -1276,14 +1838,42 @@ class SolariaDashboardServer {
     async createSprint(req, res) {
         try {
             const { id } = req.params; // project_id
+            const projectId = parseInt(id, 10);
             const { name, goal, status, start_date, end_date, velocity, capacity } = req.body;
+            // Validation: name is required
             if (!name) {
                 res.status(400).json({ error: 'Sprint name is required' });
                 return;
             }
-            // Get next sprint number for this project
+            // Validation: name format for agents (must be descriptive, not random)
+            if (name.length < 3) {
+                res.status(400).json({
+                    error: 'Sprint name must be at least 3 characters',
+                    hint: 'Use descriptive names like "MVP Release" or "Security Hardening"'
+                });
+                return;
+            }
+            // Validation: status must be valid
+            const validStatuses = ['planned', 'active', 'completed', 'cancelled'];
+            if (status && !validStatuses.includes(status)) {
+                res.status(400).json({
+                    error: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+                });
+                return;
+            }
+            // Validation: velocity and capacity must be non-negative
+            if (velocity !== undefined && velocity < 0) {
+                res.status(400).json({ error: 'Velocity must be non-negative' });
+                return;
+            }
+            if (capacity !== undefined && capacity < 0) {
+                res.status(400).json({ error: 'Capacity must be non-negative' });
+                return;
+            }
+            // Get next sprint number for this project (auto-numbering)
             const [maxNum] = await this.db.execute('SELECT COALESCE(MAX(sprint_number), 0) as max_num FROM sprints WHERE project_id = ?', [id]);
             const sprintNumber = (maxNum[0]?.max_num || 0) + 1;
+            const sprintCode = `SPRINT${String(sprintNumber).padStart(3, '0')}`;
             const [result] = await this.db.execute(`
                 INSERT INTO sprints (project_id, sprint_number, name, goal, status, start_date, end_date, velocity, capacity, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1299,9 +1889,26 @@ class SolariaDashboardServer {
                 capacity || 0,
                 req.user?.userId || null
             ]);
+            // Log activity and emit Socket.IO event
+            await this.logActivity({
+                action: 'sprint_created',
+                message: `Sprint ${sprintCode} creado: ${name}`,
+                category: 'sprint',
+                level: 'info',
+                project_id: projectId,
+                metadata: { sprintId: result.insertId, sprintNumber, sprintCode, name, goal }
+            });
+            // Emit sprint_created event for real-time updates
+            this.io.to('notifications').emit('sprint_created', {
+                id: result.insertId,
+                sprintNumber,
+                name,
+                projectId
+            });
             res.status(201).json({
                 id: result.insertId,
                 sprint_number: sprintNumber,
+                sprint_code: sprintCode,
                 message: 'Sprint created successfully'
             });
         }
@@ -1476,7 +2083,7 @@ class SolariaDashboardServer {
             let query = `
                 SELECT pr.*, a.name as assigned_agent_name
                 FROM project_requests pr
-                LEFT JOIN agents a ON pr.assigned_to = a.id
+                LEFT JOIN ai_agents a ON pr.assigned_to = a.id
                 WHERE pr.project_id = ?
             `;
             const params = [id];
@@ -1619,7 +2226,7 @@ class SolariaDashboardServer {
             if (whereConditions.length > 0) {
                 query += ' WHERE ' + whereConditions.join(' AND ');
             }
-            query += ' GROUP BY aa.id ORDER BY aa.last_active_at DESC';
+            query += ' GROUP BY aa.id ORDER BY aa.last_activity DESC';
             const offset = (pageNum - 1) * limitNum;
             query += ` LIMIT ${limitNum} OFFSET ${offset}`;
             const [agents] = await this.db.execute(query, params);
@@ -1684,7 +2291,7 @@ class SolariaDashboardServer {
             const { status } = req.body;
             await this.db.execute(`
                 UPDATE ai_agents
-                SET status = ?, last_active_at = NOW(), updated_at = NOW()
+                SET status = ?, last_activity = NOW()
                 WHERE id = ?
             `, [status, id]);
             res.json({ message: 'Agent status updated successfully' });
@@ -1911,13 +2518,15 @@ class SolariaDashboardServer {
                     taskCode += suffix;
                 }
             }
-            // Emit task_created notification
-            this.io.to('notifications').emit('task_created', {
+            // Emit task:created notification (colon format for NotificationContext)
+            this.io.emit('task:created', {
                 id: result.insertId,
+                taskId: result.insertId,
                 task_code: taskCode,
                 task_number: taskNumber,
                 title: title || 'Nueva tarea',
                 description: description || '',
+                projectId: project_id || null,
                 project_id: project_id || null,
                 assigned_agent_id: agentId || null,
                 priority: priority || 'medium',
@@ -2015,12 +2624,14 @@ class SolariaDashboardServer {
             const taskCode = taskForEmit.project_code && taskForEmit.task_number
                 ? `${taskForEmit.project_code}-${String(taskForEmit.task_number).padStart(3, '0')}`
                 : `TASK-${id}`;
-            // Emit task_updated for real-time updates
-            this.io.to('notifications').emit('task_updated', {
+            // Emit task:updated for real-time updates (colon format for NotificationContext)
+            this.io.emit('task:updated', {
+                taskId: parseInt(id),
                 task_id: parseInt(id),
                 id: parseInt(id),
                 task_code: taskCode,
                 title: taskForEmit.title || updates.title,
+                projectId: taskForEmit.project_id,
                 project_id: taskForEmit.project_id,
                 project_name: taskForEmit.project_name,
                 ...updates,
@@ -2036,9 +2647,12 @@ class SolariaDashboardServer {
                     WHERE t.id = ?
                 `, [id]);
                 const task = taskData[0] || {};
-                this.io.to('notifications').emit('task_completed', {
+                // Emit task:completed (colon format for NotificationContext)
+                this.io.emit('task:completed', {
+                    taskId: parseInt(id),
                     id: parseInt(id),
                     title: task.title || `Tarea #${id}`,
+                    projectId: task.project_id,
                     project_id: task.project_id,
                     project_name: task.project_name || 'Sin proyecto',
                     agent_name: task.agent_name,
@@ -2072,10 +2686,12 @@ class SolariaDashboardServer {
                 res.status(404).json({ error: 'Task not found' });
                 return;
             }
-            // Emit WebSocket notification
-            this.io.to('notifications').emit('task_deleted', {
+            // Emit task:deleted (colon format for NotificationContext)
+            this.io.emit('task:deleted', {
+                taskId: parseInt(id),
                 id: parseInt(id),
                 title: task.title,
+                projectId: task.project_id,
                 project_id: task.project_id
             });
             res.json({ message: 'Task deleted successfully', deleted_id: parseInt(id) });
@@ -2390,25 +3006,394 @@ class SolariaDashboardServer {
         }
     }
     // ========================================================================
-    // Business Handlers (Stubs)
+    // Business Handlers
     // ========================================================================
-    async getBusinesses(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+    async getBusinesses(req, res) {
+        try {
+            const { status, limit = 50, offset = 0 } = req.query;
+            let query = `
+                SELECT
+                    b.*,
+                    COUNT(DISTINCT p.id) as project_count,
+                    SUM(CASE WHEN p.status = 'active' THEN 1 ELSE 0 END) as active_projects
+                FROM businesses b
+                LEFT JOIN projects p ON p.business_id = b.id
+                WHERE 1=1
+            `;
+            const params = [];
+            if (status) {
+                query += ' AND b.status = ?';
+                params.push(String(status));
+            }
+            query += ' GROUP BY b.id ORDER BY b.name ASC LIMIT ? OFFSET ?';
+            params.push(Number(limit), Number(offset));
+            const [businesses] = await this.db.execute(query, params);
+            // Get total count
+            const [countResult] = await this.db.execute('SELECT COUNT(*) as total FROM businesses');
+            res.json({
+                businesses,
+                pagination: {
+                    total: countResult[0]?.total || 0,
+                    limit: Number(limit),
+                    offset: Number(offset)
+                }
+            });
+        }
+        catch (error) {
+            console.error('Error fetching businesses:', error);
+            res.status(500).json({ error: 'Failed to fetch businesses' });
+        }
     }
-    async getBusiness(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+    async getBusiness(req, res) {
+        try {
+            const { id } = req.params;
+            // Get business details
+            const [businesses] = await this.db.execute(`
+                SELECT * FROM businesses WHERE id = ?
+            `, [id]);
+            if (businesses.length === 0) {
+                res.status(404).json({ error: 'Business not found' });
+                return;
+            }
+            const business = businesses[0];
+            // Get associated projects
+            const [projects] = await this.db.execute(`
+                SELECT
+                    id, name, code, status, description,
+                    start_date, end_date, progress,
+                    budget_allocated, budget_spent
+                FROM projects
+                WHERE business_id = ?
+                ORDER BY created_at DESC
+            `, [id]);
+            // Get financial summary
+            const [financials] = await this.db.execute(`
+                SELECT
+                    SUM(budget_allocated) as total_budget,
+                    SUM(budget_spent) as total_spent,
+                    COUNT(*) as total_projects,
+                    AVG(progress) as avg_progress
+                FROM projects
+                WHERE business_id = ?
+            `, [id]);
+            res.json({
+                ...business,
+                projects,
+                financials: financials[0] || {}
+            });
+        }
+        catch (error) {
+            console.error('Error fetching business:', error);
+            res.status(500).json({ error: 'Failed to fetch business' });
+        }
     }
-    async updateBusiness(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+    async createBusiness(req, res) {
+        try {
+            const { name, description, website, status = 'inactive', revenue = 0, expenses = 0, logo_url } = req.body;
+            if (!name) {
+                res.status(400).json({ error: 'Name is required' });
+                return;
+            }
+            const profit = Number(revenue) - Number(expenses);
+            const [result] = await this.db.execute(`
+                INSERT INTO businesses (name, description, website, status, revenue, expenses, profit, logo_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, [name, description, website, status, revenue, expenses, profit, logo_url]);
+            // Log activity
+            await this.db.execute(`
+                INSERT INTO activity_logs (action, details, category, level)
+                VALUES ('business_created', ?, 'management', 'info')
+            `, [JSON.stringify({ business_id: result.insertId, name })]);
+            res.status(201).json({
+                id: result.insertId,
+                message: 'Business created successfully'
+            });
+        }
+        catch (error) {
+            console.error('Error creating business:', error);
+            res.status(500).json({ error: 'Failed to create business' });
+        }
+    }
+    async updateBusiness(req, res) {
+        try {
+            const { id } = req.params;
+            const { name, description, website, status, revenue, expenses, logo_url } = req.body;
+            // Check if business exists
+            const [existing] = await this.db.execute('SELECT id FROM businesses WHERE id = ?', [id]);
+            if (existing.length === 0) {
+                res.status(404).json({ error: 'Business not found' });
+                return;
+            }
+            // Build dynamic update query
+            const updates = [];
+            const params = [];
+            if (name !== undefined) {
+                updates.push('name = ?');
+                params.push(name);
+            }
+            if (description !== undefined) {
+                updates.push('description = ?');
+                params.push(description);
+            }
+            if (website !== undefined) {
+                updates.push('website = ?');
+                params.push(website);
+            }
+            if (status !== undefined) {
+                updates.push('status = ?');
+                params.push(status);
+            }
+            if (revenue !== undefined) {
+                updates.push('revenue = ?');
+                params.push(Number(revenue));
+            }
+            if (expenses !== undefined) {
+                updates.push('expenses = ?');
+                params.push(Number(expenses));
+            }
+            if (logo_url !== undefined) {
+                updates.push('logo_url = ?');
+                params.push(logo_url);
+            }
+            // Recalculate profit if revenue or expenses changed
+            if (revenue !== undefined || expenses !== undefined) {
+                updates.push('profit = revenue - expenses');
+            }
+            if (updates.length === 0) {
+                res.status(400).json({ error: 'No fields to update' });
+                return;
+            }
+            params.push(Number(id));
+            await this.db.execute(`
+                UPDATE businesses SET ${updates.join(', ')} WHERE id = ?
+            `, params);
+            // Log activity
+            await this.db.execute(`
+                INSERT INTO activity_logs (action, details, category, level)
+                VALUES ('business_updated', ?, 'management', 'info')
+            `, [JSON.stringify({ business_id: id, updates: Object.keys(req.body) })]);
+            res.json({ message: 'Business updated successfully' });
+        }
+        catch (error) {
+            console.error('Error updating business:', error);
+            res.status(500).json({ error: 'Failed to update business' });
+        }
+    }
+    async deleteBusiness(req, res) {
+        try {
+            const { id } = req.params;
+            // Check if business exists and has no active projects
+            const [existing] = await this.db.execute(`
+                SELECT b.id, b.name, COUNT(p.id) as project_count
+                FROM businesses b
+                LEFT JOIN projects p ON p.business_id = b.id AND p.status IN ('active', 'planning')
+                WHERE b.id = ?
+                GROUP BY b.id
+            `, [id]);
+            if (existing.length === 0) {
+                res.status(404).json({ error: 'Business not found' });
+                return;
+            }
+            if (existing[0].project_count > 0) {
+                res.status(400).json({
+                    error: 'Cannot delete business with active projects',
+                    project_count: existing[0].project_count
+                });
+                return;
+            }
+            // Nullify business_id in related projects
+            await this.db.execute('UPDATE projects SET business_id = NULL WHERE business_id = ?', [id]);
+            // Delete business
+            await this.db.execute('DELETE FROM businesses WHERE id = ?', [id]);
+            // Log activity
+            await this.db.execute(`
+                INSERT INTO activity_logs (action, details, category, level)
+                VALUES ('business_deleted', ?, 'management', 'warning')
+            `, [JSON.stringify({ business_id: id, name: existing[0].name })]);
+            res.json({ message: 'Business deleted successfully' });
+        }
+        catch (error) {
+            console.error('Error deleting business:', error);
+            res.status(500).json({ error: 'Failed to delete business' });
+        }
     }
     // ========================================================================
     // Log Handlers (Stubs)
     // ========================================================================
-    async getLogs(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+    async getLogs(req, res) {
+        try {
+            const { project_id, agent_id, category, level, limit = 100, offset = 0, from_date, to_date } = req.query;
+            let query = `
+                SELECT
+                    al.id,
+                    al.project_id,
+                    al.agent_id,
+                    al.task_id,
+                    al.user_id,
+                    al.action,
+                    al.details,
+                    al.category,
+                    al.level,
+                    al.timestamp,
+                    al.created_at,
+                    p.name as project_name,
+                    p.code as project_code,
+                    aa.name as agent_name,
+                    t.title as task_title,
+                    t.task_number,
+                    u.username as user_name
+                FROM activity_logs al
+                LEFT JOIN projects p ON al.project_id = p.id
+                LEFT JOIN ai_agents aa ON al.agent_id = aa.id
+                LEFT JOIN tasks t ON al.task_id = t.id
+                LEFT JOIN users u ON al.user_id = u.id
+                WHERE 1=1
+            `;
+            const params = [];
+            if (project_id) {
+                query += ' AND al.project_id = ?';
+                params.push(Number(project_id));
+            }
+            if (agent_id) {
+                query += ' AND al.agent_id = ?';
+                params.push(Number(agent_id));
+            }
+            if (category) {
+                query += ' AND al.category = ?';
+                params.push(String(category));
+            }
+            if (level) {
+                query += ' AND al.level = ?';
+                params.push(String(level));
+            }
+            if (from_date) {
+                query += ' AND al.created_at >= ?';
+                params.push(String(from_date));
+            }
+            if (to_date) {
+                query += ' AND al.created_at <= ?';
+                params.push(String(to_date));
+            }
+            query += ' ORDER BY al.created_at DESC LIMIT ? OFFSET ?';
+            params.push(Number(limit), Number(offset));
+            const [logs] = await this.db.execute(query, params);
+            // Get total count
+            let countQuery = 'SELECT COUNT(*) as total FROM activity_logs al WHERE 1=1';
+            const countParams = [];
+            if (project_id) {
+                countQuery += ' AND al.project_id = ?';
+                countParams.push(Number(project_id));
+            }
+            if (agent_id) {
+                countQuery += ' AND al.agent_id = ?';
+                countParams.push(Number(agent_id));
+            }
+            if (category) {
+                countQuery += ' AND al.category = ?';
+                countParams.push(String(category));
+            }
+            if (level) {
+                countQuery += ' AND al.level = ?';
+                countParams.push(String(level));
+            }
+            const [countResult] = await this.db.execute(countQuery, countParams);
+            const total = countResult[0]?.total || 0;
+            res.json({
+                logs,
+                pagination: {
+                    total,
+                    limit: Number(limit),
+                    offset: Number(offset),
+                    has_more: Number(offset) + logs.length < total
+                }
+            });
+        }
+        catch (error) {
+            console.error('Error fetching logs:', error);
+            res.status(500).json({ error: 'Failed to fetch logs' });
+        }
     }
-    async getAuditLogs(_req, res) {
-        res.json({ message: 'Not implemented yet' });
+    async getAuditLogs(req, res) {
+        try {
+            const { project_id, user_id, action, limit = 50, offset = 0 } = req.query;
+            // Audit logs focus on security-sensitive actions
+            const auditActions = [
+                'login', 'logout', 'login_failed',
+                'user_created', 'user_updated', 'user_deleted',
+                'permission_changed', 'role_changed',
+                'project_created', 'project_deleted', 'project_archived',
+                'task_deleted', 'document_deleted',
+                'api_key_created', 'api_key_revoked',
+                'settings_changed', 'backup_created', 'backup_restored'
+            ];
+            let query = `
+                SELECT
+                    al.id,
+                    al.project_id,
+                    al.agent_id,
+                    al.task_id,
+                    al.user_id,
+                    al.action,
+                    al.details,
+                    al.category,
+                    al.level,
+                    al.timestamp,
+                    al.created_at,
+                    p.name as project_name,
+                    p.code as project_code,
+                    u.username as user_name,
+                    INET_NTOA(CONV(SUBSTRING(al.details, LOCATE('"ip":"', al.details) + 6,
+                        LOCATE('"', al.details, LOCATE('"ip":"', al.details) + 6) - LOCATE('"ip":"', al.details) - 6
+                    ), 10, 10)) as ip_address
+                FROM activity_logs al
+                LEFT JOIN projects p ON al.project_id = p.id
+                LEFT JOIN users u ON al.user_id = u.id
+                WHERE (al.category = 'security' OR al.action IN (${auditActions.map(() => '?').join(',')}))
+            `;
+            const params = [...auditActions];
+            if (project_id) {
+                query += ' AND al.project_id = ?';
+                params.push(Number(project_id));
+            }
+            if (user_id) {
+                query += ' AND al.user_id = ?';
+                params.push(Number(user_id));
+            }
+            if (action) {
+                query += ' AND al.action = ?';
+                params.push(String(action));
+            }
+            query += ' ORDER BY al.created_at DESC LIMIT ? OFFSET ?';
+            params.push(Number(limit), Number(offset));
+            const [logs] = await this.db.execute(query, params);
+            // Get audit summary stats
+            const [stats] = await this.db.execute(`
+                SELECT
+                    COUNT(*) as total_entries,
+                    COUNT(CASE WHEN level = 'warning' THEN 1 END) as warnings,
+                    COUNT(CASE WHEN level = 'error' THEN 1 END) as errors,
+                    COUNT(CASE WHEN level = 'critical' THEN 1 END) as critical,
+                    COUNT(CASE WHEN action LIKE 'login_failed%' THEN 1 END) as failed_logins,
+                    COUNT(DISTINCT user_id) as unique_users,
+                    COUNT(DISTINCT project_id) as affected_projects
+                FROM activity_logs
+                WHERE category = 'security'
+                   OR action IN (${auditActions.map(() => '?').join(',')})
+            `, auditActions);
+            res.json({
+                logs,
+                stats: stats[0] || {},
+                pagination: {
+                    limit: Number(limit),
+                    offset: Number(offset),
+                    has_more: logs.length === Number(limit)
+                }
+            });
+        }
+        catch (error) {
+            console.error('Error fetching audit logs:', error);
+            res.status(500).json({ error: 'Failed to fetch audit logs' });
+        }
     }
     // ========================================================================
     // Report Handlers
@@ -2485,6 +3470,166 @@ class SolariaDashboardServer {
     // ========================================================================
     // Docs Handlers
     // ========================================================================
+    async getOpenAPISpec(_req, res) {
+        const openApiSpec = {
+            openapi: '3.0.3',
+            info: {
+                title: 'SOLARIA DFO API',
+                version: '3.2.0',
+                description: 'Digital Field Operations API for project management, task tracking, and AI agent coordination',
+                contact: { email: 'charlie@solaria.agency' }
+            },
+            servers: [
+                { url: 'https://dfo.solaria.agency/api', description: 'Production' },
+                { url: 'http://localhost:3030/api', description: 'Development' }
+            ],
+            tags: [
+                { name: 'Auth', description: 'Authentication endpoints' },
+                { name: 'Projects', description: 'Project management' },
+                { name: 'Tasks', description: 'Task management' },
+                { name: 'Agents', description: 'AI Agent management' },
+                { name: 'Businesses', description: 'Business entities' },
+                { name: 'Memories', description: 'Persistent memory system' },
+                { name: 'Dashboard', description: 'Analytics and metrics' },
+                { name: 'Logs', description: 'Activity and audit logs' },
+                { name: 'Public', description: 'Public endpoints (no auth)' }
+            ],
+            paths: {
+                '/auth/login': {
+                    post: { tags: ['Auth'], summary: 'Login', requestBody: { content: { 'application/json': { schema: { properties: { username: { type: 'string' }, password: { type: 'string' } } } } } } }
+                },
+                '/auth/verify': {
+                    get: { tags: ['Auth'], summary: 'Verify token', security: [{ bearerAuth: [] }] }
+                },
+                '/projects': {
+                    get: { tags: ['Projects'], summary: 'List projects', parameters: [{ name: 'status', in: 'query', schema: { type: 'string' } }] },
+                    post: { tags: ['Projects'], summary: 'Create project', security: [{ bearerAuth: [] }] }
+                },
+                '/projects/{id}': {
+                    get: { tags: ['Projects'], summary: 'Get project details', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'integer' } }] },
+                    put: { tags: ['Projects'], summary: 'Update project', security: [{ bearerAuth: [] }] },
+                    delete: { tags: ['Projects'], summary: 'Delete project', security: [{ bearerAuth: [] }] }
+                },
+                '/projects/{id}/epics': {
+                    get: { tags: ['Projects'], summary: 'List project epics' },
+                    post: { tags: ['Projects'], summary: 'Create epic', security: [{ bearerAuth: [] }] }
+                },
+                '/projects/{id}/sprints': {
+                    get: { tags: ['Projects'], summary: 'List project sprints' },
+                    post: { tags: ['Projects'], summary: 'Create sprint', security: [{ bearerAuth: [] }] }
+                },
+                '/tasks': {
+                    get: { tags: ['Tasks'], summary: 'List tasks', parameters: [{ name: 'status', in: 'query', schema: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked'] } }, { name: 'project_id', in: 'query', schema: { type: 'integer' } }] },
+                    post: { tags: ['Tasks'], summary: 'Create task', security: [{ bearerAuth: [] }] }
+                },
+                '/tasks/{id}': {
+                    get: { tags: ['Tasks'], summary: 'Get task details' },
+                    put: { tags: ['Tasks'], summary: 'Update task', security: [{ bearerAuth: [] }] },
+                    delete: { tags: ['Tasks'], summary: 'Delete task', security: [{ bearerAuth: [] }] }
+                },
+                '/tasks/{id}/items': {
+                    get: { tags: ['Tasks'], summary: 'Get task items/subtasks' },
+                    post: { tags: ['Tasks'], summary: 'Create task items' }
+                },
+                '/agents': {
+                    get: { tags: ['Agents'], summary: 'List AI agents' }
+                },
+                '/agents/{id}': {
+                    get: { tags: ['Agents'], summary: 'Get agent details' }
+                },
+                '/agents/{id}/status': {
+                    put: { tags: ['Agents'], summary: 'Update agent status' }
+                },
+                '/businesses': {
+                    get: { tags: ['Businesses'], summary: 'List businesses' },
+                    post: { tags: ['Businesses'], summary: 'Create business', security: [{ bearerAuth: [] }] }
+                },
+                '/businesses/{id}': {
+                    get: { tags: ['Businesses'], summary: 'Get business details' },
+                    put: { tags: ['Businesses'], summary: 'Update business', security: [{ bearerAuth: [] }] },
+                    delete: { tags: ['Businesses'], summary: 'Delete business', security: [{ bearerAuth: [] }] }
+                },
+                '/memories': {
+                    get: { tags: ['Memories'], summary: 'List memories', parameters: [{ name: 'tags', in: 'query', schema: { type: 'string' } }, { name: 'query', in: 'query', schema: { type: 'string' } }] },
+                    post: { tags: ['Memories'], summary: 'Create memory' }
+                },
+                '/memories/search': {
+                    get: { tags: ['Memories'], summary: 'Search memories with full-text' }
+                },
+                '/memories/{id}': {
+                    get: { tags: ['Memories'], summary: 'Get memory details' },
+                    put: { tags: ['Memories'], summary: 'Update memory' },
+                    delete: { tags: ['Memories'], summary: 'Delete memory' }
+                },
+                '/dashboard/overview': {
+                    get: { tags: ['Dashboard'], summary: 'Get dashboard overview with KPIs' }
+                },
+                '/dashboard/metrics': {
+                    get: { tags: ['Dashboard'], summary: 'Get detailed metrics' }
+                },
+                '/dashboard/alerts': {
+                    get: { tags: ['Dashboard'], summary: 'Get active alerts' }
+                },
+                '/logs': {
+                    get: { tags: ['Logs'], summary: 'Get activity logs', parameters: [{ name: 'project_id', in: 'query', schema: { type: 'integer' } }, { name: 'category', in: 'query', schema: { type: 'string' } }, { name: 'level', in: 'query', schema: { type: 'string' } }] }
+                },
+                '/logs/audit': {
+                    get: { tags: ['Logs'], summary: 'Get security audit logs' }
+                },
+                '/public/projects': {
+                    get: { tags: ['Public'], summary: 'List projects (public)' }
+                },
+                '/public/tasks': {
+                    get: { tags: ['Public'], summary: 'List tasks (public)' }
+                },
+                '/public/dashboard': {
+                    get: { tags: ['Public'], summary: 'Dashboard stats (public)' }
+                }
+            },
+            components: {
+                securitySchemes: {
+                    bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
+                },
+                schemas: {
+                    Project: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'integer' },
+                            name: { type: 'string' },
+                            code: { type: 'string' },
+                            status: { type: 'string', enum: ['planning', 'active', 'paused', 'completed', 'cancelled'] },
+                            description: { type: 'string' },
+                            progress: { type: 'integer', minimum: 0, maximum: 100 }
+                        }
+                    },
+                    Task: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'integer' },
+                            title: { type: 'string' },
+                            description: { type: 'string' },
+                            status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked'] },
+                            priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+                            project_id: { type: 'integer' },
+                            epic_id: { type: 'integer' },
+                            sprint_id: { type: 'integer' }
+                        }
+                    },
+                    Memory: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'integer' },
+                            content: { type: 'string' },
+                            summary: { type: 'string' },
+                            tags: { type: 'array', items: { type: 'string' } },
+                            importance: { type: 'number', minimum: 0, maximum: 1 }
+                        }
+                    }
+                }
+            }
+        };
+        res.json(openApiSpec);
+    }
     async getDocumentsList(_req, res) {
         try {
             const repoPath = process.env.REPO_PATH || '/repo';
@@ -3121,12 +4266,18 @@ class SolariaDashboardServer {
                 sql += ' AND (m.content LIKE ? OR m.summary LIKE ?)';
                 params.push(`%${query}%`, `%${query}%`);
             }
-            if (tags) {
-                const tagList = JSON.parse(tags);
-                if (tagList.length > 0) {
-                    const tagConditions = tagList.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
-                    sql += ` AND (${tagConditions})`;
-                    tagList.forEach(tag => params.push(JSON.stringify(tag)));
+            if (tags && tags !== '' && tags !== '[]') {
+                try {
+                    const tagList = JSON.parse(tags);
+                    if (Array.isArray(tagList) && tagList.length > 0) {
+                        const tagConditions = tagList.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
+                        sql += ` AND (${tagConditions})`;
+                        tagList.forEach(tag => params.push(JSON.stringify(tag)));
+                    }
+                }
+                catch (parseError) {
+                    console.warn('Invalid tags parameter in getMemories, ignoring:', tags);
+                    // Continue without tag filtering
                 }
             }
             // Sort order
@@ -3172,12 +4323,18 @@ class SolariaDashboardServer {
                 sql += ' AND m.project_id = ?';
                 params.push(parseInt(project_id));
             }
-            if (tags) {
-                const tagList = JSON.parse(tags);
-                if (tagList.length > 0) {
-                    const tagConditions = tagList.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
-                    sql += ` AND (${tagConditions})`;
-                    tagList.forEach(tag => params.push(JSON.stringify(tag)));
+            if (tags && tags !== '' && tags !== '[]') {
+                try {
+                    const tagList = JSON.parse(tags);
+                    if (Array.isArray(tagList) && tagList.length > 0) {
+                        const tagConditions = tagList.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
+                        sql += ` AND (${tagConditions})`;
+                        tagList.forEach(tag => params.push(JSON.stringify(tag)));
+                    }
+                }
+                catch (parseError) {
+                    console.warn('Invalid tags parameter in searchMemories, ignoring:', tags);
+                    // Continue without tag filtering
                 }
             }
             sql += ` ORDER BY relevance DESC, m.importance DESC LIMIT ${parseInt(limit)}`;

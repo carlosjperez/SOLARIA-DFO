@@ -579,6 +579,147 @@ export const toolDefinitions: MCPToolDefinition[] = [
     },
   },
 
+  // Epic Tools
+  {
+    name: "list_epics",
+    description: "List all epics for a project with task counts and progress",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "number", description: "Project ID" },
+        status: {
+          type: "string",
+          enum: ["open", "in_progress", "completed", "cancelled"],
+          description: "Filter by epic status",
+        },
+      },
+      required: ["project_id"],
+    },
+  },
+  {
+    name: "create_epic",
+    description: "Create a new epic for a project. Epics group related tasks into major features or milestones.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "number", description: "Project ID" },
+        name: { type: "string", description: "Epic name (min 3 chars, e.g., 'User Authentication')" },
+        description: { type: "string", description: "Epic description" },
+        color: { type: "string", description: "Color hex code (e.g., #6366f1)" },
+        status: {
+          type: "string",
+          enum: ["open", "in_progress", "completed", "cancelled"],
+          description: "Epic status (default: open)",
+        },
+        start_date: { type: "string", description: "Start date (YYYY-MM-DD)" },
+        target_date: { type: "string", description: "Target completion date (YYYY-MM-DD)" },
+      },
+      required: ["project_id", "name"],
+    },
+  },
+  {
+    name: "update_epic",
+    description: "Update an existing epic's details or status",
+    inputSchema: {
+      type: "object",
+      properties: {
+        epic_id: { type: "number", description: "Epic ID to update" },
+        name: { type: "string", description: "New epic name" },
+        description: { type: "string", description: "New description" },
+        color: { type: "string", description: "New color hex code" },
+        status: {
+          type: "string",
+          enum: ["open", "in_progress", "completed", "cancelled"],
+        },
+        start_date: { type: "string", description: "New start date" },
+        target_date: { type: "string", description: "New target date" },
+      },
+      required: ["epic_id"],
+    },
+  },
+  {
+    name: "delete_epic",
+    description: "Delete an epic. Tasks will have their epic_id set to NULL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        epic_id: { type: "number", description: "Epic ID to delete" },
+      },
+      required: ["epic_id"],
+    },
+  },
+
+  // Sprint Tools
+  {
+    name: "list_sprints",
+    description: "List all sprints for a project with task counts and velocity",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "number", description: "Project ID" },
+        status: {
+          type: "string",
+          enum: ["planned", "active", "completed", "cancelled"],
+          description: "Filter by sprint status",
+        },
+      },
+      required: ["project_id"],
+    },
+  },
+  {
+    name: "create_sprint",
+    description: "Create a new sprint for a project. Sprints are time-boxed iterations for completing tasks.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_id: { type: "number", description: "Project ID" },
+        name: { type: "string", description: "Sprint name (min 3 chars, e.g., 'Sprint 1 - MVP')" },
+        goal: { type: "string", description: "Sprint goal - what success looks like" },
+        status: {
+          type: "string",
+          enum: ["planned", "active", "completed", "cancelled"],
+          description: "Sprint status (default: planned)",
+        },
+        start_date: { type: "string", description: "Start date (YYYY-MM-DD)" },
+        end_date: { type: "string", description: "End date (YYYY-MM-DD)" },
+        velocity: { type: "number", description: "Planned velocity in story points" },
+        capacity: { type: "number", description: "Team capacity in hours" },
+      },
+      required: ["project_id", "name"],
+    },
+  },
+  {
+    name: "update_sprint",
+    description: "Update an existing sprint's details, status, or velocity",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sprint_id: { type: "number", description: "Sprint ID to update" },
+        name: { type: "string", description: "New sprint name" },
+        goal: { type: "string", description: "New sprint goal" },
+        status: {
+          type: "string",
+          enum: ["planned", "active", "completed", "cancelled"],
+        },
+        start_date: { type: "string", description: "New start date" },
+        end_date: { type: "string", description: "New end date" },
+        velocity: { type: "number", description: "Actual velocity (for retrospective)" },
+      },
+      required: ["sprint_id"],
+    },
+  },
+  {
+    name: "delete_sprint",
+    description: "Delete a sprint. Tasks will have their sprint_id set to NULL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        sprint_id: { type: "number", description: "Sprint ID to delete" },
+      },
+      required: ["sprint_id"],
+    },
+  },
+
   // Memory Tools
   {
     name: "memory_create",
@@ -844,7 +985,11 @@ export function createApiClient(dashboardUrl: string, credentials: ApiCredential
     return response.json();
   }
 
-  return { apiCall, authenticate };
+  function setToken(token: string): void {
+    authToken = token;
+  }
+
+  return { apiCall, authenticate, setToken };
 }
 
 // ============================================================================
@@ -1360,6 +1505,138 @@ export async function executeTool(
           notes: params.notes,
         }),
       });
+    }
+
+    // Epic Tools
+    case "list_epics": {
+      const params = args as { project_id?: number; status?: string };
+      const projectId = isIsolated ? context.project_id : params.project_id;
+      if (!projectId) return { error: "project_id required" };
+      const queryParams = params.status ? `?status=${params.status}` : '';
+      return apiCall(`/projects/${projectId}/epics${queryParams}`);
+    }
+
+    case "create_epic": {
+      const params = args as {
+        project_id?: number;
+        name: string;
+        description?: string;
+        color?: string;
+        status?: string;
+        start_date?: string;
+        target_date?: string;
+      };
+      const projectId = isIsolated ? context.project_id : params.project_id;
+      if (!projectId) return { error: "project_id required" };
+      if (!params.name) return { error: "name required" };
+      return apiCall(`/projects/${projectId}/epics`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: params.name,
+          description: params.description,
+          color: params.color || '#6366f1',
+          status: params.status || 'open',
+          start_date: params.start_date,
+          target_date: params.target_date,
+        }),
+      });
+    }
+
+    case "update_epic": {
+      const params = args as {
+        epic_id: number;
+        name?: string;
+        description?: string;
+        color?: string;
+        status?: string;
+        start_date?: string;
+        target_date?: string;
+      };
+      if (!params.epic_id) return { error: "epic_id required" };
+      return apiCall(`/epics/${params.epic_id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: params.name,
+          description: params.description,
+          color: params.color,
+          status: params.status,
+          start_date: params.start_date,
+          target_date: params.target_date,
+        }),
+      });
+    }
+
+    case "delete_epic": {
+      const params = args as { epic_id: number };
+      if (!params.epic_id) return { error: "epic_id required" };
+      return apiCall(`/epics/${params.epic_id}`, { method: "DELETE" });
+    }
+
+    // Sprint Tools
+    case "list_sprints": {
+      const params = args as { project_id?: number; status?: string };
+      const projectId = isIsolated ? context.project_id : params.project_id;
+      if (!projectId) return { error: "project_id required" };
+      const queryParams = params.status ? `?status=${params.status}` : '';
+      return apiCall(`/projects/${projectId}/sprints${queryParams}`);
+    }
+
+    case "create_sprint": {
+      const params = args as {
+        project_id?: number;
+        name: string;
+        goal?: string;
+        status?: string;
+        start_date?: string;
+        end_date?: string;
+        velocity?: number;
+        capacity?: number;
+      };
+      const projectId = isIsolated ? context.project_id : params.project_id;
+      if (!projectId) return { error: "project_id required" };
+      if (!params.name) return { error: "name required" };
+      return apiCall(`/projects/${projectId}/sprints`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: params.name,
+          goal: params.goal,
+          status: params.status || 'planned',
+          start_date: params.start_date,
+          end_date: params.end_date,
+          velocity: params.velocity,
+          capacity: params.capacity,
+        }),
+      });
+    }
+
+    case "update_sprint": {
+      const params = args as {
+        sprint_id: number;
+        name?: string;
+        goal?: string;
+        status?: string;
+        start_date?: string;
+        end_date?: string;
+        velocity?: number;
+      };
+      if (!params.sprint_id) return { error: "sprint_id required" };
+      return apiCall(`/sprints/${params.sprint_id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: params.name,
+          goal: params.goal,
+          status: params.status,
+          start_date: params.start_date,
+          end_date: params.end_date,
+          velocity: params.velocity,
+        }),
+      });
+    }
+
+    case "delete_sprint": {
+      const params = args as { sprint_id: number };
+      if (!params.sprint_id) return { error: "sprint_id required" };
+      return apiCall(`/sprints/${params.sprint_id}`, { method: "DELETE" });
     }
 
     // Memory Tools

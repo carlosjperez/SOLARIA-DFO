@@ -1,77 +1,13 @@
-"use strict";
 /**
  * SOLARIA Dashboard MCP Handlers
  * Shared handlers for both stdio and HTTP transports
  *
  * @module handlers
  */
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
-    };
-    return __assign.apply(this, arguments);
-};
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-var __generator = (this && this.__generator) || function (thisArg, body) {
-    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
-    return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
-    function verb(n) { return function (v) { return step([n, v]); }; }
-    function step(op) {
-        if (f) throw new TypeError("Generator is already executing.");
-        while (g && (g = 0, op[0] && (_ = 0)), _) try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
-            if (y = 0, t) op = [op[0] & 2, t.value];
-            switch (op[0]) {
-                case 0: case 1: t = op; break;
-                case 4: _.label++; return { value: op[1], done: false };
-                case 5: _.label++; y = op[1]; op = [0]; continue;
-                case 7: op = _.ops.pop(); _.trys.pop(); continue;
-                default:
-                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
-                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
-                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
-                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
-                    if (t[2]) _.ops.pop();
-                    _.trys.pop(); continue;
-            }
-            op = body.call(thisArg, _);
-        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
-        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
-    }
-};
-var __rest = (this && this.__rest) || function (s, e) {
-    var t = {};
-    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
-        t[p] = s[p];
-    if (s != null && typeof Object.getOwnPropertySymbols === "function")
-        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
-            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
-                t[p[i]] = s[p[i]];
-        }
-    return t;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.resourceDefinitions = exports.toolDefinitions = void 0;
-exports.createApiClient = createApiClient;
-exports.executeTool = executeTool;
-exports.readResource = readResource;
 // ============================================================================
 // Tool Definitions
 // ============================================================================
-exports.toolDefinitions = [
+export const toolDefinitions = [
     // Session Context Tool (MUST be called first)
     {
         name: "set_project_context",
@@ -574,6 +510,145 @@ exports.toolDefinitions = [
             required: ["project_id", "request_id"],
         },
     },
+    // Epic Tools
+    {
+        name: "list_epics",
+        description: "List all epics for a project with task counts and progress",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Project ID" },
+                status: {
+                    type: "string",
+                    enum: ["open", "in_progress", "completed", "cancelled"],
+                    description: "Filter by epic status",
+                },
+            },
+            required: ["project_id"],
+        },
+    },
+    {
+        name: "create_epic",
+        description: "Create a new epic for a project. Epics group related tasks into major features or milestones.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Project ID" },
+                name: { type: "string", description: "Epic name (min 3 chars, e.g., 'User Authentication')" },
+                description: { type: "string", description: "Epic description" },
+                color: { type: "string", description: "Color hex code (e.g., #6366f1)" },
+                status: {
+                    type: "string",
+                    enum: ["open", "in_progress", "completed", "cancelled"],
+                    description: "Epic status (default: open)",
+                },
+                start_date: { type: "string", description: "Start date (YYYY-MM-DD)" },
+                target_date: { type: "string", description: "Target completion date (YYYY-MM-DD)" },
+            },
+            required: ["project_id", "name"],
+        },
+    },
+    {
+        name: "update_epic",
+        description: "Update an existing epic's details or status",
+        inputSchema: {
+            type: "object",
+            properties: {
+                epic_id: { type: "number", description: "Epic ID to update" },
+                name: { type: "string", description: "New epic name" },
+                description: { type: "string", description: "New description" },
+                color: { type: "string", description: "New color hex code" },
+                status: {
+                    type: "string",
+                    enum: ["open", "in_progress", "completed", "cancelled"],
+                },
+                start_date: { type: "string", description: "New start date" },
+                target_date: { type: "string", description: "New target date" },
+            },
+            required: ["epic_id"],
+        },
+    },
+    {
+        name: "delete_epic",
+        description: "Delete an epic. Tasks will have their epic_id set to NULL.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                epic_id: { type: "number", description: "Epic ID to delete" },
+            },
+            required: ["epic_id"],
+        },
+    },
+    // Sprint Tools
+    {
+        name: "list_sprints",
+        description: "List all sprints for a project with task counts and velocity",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Project ID" },
+                status: {
+                    type: "string",
+                    enum: ["planned", "active", "completed", "cancelled"],
+                    description: "Filter by sprint status",
+                },
+            },
+            required: ["project_id"],
+        },
+    },
+    {
+        name: "create_sprint",
+        description: "Create a new sprint for a project. Sprints are time-boxed iterations for completing tasks.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Project ID" },
+                name: { type: "string", description: "Sprint name (min 3 chars, e.g., 'Sprint 1 - MVP')" },
+                goal: { type: "string", description: "Sprint goal - what success looks like" },
+                status: {
+                    type: "string",
+                    enum: ["planned", "active", "completed", "cancelled"],
+                    description: "Sprint status (default: planned)",
+                },
+                start_date: { type: "string", description: "Start date (YYYY-MM-DD)" },
+                end_date: { type: "string", description: "End date (YYYY-MM-DD)" },
+                velocity: { type: "number", description: "Planned velocity in story points" },
+                capacity: { type: "number", description: "Team capacity in hours" },
+            },
+            required: ["project_id", "name"],
+        },
+    },
+    {
+        name: "update_sprint",
+        description: "Update an existing sprint's details, status, or velocity",
+        inputSchema: {
+            type: "object",
+            properties: {
+                sprint_id: { type: "number", description: "Sprint ID to update" },
+                name: { type: "string", description: "New sprint name" },
+                goal: { type: "string", description: "New sprint goal" },
+                status: {
+                    type: "string",
+                    enum: ["planned", "active", "completed", "cancelled"],
+                },
+                start_date: { type: "string", description: "New start date" },
+                end_date: { type: "string", description: "New end date" },
+                velocity: { type: "number", description: "Actual velocity (for retrospective)" },
+            },
+            required: ["sprint_id"],
+        },
+    },
+    {
+        name: "delete_sprint",
+        description: "Delete a sprint. Tasks will have their sprint_id set to NULL.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                sprint_id: { type: "number", description: "Sprint ID to delete" },
+            },
+            required: ["sprint_id"],
+        },
+    },
     // Memory Tools
     {
         name: "memory_create",
@@ -763,7 +838,7 @@ exports.toolDefinitions = [
 // ============================================================================
 // Resource Definitions
 // ============================================================================
-exports.resourceDefinitions = [
+export const resourceDefinitions = [
     {
         uri: "solaria://dashboard/overview",
         name: "Dashboard Overview",
@@ -792,61 +867,42 @@ exports.resourceDefinitions = [
 // ============================================================================
 // API Client Factory
 // ============================================================================
-function createApiClient(dashboardUrl, credentials) {
-    var authToken = null;
-    var user = credentials.user, password = credentials.password;
-    function authenticate() {
-        return __awaiter(this, void 0, void 0, function () {
-            var response, data;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, fetch("".concat(dashboardUrl, "/auth/login"), {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ userId: user, password: password }),
-                        })];
-                    case 1:
-                        response = _a.sent();
-                        if (!response.ok) {
-                            throw new Error("Authentication failed");
-                        }
-                        return [4 /*yield*/, response.json()];
-                    case 2:
-                        data = _a.sent();
-                        authToken = data.token;
-                        return [2 /*return*/, data];
-                }
-            });
+export function createApiClient(dashboardUrl, credentials) {
+    let authToken = null;
+    const { user, password } = credentials;
+    async function authenticate() {
+        const response = await fetch(`${dashboardUrl}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: user, password }),
         });
+        if (!response.ok) {
+            throw new Error("Authentication failed");
+        }
+        const data = await response.json();
+        authToken = data.token;
+        return data;
     }
-    function apiCall(endpoint_1) {
-        return __awaiter(this, arguments, void 0, function (endpoint, options) {
-            var response;
-            if (options === void 0) { options = {}; }
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        if (!!authToken) return [3 /*break*/, 2];
-                        return [4 /*yield*/, authenticate()];
-                    case 1:
-                        _a.sent();
-                        _a.label = 2;
-                    case 2: return [4 /*yield*/, fetch("".concat(dashboardUrl).concat(endpoint), __assign(__assign({}, options), { headers: __assign({ "Content-Type": "application/json", Authorization: "Bearer ".concat(authToken) }, options.headers) }))];
-                    case 3:
-                        response = _a.sent();
-                        if (!(response.status === 401)) return [3 /*break*/, 5];
-                        // Token expired, re-authenticate
-                        return [4 /*yield*/, authenticate()];
-                    case 4:
-                        // Token expired, re-authenticate
-                        _a.sent();
-                        return [2 /*return*/, apiCall(endpoint, options)];
-                    case 5: return [2 /*return*/, response.json()];
-                }
-            });
+    async function apiCall(endpoint, options = {}) {
+        if (!authToken) {
+            await authenticate();
+        }
+        const response = await fetch(`${dashboardUrl}${endpoint}`, {
+            ...options,
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+                ...options.headers,
+            },
         });
+        if (response.status === 401) {
+            // Token expired, re-authenticate
+            await authenticate();
+            return apiCall(endpoint, options);
+        }
+        return response.json();
     }
-    return { apiCall: apiCall, authenticate: authenticate };
+    return { apiCall, authenticate };
 }
 // ============================================================================
 // Tool Execution with Project Isolation
@@ -862,773 +918,726 @@ function createApiClient(dashboardUrl, credentials) {
  * - create_task → Forces project_id from context
  * - Admin mode (context.adminMode=true) bypasses isolation
  */
-function executeTool(name_1, args_1, apiCall_1) {
-    return __awaiter(this, arguments, void 0, function (name, args, apiCall, context) {
-        // Helper to validate task belongs to context project
-        function validateTaskProject(taskId) {
-            return __awaiter(this, void 0, void 0, function () {
-                var task;
-                return __generator(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            if (!isIsolated)
-                                return [2 /*return*/, true];
-                            return [4 /*yield*/, apiCall("/tasks/".concat(taskId))];
-                        case 1:
-                            task = _a.sent();
-                            if (task.project_id !== context.project_id) {
-                                throw new Error("ACCESS DENIED: Task #".concat(taskId, " does not belong to your project"));
-                            }
-                            return [2 /*return*/, true];
-                    }
-                });
+export async function executeTool(name, args, apiCall, context = {}) {
+    // Determine if strict project isolation is active
+    const isIsolated = Boolean(context.project_id && !context.adminMode);
+    const projectId = context.project_id || args?.project_id;
+    // Helper to validate task belongs to context project
+    async function validateTaskProject(taskId) {
+        if (!isIsolated)
+            return true;
+        const task = await apiCall(`/tasks/${taskId}`);
+        if (task.project_id !== context.project_id) {
+            throw new Error(`ACCESS DENIED: Task #${taskId} does not belong to your project`);
+        }
+        return true;
+    }
+    switch (name) {
+        // Session Context Management
+        case "set_project_context": {
+            const params = args;
+            let targetProject = null;
+            if (params.project_id) {
+                targetProject = await apiCall(`/projects/${params.project_id}`);
+            }
+            else if (params.project_name) {
+                const allProjects = await apiCall("/projects");
+                const projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
+                // Try exact match first
+                targetProject = projects.find(p => p.name.toLowerCase() === params.project_name.toLowerCase()) || null;
+                // Try partial match
+                if (!targetProject) {
+                    targetProject = projects.find(p => p.name.toLowerCase().includes(params.project_name.toLowerCase()) ||
+                        params.project_name.toLowerCase().includes(p.name.toLowerCase())) || null;
+                }
+            }
+            else if (params.working_directory) {
+                const dirName = params.working_directory.split('/').pop()?.toLowerCase() || '';
+                const allProjects = await apiCall("/projects");
+                const projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
+                targetProject = projects.find(p => p.name.toLowerCase().includes(dirName) ||
+                    dirName.includes(p.name.toLowerCase().replace(/\s+/g, '-'))) || null;
+            }
+            if (!targetProject) {
+                const allProjects = await apiCall("/projects");
+                const projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
+                return {
+                    success: false,
+                    error: "Project not found",
+                    available_projects: projects.map(p => ({ id: p.id, name: p.name })),
+                    hint: "Use set_project_context with project_id or exact project_name",
+                };
+            }
+            const result = {
+                __action: "SET_PROJECT_CONTEXT",
+                success: true,
+                project_id: targetProject.id,
+                project_name: targetProject.name,
+                message: `Context set to project: ${targetProject.name} (ID: ${targetProject.id}). All subsequent operations will be isolated to this project.`,
+            };
+            return result;
+        }
+        case "get_current_context":
+            return {
+                project_id: context.project_id,
+                isolation_enabled: isIsolated,
+                admin_mode: context.adminMode || false,
+                message: isIsolated
+                    ? `You are working in project #${context.project_id}. All operations are isolated to this project.`
+                    : "No project context set. You have access to all projects. Call set_project_context to isolate to a specific project.",
+            };
+        // Dashboard
+        case "get_dashboard_overview":
+            if (isIsolated) {
+                const [project, allTasks] = await Promise.all([
+                    apiCall(`/projects/${context.project_id}`),
+                    apiCall(`/tasks?project_id=${context.project_id}`),
+                ]);
+                const tasks = allTasks || [];
+                return {
+                    project,
+                    metrics: {
+                        total_tasks: tasks.length,
+                        completed: tasks.filter(t => t.status === "completed").length,
+                        in_progress: tasks.filter(t => t.status === "in_progress").length,
+                        pending: tasks.filter(t => t.status === "pending").length,
+                        blocked: tasks.filter(t => t.status === "blocked").length,
+                    },
+                    isolation_mode: true,
+                    project_id: context.project_id,
+                };
+            }
+            return apiCall("/dashboard/overview");
+        case "get_dashboard_alerts": {
+            const params = args;
+            if (isIsolated) {
+                const alerts = await apiCall(`/dashboard/alerts${params?.severity ? `?severity=${params.severity}` : ""}`);
+                return (alerts || []).filter(a => !a.project_id || a.project_id === context.project_id);
+            }
+            return apiCall(`/dashboard/alerts${params?.severity ? `?severity=${params.severity}` : ""}`);
+        }
+        // Projects
+        case "list_projects":
+            if (isIsolated) {
+                const project = await apiCall(`/projects/${context.project_id}`);
+                return [project];
+            }
+            return apiCall("/projects");
+        case "get_project": {
+            const params = args;
+            if (!params?.project_id && !projectId) {
+                throw new Error("project_id is required");
+            }
+            const requestedProjectId = params?.project_id || projectId;
+            if (isIsolated && requestedProjectId !== context.project_id) {
+                throw new Error(`ACCESS DENIED: Cannot access project #${requestedProjectId}. You are isolated to project #${context.project_id}`);
+            }
+            return apiCall(`/projects/${requestedProjectId}`);
+        }
+        case "create_project": {
+            const params = args;
+            const projectPayload = {
+                name: params.name,
+                client: params.client || "External Client",
+                description: params.description || "",
+                budget: params.budget || 0,
+                deadline: params.deadline,
+                status: "planning",
+                priority: params.priority || "medium",
+            };
+            if (isIsolated) {
+                console.log(`[PROJECT] Creating new project "${params.name}" from isolated session (project #${context.project_id})`);
+            }
+            return apiCall("/projects", {
+                method: "POST",
+                body: JSON.stringify(projectPayload),
             });
         }
-        var isIsolated, projectId, _a, params_1, targetProject, allProjects, projects, dirName_1, allProjects, projects, allProjects, projects, result, _b, project, allTasks, tasks, params, alerts, project, params, requestedProjectId, params, projectPayload, params, params, endpoint, queryParams, params, params, params, params, params, params, result, items, params, result, params, result, params, task_id, item_id, updateData, result, params, result, params_2, agents, params, params_3, tasks, params, params, limit, level, project, params, allDocs, params, clientProjectId, params, updateClientProjectId, params, docsProjectId, params, newDocProjectId, params, reqsProjectId, reqsUrl, reqsParams, params, newReqProjectId, params, updateReqProjectId, params, params, memParams, memEndpoint, params, params, updatePayload, params, params, searchParams, statsParams, params, boostAmount, params, relParams, params, params, searchParams;
-        var _c;
-        if (context === void 0) { context = {}; }
-        return __generator(this, function (_d) {
-            switch (_d.label) {
-                case 0:
-                    isIsolated = Boolean(context.project_id && !context.adminMode);
-                    projectId = context.project_id || (args === null || args === void 0 ? void 0 : args.project_id);
-                    _a = name;
-                    switch (_a) {
-                        case "set_project_context": return [3 /*break*/, 1];
-                        case "get_current_context": return [3 /*break*/, 10];
-                        case "get_dashboard_overview": return [3 /*break*/, 11];
-                        case "get_dashboard_alerts": return [3 /*break*/, 14];
-                        case "list_projects": return [3 /*break*/, 17];
-                        case "get_project": return [3 /*break*/, 20];
-                        case "create_project": return [3 /*break*/, 21];
-                        case "update_project": return [3 /*break*/, 22];
-                        case "list_tasks": return [3 /*break*/, 23];
-                        case "get_task": return [3 /*break*/, 24];
-                        case "create_task": return [3 /*break*/, 26];
-                        case "update_task": return [3 /*break*/, 27];
-                        case "complete_task": return [3 /*break*/, 29];
-                        case "delete_task": return [3 /*break*/, 31];
-                        case "list_task_items": return [3 /*break*/, 33];
-                        case "create_task_items": return [3 /*break*/, 36];
-                        case "complete_task_item": return [3 /*break*/, 39];
-                        case "update_task_item": return [3 /*break*/, 42];
-                        case "delete_task_item": return [3 /*break*/, 45];
-                        case "list_agents": return [3 /*break*/, 48];
-                        case "get_agent": return [3 /*break*/, 50];
-                        case "get_agent_tasks": return [3 /*break*/, 51];
-                        case "update_agent_status": return [3 /*break*/, 53];
-                        case "get_activity_logs": return [3 /*break*/, 54];
-                        case "log_activity": return [3 /*break*/, 55];
-                        case "list_docs": return [3 /*break*/, 56];
-                        case "get_project_client": return [3 /*break*/, 59];
-                        case "update_project_client": return [3 /*break*/, 60];
-                        case "get_project_documents": return [3 /*break*/, 61];
-                        case "create_project_document": return [3 /*break*/, 62];
-                        case "get_project_requests": return [3 /*break*/, 63];
-                        case "create_project_request": return [3 /*break*/, 64];
-                        case "update_project_request": return [3 /*break*/, 65];
-                        case "memory_create": return [3 /*break*/, 66];
-                        case "memory_list": return [3 /*break*/, 67];
-                        case "memory_get": return [3 /*break*/, 68];
-                        case "memory_update": return [3 /*break*/, 69];
-                        case "memory_delete": return [3 /*break*/, 70];
-                        case "memory_search": return [3 /*break*/, 71];
-                        case "memory_tags": return [3 /*break*/, 72];
-                        case "memory_stats": return [3 /*break*/, 73];
-                        case "memory_boost": return [3 /*break*/, 74];
-                        case "memory_related": return [3 /*break*/, 75];
-                        case "memory_link": return [3 /*break*/, 76];
-                        case "memory_semantic_search": return [3 /*break*/, 77];
-                    }
-                    return [3 /*break*/, 78];
-                case 1:
-                    params_1 = args;
-                    targetProject = null;
-                    if (!params_1.project_id) return [3 /*break*/, 3];
-                    return [4 /*yield*/, apiCall("/projects/".concat(params_1.project_id))];
-                case 2:
-                    targetProject = (_d.sent());
-                    return [3 /*break*/, 7];
-                case 3:
-                    if (!params_1.project_name) return [3 /*break*/, 5];
-                    return [4 /*yield*/, apiCall("/projects")];
-                case 4:
-                    allProjects = _d.sent();
-                    projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
-                    // Try exact match first
-                    targetProject = projects.find(function (p) {
-                        return p.name.toLowerCase() === params_1.project_name.toLowerCase();
-                    }) || null;
-                    // Try partial match
-                    if (!targetProject) {
-                        targetProject = projects.find(function (p) {
-                            return p.name.toLowerCase().includes(params_1.project_name.toLowerCase()) ||
-                                params_1.project_name.toLowerCase().includes(p.name.toLowerCase());
-                        }) || null;
-                    }
-                    return [3 /*break*/, 7];
-                case 5:
-                    if (!params_1.working_directory) return [3 /*break*/, 7];
-                    dirName_1 = ((_c = params_1.working_directory.split('/').pop()) === null || _c === void 0 ? void 0 : _c.toLowerCase()) || '';
-                    return [4 /*yield*/, apiCall("/projects")];
-                case 6:
-                    allProjects = _d.sent();
-                    projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
-                    targetProject = projects.find(function (p) {
-                        return p.name.toLowerCase().includes(dirName_1) ||
-                            dirName_1.includes(p.name.toLowerCase().replace(/\s+/g, '-'));
-                    }) || null;
-                    _d.label = 7;
-                case 7:
-                    if (!!targetProject) return [3 /*break*/, 9];
-                    return [4 /*yield*/, apiCall("/projects")];
-                case 8:
-                    allProjects = _d.sent();
-                    projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
-                    return [2 /*return*/, {
-                            success: false,
-                            error: "Project not found",
-                            available_projects: projects.map(function (p) { return ({ id: p.id, name: p.name }); }),
-                            hint: "Use set_project_context with project_id or exact project_name",
-                        }];
-                case 9:
-                    result = {
-                        __action: "SET_PROJECT_CONTEXT",
-                        success: true,
-                        project_id: targetProject.id,
-                        project_name: targetProject.name,
-                        message: "Context set to project: ".concat(targetProject.name, " (ID: ").concat(targetProject.id, "). All subsequent operations will be isolated to this project."),
-                    };
-                    return [2 /*return*/, result];
-                case 10: return [2 /*return*/, {
-                        project_id: context.project_id,
-                        isolation_enabled: isIsolated,
-                        admin_mode: context.adminMode || false,
-                        message: isIsolated
-                            ? "You are working in project #".concat(context.project_id, ". All operations are isolated to this project.")
-                            : "No project context set. You have access to all projects. Call set_project_context to isolate to a specific project.",
-                    }];
-                case 11:
-                    if (!isIsolated) return [3 /*break*/, 13];
-                    return [4 /*yield*/, Promise.all([
-                            apiCall("/projects/".concat(context.project_id)),
-                            apiCall("/tasks?project_id=".concat(context.project_id)),
-                        ])];
-                case 12:
-                    _b = _d.sent(), project = _b[0], allTasks = _b[1];
-                    tasks = allTasks || [];
-                    return [2 /*return*/, {
-                            project: project,
-                            metrics: {
-                                total_tasks: tasks.length,
-                                completed: tasks.filter(function (t) { return t.status === "completed"; }).length,
-                                in_progress: tasks.filter(function (t) { return t.status === "in_progress"; }).length,
-                                pending: tasks.filter(function (t) { return t.status === "pending"; }).length,
-                                blocked: tasks.filter(function (t) { return t.status === "blocked"; }).length,
-                            },
-                            isolation_mode: true,
-                            project_id: context.project_id,
-                        }];
-                case 13: return [2 /*return*/, apiCall("/dashboard/overview")];
-                case 14:
-                    params = args;
-                    if (!isIsolated) return [3 /*break*/, 16];
-                    return [4 /*yield*/, apiCall("/dashboard/alerts".concat((params === null || params === void 0 ? void 0 : params.severity) ? "?severity=".concat(params.severity) : ""))];
-                case 15:
-                    alerts = _d.sent();
-                    return [2 /*return*/, (alerts || []).filter(function (a) { return !a.project_id || a.project_id === context.project_id; })];
-                case 16: return [2 /*return*/, apiCall("/dashboard/alerts".concat((params === null || params === void 0 ? void 0 : params.severity) ? "?severity=".concat(params.severity) : ""))];
-                case 17:
-                    if (!isIsolated) return [3 /*break*/, 19];
-                    return [4 /*yield*/, apiCall("/projects/".concat(context.project_id))];
-                case 18:
-                    project = _d.sent();
-                    return [2 /*return*/, [project]];
-                case 19: return [2 /*return*/, apiCall("/projects")];
-                case 20:
-                    {
-                        params = args;
-                        if (!(params === null || params === void 0 ? void 0 : params.project_id) && !projectId) {
-                            throw new Error("project_id is required");
-                        }
-                        requestedProjectId = (params === null || params === void 0 ? void 0 : params.project_id) || projectId;
-                        if (isIsolated && requestedProjectId !== context.project_id) {
-                            throw new Error("ACCESS DENIED: Cannot access project #".concat(requestedProjectId, ". You are isolated to project #").concat(context.project_id));
-                        }
-                        return [2 /*return*/, apiCall("/projects/".concat(requestedProjectId))];
-                    }
-                    _d.label = 21;
-                case 21:
-                    {
-                        params = args;
-                        projectPayload = {
-                            name: params.name,
-                            client: params.client || "External Client",
-                            description: params.description || "",
-                            budget: params.budget || 0,
-                            deadline: params.deadline,
-                            status: "planning",
-                            priority: params.priority || "medium",
-                        };
-                        if (isIsolated) {
-                            console.log("[PROJECT] Creating new project \"".concat(params.name, "\" from isolated session (project #").concat(context.project_id, ")"));
-                        }
-                        return [2 /*return*/, apiCall("/projects", {
-                                method: "POST",
-                                body: JSON.stringify(projectPayload),
-                            })];
-                    }
-                    _d.label = 22;
-                case 22:
-                    {
-                        params = args;
-                        if (isIsolated && params.project_id !== context.project_id) {
-                            console.log("[PROJECT] Updating project #".concat(params.project_id, " from isolated session (project #").concat(context.project_id, ")"));
-                        }
-                        return [2 /*return*/, apiCall("/projects/".concat(params.project_id), {
-                                method: "PUT",
-                                body: JSON.stringify(params),
-                            })];
-                    }
-                    _d.label = 23;
-                case 23:
-                    {
-                        params = args;
-                        endpoint = "/tasks";
-                        queryParams = [];
-                        if (isIsolated) {
-                            queryParams.push("project_id=".concat(context.project_id));
-                            if ((params === null || params === void 0 ? void 0 : params.project_id) && params.project_id !== context.project_id) {
-                                console.warn("[ISOLATION] Blocked attempt to list tasks from project #".concat(params.project_id));
-                            }
-                        }
-                        else if ((params === null || params === void 0 ? void 0 : params.project_id) || projectId) {
-                            queryParams.push("project_id=".concat((params === null || params === void 0 ? void 0 : params.project_id) || projectId));
-                        }
-                        if (params === null || params === void 0 ? void 0 : params.status)
-                            queryParams.push("status=".concat(params.status));
-                        if (params === null || params === void 0 ? void 0 : params.priority)
-                            queryParams.push("priority=".concat(params.priority));
-                        if (params === null || params === void 0 ? void 0 : params.agent_id)
-                            queryParams.push("agent_id=".concat(params.agent_id));
-                        if (queryParams.length)
-                            endpoint += "?".concat(queryParams.join("&"));
-                        return [2 /*return*/, apiCall(endpoint)];
-                    }
-                    _d.label = 24;
-                case 24:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 25:
-                    _d.sent();
-                    return [2 /*return*/, apiCall("/tasks/".concat(params.task_id))];
-                case 26:
-                    {
-                        params = args;
-                        if (isIsolated) {
-                            if (params.project_id && params.project_id !== context.project_id) {
-                                throw new Error("ACCESS DENIED: Cannot create tasks in project #".concat(params.project_id, ". You are isolated to project #").concat(context.project_id));
-                            }
-                            return [2 /*return*/, apiCall("/tasks", {
-                                    method: "POST",
-                                    body: JSON.stringify(__assign(__assign({}, params), { project_id: context.project_id, status: params.status || "pending", priority: params.priority || "medium" })),
-                                })];
-                        }
-                        if (!params.project_id && !projectId) {
-                            throw new Error("project_id is required for creating tasks");
-                        }
-                        return [2 /*return*/, apiCall("/tasks", {
-                                method: "POST",
-                                body: JSON.stringify(__assign(__assign({}, params), { project_id: params.project_id || projectId, status: params.status || "pending", priority: params.priority || "medium" })),
-                            })];
-                    }
-                    _d.label = 27;
-                case 27:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 28:
-                    _d.sent();
-                    return [2 /*return*/, apiCall("/tasks/".concat(params.task_id), {
-                            method: "PUT",
-                            body: JSON.stringify(params),
-                        })];
-                case 29:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 30:
-                    _d.sent();
-                    return [2 /*return*/, apiCall("/tasks/".concat(params.task_id), {
-                            method: "PUT",
-                            body: JSON.stringify({
-                                status: "completed",
-                                progress: 100,
-                                completion_notes: params.completion_notes,
-                            }),
-                        })];
-                case 31:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 32:
-                    _d.sent();
-                    return [2 /*return*/, apiCall("/tasks/".concat(params.task_id), {
-                            method: "DELETE",
-                        })];
-                case 33:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 34:
-                    _d.sent();
-                    return [4 /*yield*/, apiCall("/tasks/".concat(params.task_id, "/items"))];
-                case 35:
-                    result = _d.sent();
-                    items = result.items;
-                    if (params.include_completed === false) {
-                        items = items.filter(function (i) { return !i.is_completed; });
-                    }
-                    return [2 /*return*/, {
-                            task_id: params.task_id,
-                            items: items,
-                            summary: {
-                                total: result.items.length,
-                                completed: result.items.filter(function (i) { return i.is_completed; }).length,
-                                pending: result.items.filter(function (i) { return !i.is_completed; }).length,
-                            },
-                        }];
-                case 36:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 37:
-                    _d.sent();
-                    return [4 /*yield*/, apiCall("/tasks/".concat(params.task_id, "/items"), {
-                            method: "POST",
-                            body: JSON.stringify({ items: params.items }),
-                        })];
-                case 38:
-                    result = _d.sent();
-                    return [2 /*return*/, {
-                            success: true,
-                            task_id: params.task_id,
-                            items_created: result.items.length,
-                            items: result.items,
-                            task_progress: result.progress,
-                            message: "Created ".concat(result.items.length, " checklist items. Task progress: ").concat(result.progress, "%"),
-                        }];
-                case 39:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 40:
-                    _d.sent();
-                    return [4 /*yield*/, apiCall("/tasks/".concat(params.task_id, "/items/").concat(params.item_id, "/complete"), {
-                            method: "PUT",
-                            body: JSON.stringify({
-                                notes: params.notes,
-                                actual_minutes: params.actual_minutes,
-                            }),
-                        })];
-                case 41:
-                    result = _d.sent();
-                    return [2 /*return*/, {
-                            success: true,
-                            item: result.item,
-                            task_progress: result.progress,
-                            items_completed: result.completed,
-                            items_total: result.total,
-                            message: "Item completed. Task progress: ".concat(result.completed, "/").concat(result.total, " (").concat(result.progress, "%)"),
-                        }];
-                case 42:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 43:
-                    _d.sent();
-                    task_id = params.task_id, item_id = params.item_id, updateData = __rest(params, ["task_id", "item_id"]);
-                    return [4 /*yield*/, apiCall("/tasks/".concat(task_id, "/items/").concat(item_id), {
-                            method: "PUT",
-                            body: JSON.stringify(updateData),
-                        })];
-                case 44:
-                    result = _d.sent();
-                    return [2 /*return*/, {
-                            success: true,
-                            item: result.item,
-                            task_progress: result.progress,
-                        }];
-                case 45:
-                    params = args;
-                    return [4 /*yield*/, validateTaskProject(params.task_id)];
-                case 46:
-                    _d.sent();
-                    return [4 /*yield*/, apiCall("/tasks/".concat(params.task_id, "/items/").concat(params.item_id), {
-                            method: "DELETE",
-                        })];
-                case 47:
-                    result = _d.sent();
-                    return [2 /*return*/, {
-                            success: true,
-                            deleted_item_id: params.item_id,
-                            task_progress: result.progress,
-                            message: "Item deleted. Task progress recalculated: ".concat(result.progress, "%"),
-                        }];
-                case 48:
-                    params_2 = args;
-                    return [4 /*yield*/, apiCall("/agents")];
-                case 49:
-                    agents = _d.sent();
-                    if (params_2 === null || params_2 === void 0 ? void 0 : params_2.status) {
-                        agents = agents.filter(function (a) { return a.status === params_2.status; });
-                    }
-                    if (params_2 === null || params_2 === void 0 ? void 0 : params_2.role) {
-                        agents = agents.filter(function (a) { return a.role === params_2.role; });
-                    }
-                    return [2 /*return*/, agents];
-                case 50:
-                    {
-                        params = args;
-                        return [2 /*return*/, apiCall("/agents/".concat(params.agent_id))];
-                    }
-                    _d.label = 51;
-                case 51:
-                    params_3 = args;
-                    return [4 /*yield*/, apiCall("/tasks")];
-                case 52:
-                    tasks = _d.sent();
-                    return [2 /*return*/, tasks.filter(function (t) { return t.assigned_agent_id === params_3.agent_id; })];
-                case 53:
-                    {
-                        params = args;
-                        return [2 /*return*/, apiCall("/agents/".concat(params.agent_id, "/status"), {
-                                method: "PUT",
-                                body: JSON.stringify({ status: params.status }),
-                            })];
-                    }
-                    _d.label = 54;
-                case 54:
-                    {
-                        params = args;
-                        limit = (params === null || params === void 0 ? void 0 : params.limit) || 50;
-                        level = (params === null || params === void 0 ? void 0 : params.level) ? "&level=".concat(params.level) : "";
-                        project = isIsolated
-                            ? "&project_id=".concat(context.project_id)
-                            : (params === null || params === void 0 ? void 0 : params.project_id) ? "&project_id=".concat(params.project_id) : "";
-                        return [2 /*return*/, apiCall("/logs?limit=".concat(limit).concat(level).concat(project))];
-                    }
-                    _d.label = 55;
-                case 55:
-                    {
-                        params = args;
-                        return [2 /*return*/, apiCall("/logs", {
-                                method: "POST",
-                                body: JSON.stringify(__assign(__assign({}, params), { project_id: isIsolated ? context.project_id : (params.project_id || projectId) })),
-                            })];
-                    }
-                    _d.label = 56;
-                case 56:
-                    if (!isIsolated) return [3 /*break*/, 58];
-                    return [4 /*yield*/, apiCall("/docs/list")];
-                case 57:
-                    allDocs = _d.sent();
-                    return [2 /*return*/, (allDocs || []).filter(function (d) { return d.project_id === context.project_id; })];
-                case 58: return [2 /*return*/, apiCall("/docs/list")];
-                case 59:
-                    {
-                        params = args;
-                        clientProjectId = isIsolated ? context.project_id : params.project_id;
-                        if (!clientProjectId)
-                            return [2 /*return*/, { error: "project_id required" }];
-                        return [2 /*return*/, apiCall("/projects/".concat(clientProjectId, "/client"))];
-                    }
-                    _d.label = 60;
-                case 60:
-                    {
-                        params = args;
-                        updateClientProjectId = isIsolated ? context.project_id : params.project_id;
-                        if (!updateClientProjectId)
-                            return [2 /*return*/, { error: "project_id required" }];
-                        if (!params.name)
-                            return [2 /*return*/, { error: "name required" }];
-                        return [2 /*return*/, apiCall("/projects/".concat(updateClientProjectId, "/client"), {
-                                method: "PUT",
-                                body: JSON.stringify({
-                                    name: params.name,
-                                    fiscal_name: params.fiscal_name,
-                                    rfc: params.rfc,
-                                    website: params.website,
-                                    address: params.address,
-                                    contact_name: params.contact_name,
-                                    contact_email: params.contact_email,
-                                    contact_phone: params.contact_phone,
-                                }),
-                            })];
-                    }
-                    _d.label = 61;
-                case 61:
-                    {
-                        params = args;
-                        docsProjectId = isIsolated ? context.project_id : params.project_id;
-                        if (!docsProjectId)
-                            return [2 /*return*/, { error: "project_id required" }];
-                        return [2 /*return*/, apiCall("/projects/".concat(docsProjectId, "/documents"))];
-                    }
-                    _d.label = 62;
-                case 62:
-                    {
-                        params = args;
-                        newDocProjectId = isIsolated ? context.project_id : params.project_id;
-                        if (!newDocProjectId)
-                            return [2 /*return*/, { error: "project_id required" }];
-                        if (!params.name || !params.url)
-                            return [2 /*return*/, { error: "name and url required" }];
-                        return [2 /*return*/, apiCall("/projects/".concat(newDocProjectId, "/documents"), {
-                                method: "POST",
-                                body: JSON.stringify({
-                                    name: params.name,
-                                    type: params.type || "other",
-                                    url: params.url,
-                                    description: params.description,
-                                }),
-                            })];
-                    }
-                    _d.label = 63;
-                case 63:
-                    {
-                        params = args;
-                        reqsProjectId = isIsolated ? context.project_id : params.project_id;
-                        if (!reqsProjectId)
-                            return [2 /*return*/, { error: "project_id required" }];
-                        reqsUrl = "/projects/".concat(reqsProjectId, "/requests");
-                        reqsParams = [];
-                        if (params.status)
-                            reqsParams.push("status=".concat(params.status));
-                        if (params.priority)
-                            reqsParams.push("priority=".concat(params.priority));
-                        if (reqsParams.length > 0)
-                            reqsUrl += "?".concat(reqsParams.join("&"));
-                        return [2 /*return*/, apiCall(reqsUrl)];
-                    }
-                    _d.label = 64;
-                case 64:
-                    {
-                        params = args;
-                        newReqProjectId = isIsolated ? context.project_id : params.project_id;
-                        if (!newReqProjectId)
-                            return [2 /*return*/, { error: "project_id required" }];
-                        if (!params.text)
-                            return [2 /*return*/, { error: "text required" }];
-                        return [2 /*return*/, apiCall("/projects/".concat(newReqProjectId, "/requests"), {
-                                method: "POST",
-                                body: JSON.stringify({
-                                    text: params.text,
-                                    priority: params.priority || "medium",
-                                    requested_by: params.requested_by,
-                                }),
-                            })];
-                    }
-                    _d.label = 65;
-                case 65:
-                    {
-                        params = args;
-                        updateReqProjectId = isIsolated ? context.project_id : params.project_id;
-                        if (!updateReqProjectId || !params.request_id)
-                            return [2 /*return*/, { error: "project_id and request_id required" }];
-                        return [2 /*return*/, apiCall("/projects/".concat(updateReqProjectId, "/requests/").concat(params.request_id), {
-                                method: "PUT",
-                                body: JSON.stringify({
-                                    status: params.status,
-                                    priority: params.priority,
-                                    notes: params.notes,
-                                }),
-                            })];
-                    }
-                    _d.label = 66;
-                case 66:
-                    {
-                        params = args;
-                        return [2 /*return*/, apiCall("/memories", {
-                                method: "POST",
-                                body: JSON.stringify({
-                                    content: params.content,
-                                    summary: params.summary || params.content.substring(0, 200),
-                                    tags: JSON.stringify(params.tags || []),
-                                    metadata: JSON.stringify(params.metadata || {}),
-                                    importance: params.importance || 0.5,
-                                    project_id: isIsolated ? context.project_id : (params.project_id || projectId),
-                                }),
-                            })];
-                    }
-                    _d.label = 67;
-                case 67:
-                    {
-                        params = args;
-                        memParams = [];
-                        if (isIsolated) {
-                            memParams.push("project_id=".concat(context.project_id));
-                        }
-                        if (params === null || params === void 0 ? void 0 : params.query)
-                            memParams.push("query=".concat(encodeURIComponent(params.query)));
-                        if (params === null || params === void 0 ? void 0 : params.tags)
-                            memParams.push("tags=".concat(encodeURIComponent(JSON.stringify(params.tags))));
-                        if (params === null || params === void 0 ? void 0 : params.limit)
-                            memParams.push("limit=".concat(params.limit));
-                        if (params === null || params === void 0 ? void 0 : params.offset)
-                            memParams.push("offset=".concat(params.offset));
-                        if (params === null || params === void 0 ? void 0 : params.sort_by)
-                            memParams.push("sort_by=".concat(params.sort_by));
-                        memEndpoint = "/memories".concat(memParams.length ? '?' + memParams.join('&') : '');
-                        return [2 /*return*/, apiCall(memEndpoint)];
-                    }
-                    _d.label = 68;
-                case 68:
-                    {
-                        params = args;
-                        return [2 /*return*/, apiCall("/memories/".concat(params.memory_id, "?track_access=true"))];
-                    }
-                    _d.label = 69;
-                case 69:
-                    {
-                        params = args;
-                        updatePayload = {};
-                        if (params.content !== undefined)
-                            updatePayload.content = params.content;
-                        if (params.summary !== undefined)
-                            updatePayload.summary = params.summary;
-                        if (params.tags !== undefined)
-                            updatePayload.tags = JSON.stringify(params.tags);
-                        if (params.metadata !== undefined)
-                            updatePayload.metadata = JSON.stringify(params.metadata);
-                        if (params.importance !== undefined)
-                            updatePayload.importance = params.importance;
-                        return [2 /*return*/, apiCall("/memories/".concat(params.memory_id), {
-                                method: "PUT",
-                                body: JSON.stringify(updatePayload),
-                            })];
-                    }
-                    _d.label = 70;
-                case 70:
-                    {
-                        params = args;
-                        return [2 /*return*/, apiCall("/memories/".concat(params.memory_id), { method: "DELETE" })];
-                    }
-                    _d.label = 71;
-                case 71:
-                    {
-                        params = args;
-                        searchParams = ["query=".concat(encodeURIComponent(params.query))];
-                        if (isIsolated)
-                            searchParams.push("project_id=".concat(context.project_id));
-                        if (params.tags)
-                            searchParams.push("tags=".concat(encodeURIComponent(JSON.stringify(params.tags))));
-                        if (params.min_importance)
-                            searchParams.push("min_importance=".concat(params.min_importance));
-                        if (params.limit)
-                            searchParams.push("limit=".concat(params.limit));
-                        return [2 /*return*/, apiCall("/memories/search?".concat(searchParams.join('&')))];
-                    }
-                    _d.label = 72;
-                case 72: return [2 /*return*/, apiCall("/memories/tags")];
-                case 73:
-                    {
-                        statsParams = isIsolated ? "?project_id=".concat(context.project_id) : '';
-                        return [2 /*return*/, apiCall("/memories/stats".concat(statsParams))];
-                    }
-                    _d.label = 74;
-                case 74:
-                    {
-                        params = args;
-                        boostAmount = Math.min(params.boost_amount || 0.1, 0.5);
-                        return [2 /*return*/, apiCall("/memories/".concat(params.memory_id, "/boost"), {
-                                method: "POST",
-                                body: JSON.stringify({ boost_amount: boostAmount }),
-                            })];
-                    }
-                    _d.label = 75;
-                case 75:
-                    {
-                        params = args;
-                        relParams = params.relationship_type ? "?type=".concat(params.relationship_type) : '';
-                        return [2 /*return*/, apiCall("/memories/".concat(params.memory_id, "/related").concat(relParams))];
-                    }
-                    _d.label = 76;
-                case 76:
-                    {
-                        params = args;
-                        return [2 /*return*/, apiCall("/memories/crossrefs", {
-                                method: "POST",
-                                body: JSON.stringify({
-                                    source_memory_id: params.source_id,
-                                    target_memory_id: params.target_id,
-                                    relationship_type: params.relationship_type || "related",
-                                }),
-                            })];
-                    }
-                    _d.label = 77;
-                case 77:
-                    {
-                        params = args;
-                        searchParams = ["query=".concat(encodeURIComponent(params.query))];
-                        if (isIsolated)
-                            searchParams.push("project_id=".concat(context.project_id));
-                        if (params.min_similarity !== undefined)
-                            searchParams.push("min_similarity=".concat(params.min_similarity));
-                        if (params.limit !== undefined)
-                            searchParams.push("limit=".concat(params.limit));
-                        if (params.include_fulltext !== undefined)
-                            searchParams.push("include_fulltext=".concat(params.include_fulltext));
-                        return [2 /*return*/, apiCall("/memories/semantic-search?".concat(searchParams.join('&')))];
-                    }
-                    _d.label = 78;
-                case 78: throw new Error("Unknown tool: ".concat(name));
+        case "update_project": {
+            const params = args;
+            if (isIsolated && params.project_id !== context.project_id) {
+                console.log(`[PROJECT] Updating project #${params.project_id} from isolated session (project #${context.project_id})`);
             }
-        });
-    });
+            return apiCall(`/projects/${params.project_id}`, {
+                method: "PUT",
+                body: JSON.stringify(params),
+            });
+        }
+        // Tasks
+        case "list_tasks": {
+            const params = args;
+            let endpoint = "/tasks";
+            const queryParams = [];
+            if (isIsolated) {
+                queryParams.push(`project_id=${context.project_id}`);
+                if (params?.project_id && params.project_id !== context.project_id) {
+                    console.warn(`[ISOLATION] Blocked attempt to list tasks from project #${params.project_id}`);
+                }
+            }
+            else if (params?.project_id || projectId) {
+                queryParams.push(`project_id=${params?.project_id || projectId}`);
+            }
+            if (params?.status)
+                queryParams.push(`status=${params.status}`);
+            if (params?.priority)
+                queryParams.push(`priority=${params.priority}`);
+            if (params?.agent_id)
+                queryParams.push(`agent_id=${params.agent_id}`);
+            if (queryParams.length)
+                endpoint += `?${queryParams.join("&")}`;
+            return apiCall(endpoint);
+        }
+        case "get_task": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            return apiCall(`/tasks/${params.task_id}`);
+        }
+        case "create_task": {
+            const params = args;
+            if (isIsolated) {
+                if (params.project_id && params.project_id !== context.project_id) {
+                    throw new Error(`ACCESS DENIED: Cannot create tasks in project #${params.project_id}. You are isolated to project #${context.project_id}`);
+                }
+                return apiCall("/tasks", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        ...params,
+                        project_id: context.project_id,
+                        status: params.status || "pending",
+                        priority: params.priority || "medium",
+                    }),
+                });
+            }
+            if (!params.project_id && !projectId) {
+                throw new Error("project_id is required for creating tasks");
+            }
+            return apiCall("/tasks", {
+                method: "POST",
+                body: JSON.stringify({
+                    ...params,
+                    project_id: params.project_id || projectId,
+                    status: params.status || "pending",
+                    priority: params.priority || "medium",
+                }),
+            });
+        }
+        case "update_task": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            return apiCall(`/tasks/${params.task_id}`, {
+                method: "PUT",
+                body: JSON.stringify(params),
+            });
+        }
+        case "complete_task": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            return apiCall(`/tasks/${params.task_id}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    status: "completed",
+                    progress: 100,
+                    completion_notes: params.completion_notes,
+                }),
+            });
+        }
+        case "delete_task": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            return apiCall(`/tasks/${params.task_id}`, {
+                method: "DELETE",
+            });
+        }
+        // Task Items
+        case "list_task_items": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            const result = await apiCall(`/tasks/${params.task_id}/items`);
+            let items = result.items;
+            if (params.include_completed === false) {
+                items = items.filter(i => !i.is_completed);
+            }
+            return {
+                task_id: params.task_id,
+                items,
+                summary: {
+                    total: result.items.length,
+                    completed: result.items.filter(i => i.is_completed).length,
+                    pending: result.items.filter(i => !i.is_completed).length,
+                },
+            };
+        }
+        case "create_task_items": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            const result = await apiCall(`/tasks/${params.task_id}/items`, {
+                method: "POST",
+                body: JSON.stringify({ items: params.items }),
+            });
+            return {
+                success: true,
+                task_id: params.task_id,
+                items_created: result.items.length,
+                items: result.items,
+                task_progress: result.progress,
+                message: `Created ${result.items.length} checklist items. Task progress: ${result.progress}%`,
+            };
+        }
+        case "complete_task_item": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            const result = await apiCall(`/tasks/${params.task_id}/items/${params.item_id}/complete`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    notes: params.notes,
+                    actual_minutes: params.actual_minutes,
+                }),
+            });
+            return {
+                success: true,
+                item: result.item,
+                task_progress: result.progress,
+                items_completed: result.completed,
+                items_total: result.total,
+                message: `Item completed. Task progress: ${result.completed}/${result.total} (${result.progress}%)`,
+            };
+        }
+        case "update_task_item": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            const { task_id, item_id, ...updateData } = params;
+            const result = await apiCall(`/tasks/${task_id}/items/${item_id}`, {
+                method: "PUT",
+                body: JSON.stringify(updateData),
+            });
+            return {
+                success: true,
+                item: result.item,
+                task_progress: result.progress,
+            };
+        }
+        case "delete_task_item": {
+            const params = args;
+            await validateTaskProject(params.task_id);
+            const result = await apiCall(`/tasks/${params.task_id}/items/${params.item_id}`, {
+                method: "DELETE",
+            });
+            return {
+                success: true,
+                deleted_item_id: params.item_id,
+                task_progress: result.progress,
+                message: `Item deleted. Task progress recalculated: ${result.progress}%`,
+            };
+        }
+        // Agents
+        case "list_agents": {
+            const params = args;
+            let agents = await apiCall("/agents");
+            if (params?.status) {
+                agents = agents.filter(a => a.status === params.status);
+            }
+            if (params?.role) {
+                agents = agents.filter(a => a.role === params.role);
+            }
+            return agents;
+        }
+        case "get_agent": {
+            const params = args;
+            return apiCall(`/agents/${params.agent_id}`);
+        }
+        case "get_agent_tasks": {
+            const params = args;
+            const tasks = await apiCall("/tasks");
+            return tasks.filter(t => t.assigned_agent_id === params.agent_id);
+        }
+        case "update_agent_status": {
+            const params = args;
+            return apiCall(`/agents/${params.agent_id}/status`, {
+                method: "PUT",
+                body: JSON.stringify({ status: params.status }),
+            });
+        }
+        // Logs
+        case "get_activity_logs": {
+            const params = args;
+            const limit = params?.limit || 50;
+            const level = params?.level ? `&level=${params.level}` : "";
+            const project = isIsolated
+                ? `&project_id=${context.project_id}`
+                : params?.project_id ? `&project_id=${params.project_id}` : "";
+            return apiCall(`/logs?limit=${limit}${level}${project}`);
+        }
+        case "log_activity": {
+            const params = args;
+            return apiCall("/logs", {
+                method: "POST",
+                body: JSON.stringify({
+                    ...params,
+                    project_id: isIsolated ? context.project_id : (params.project_id || projectId),
+                }),
+            });
+        }
+        // Docs
+        case "list_docs": {
+            if (isIsolated) {
+                const allDocs = await apiCall("/docs/list");
+                return (allDocs || []).filter(d => d.project_id === context.project_id);
+            }
+            return apiCall("/docs/list");
+        }
+        // Project Extended Data
+        case "get_project_client": {
+            const params = args;
+            const clientProjectId = isIsolated ? context.project_id : params.project_id;
+            if (!clientProjectId)
+                return { error: "project_id required" };
+            return apiCall(`/projects/${clientProjectId}/client`);
+        }
+        case "update_project_client": {
+            const params = args;
+            const updateClientProjectId = isIsolated ? context.project_id : params.project_id;
+            if (!updateClientProjectId)
+                return { error: "project_id required" };
+            if (!params.name)
+                return { error: "name required" };
+            return apiCall(`/projects/${updateClientProjectId}/client`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    name: params.name,
+                    fiscal_name: params.fiscal_name,
+                    rfc: params.rfc,
+                    website: params.website,
+                    address: params.address,
+                    contact_name: params.contact_name,
+                    contact_email: params.contact_email,
+                    contact_phone: params.contact_phone,
+                }),
+            });
+        }
+        case "get_project_documents": {
+            const params = args;
+            const docsProjectId = isIsolated ? context.project_id : params.project_id;
+            if (!docsProjectId)
+                return { error: "project_id required" };
+            return apiCall(`/projects/${docsProjectId}/documents`);
+        }
+        case "create_project_document": {
+            const params = args;
+            const newDocProjectId = isIsolated ? context.project_id : params.project_id;
+            if (!newDocProjectId)
+                return { error: "project_id required" };
+            if (!params.name || !params.url)
+                return { error: "name and url required" };
+            return apiCall(`/projects/${newDocProjectId}/documents`, {
+                method: "POST",
+                body: JSON.stringify({
+                    name: params.name,
+                    type: params.type || "other",
+                    url: params.url,
+                    description: params.description,
+                }),
+            });
+        }
+        case "get_project_requests": {
+            const params = args;
+            const reqsProjectId = isIsolated ? context.project_id : params.project_id;
+            if (!reqsProjectId)
+                return { error: "project_id required" };
+            let reqsUrl = `/projects/${reqsProjectId}/requests`;
+            const reqsParams = [];
+            if (params.status)
+                reqsParams.push(`status=${params.status}`);
+            if (params.priority)
+                reqsParams.push(`priority=${params.priority}`);
+            if (reqsParams.length > 0)
+                reqsUrl += `?${reqsParams.join("&")}`;
+            return apiCall(reqsUrl);
+        }
+        case "create_project_request": {
+            const params = args;
+            const newReqProjectId = isIsolated ? context.project_id : params.project_id;
+            if (!newReqProjectId)
+                return { error: "project_id required" };
+            if (!params.text)
+                return { error: "text required" };
+            return apiCall(`/projects/${newReqProjectId}/requests`, {
+                method: "POST",
+                body: JSON.stringify({
+                    text: params.text,
+                    priority: params.priority || "medium",
+                    requested_by: params.requested_by,
+                }),
+            });
+        }
+        case "update_project_request": {
+            const params = args;
+            const updateReqProjectId = isIsolated ? context.project_id : params.project_id;
+            if (!updateReqProjectId || !params.request_id)
+                return { error: "project_id and request_id required" };
+            return apiCall(`/projects/${updateReqProjectId}/requests/${params.request_id}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    status: params.status,
+                    priority: params.priority,
+                    notes: params.notes,
+                }),
+            });
+        }
+        // Epic Tools
+        case "list_epics": {
+            const params = args;
+            const projectId = isIsolated ? context.project_id : params.project_id;
+            if (!projectId)
+                return { error: "project_id required" };
+            const queryParams = params.status ? `?status=${params.status}` : '';
+            return apiCall(`/projects/${projectId}/epics${queryParams}`);
+        }
+        case "create_epic": {
+            const params = args;
+            const projectId = isIsolated ? context.project_id : params.project_id;
+            if (!projectId)
+                return { error: "project_id required" };
+            if (!params.name)
+                return { error: "name required" };
+            return apiCall(`/projects/${projectId}/epics`, {
+                method: "POST",
+                body: JSON.stringify({
+                    name: params.name,
+                    description: params.description,
+                    color: params.color || '#6366f1',
+                    status: params.status || 'open',
+                    start_date: params.start_date,
+                    target_date: params.target_date,
+                }),
+            });
+        }
+        case "update_epic": {
+            const params = args;
+            if (!params.epic_id)
+                return { error: "epic_id required" };
+            return apiCall(`/epics/${params.epic_id}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    name: params.name,
+                    description: params.description,
+                    color: params.color,
+                    status: params.status,
+                    start_date: params.start_date,
+                    target_date: params.target_date,
+                }),
+            });
+        }
+        case "delete_epic": {
+            const params = args;
+            if (!params.epic_id)
+                return { error: "epic_id required" };
+            return apiCall(`/epics/${params.epic_id}`, { method: "DELETE" });
+        }
+        // Sprint Tools
+        case "list_sprints": {
+            const params = args;
+            const projectId = isIsolated ? context.project_id : params.project_id;
+            if (!projectId)
+                return { error: "project_id required" };
+            const queryParams = params.status ? `?status=${params.status}` : '';
+            return apiCall(`/projects/${projectId}/sprints${queryParams}`);
+        }
+        case "create_sprint": {
+            const params = args;
+            const projectId = isIsolated ? context.project_id : params.project_id;
+            if (!projectId)
+                return { error: "project_id required" };
+            if (!params.name)
+                return { error: "name required" };
+            return apiCall(`/projects/${projectId}/sprints`, {
+                method: "POST",
+                body: JSON.stringify({
+                    name: params.name,
+                    goal: params.goal,
+                    status: params.status || 'planned',
+                    start_date: params.start_date,
+                    end_date: params.end_date,
+                    velocity: params.velocity,
+                    capacity: params.capacity,
+                }),
+            });
+        }
+        case "update_sprint": {
+            const params = args;
+            if (!params.sprint_id)
+                return { error: "sprint_id required" };
+            return apiCall(`/sprints/${params.sprint_id}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    name: params.name,
+                    goal: params.goal,
+                    status: params.status,
+                    start_date: params.start_date,
+                    end_date: params.end_date,
+                    velocity: params.velocity,
+                }),
+            });
+        }
+        case "delete_sprint": {
+            const params = args;
+            if (!params.sprint_id)
+                return { error: "sprint_id required" };
+            return apiCall(`/sprints/${params.sprint_id}`, { method: "DELETE" });
+        }
+        // Memory Tools
+        case "memory_create": {
+            const params = args;
+            return apiCall("/memories", {
+                method: "POST",
+                body: JSON.stringify({
+                    content: params.content,
+                    summary: params.summary || params.content.substring(0, 200),
+                    tags: JSON.stringify(params.tags || []),
+                    metadata: JSON.stringify(params.metadata || {}),
+                    importance: params.importance || 0.5,
+                    project_id: isIsolated ? context.project_id : (params.project_id || projectId),
+                }),
+            });
+        }
+        case "memory_list": {
+            const params = args;
+            const memParams = [];
+            if (isIsolated) {
+                memParams.push(`project_id=${context.project_id}`);
+            }
+            if (params?.query)
+                memParams.push(`query=${encodeURIComponent(params.query)}`);
+            if (params?.tags)
+                memParams.push(`tags=${encodeURIComponent(JSON.stringify(params.tags))}`);
+            if (params?.limit)
+                memParams.push(`limit=${params.limit}`);
+            if (params?.offset)
+                memParams.push(`offset=${params.offset}`);
+            if (params?.sort_by)
+                memParams.push(`sort_by=${params.sort_by}`);
+            const memEndpoint = `/memories${memParams.length ? '?' + memParams.join('&') : ''}`;
+            return apiCall(memEndpoint);
+        }
+        case "memory_get": {
+            const params = args;
+            return apiCall(`/memories/${params.memory_id}?track_access=true`);
+        }
+        case "memory_update": {
+            const params = args;
+            const updatePayload = {};
+            if (params.content !== undefined)
+                updatePayload.content = params.content;
+            if (params.summary !== undefined)
+                updatePayload.summary = params.summary;
+            if (params.tags !== undefined)
+                updatePayload.tags = JSON.stringify(params.tags);
+            if (params.metadata !== undefined)
+                updatePayload.metadata = JSON.stringify(params.metadata);
+            if (params.importance !== undefined)
+                updatePayload.importance = params.importance;
+            return apiCall(`/memories/${params.memory_id}`, {
+                method: "PUT",
+                body: JSON.stringify(updatePayload),
+            });
+        }
+        case "memory_delete": {
+            const params = args;
+            return apiCall(`/memories/${params.memory_id}`, { method: "DELETE" });
+        }
+        case "memory_search": {
+            const params = args;
+            const searchParams = [`query=${encodeURIComponent(params.query)}`];
+            if (isIsolated)
+                searchParams.push(`project_id=${context.project_id}`);
+            if (params.tags)
+                searchParams.push(`tags=${encodeURIComponent(JSON.stringify(params.tags))}`);
+            if (params.min_importance)
+                searchParams.push(`min_importance=${params.min_importance}`);
+            if (params.limit)
+                searchParams.push(`limit=${params.limit}`);
+            return apiCall(`/memories/search?${searchParams.join('&')}`);
+        }
+        case "memory_tags":
+            return apiCall("/memories/tags");
+        case "memory_stats": {
+            const statsParams = isIsolated ? `?project_id=${context.project_id}` : '';
+            return apiCall(`/memories/stats${statsParams}`);
+        }
+        case "memory_boost": {
+            const params = args;
+            const boostAmount = Math.min(params.boost_amount || 0.1, 0.5);
+            return apiCall(`/memories/${params.memory_id}/boost`, {
+                method: "POST",
+                body: JSON.stringify({ boost_amount: boostAmount }),
+            });
+        }
+        case "memory_related": {
+            const params = args;
+            const relParams = params.relationship_type ? `?type=${params.relationship_type}` : '';
+            return apiCall(`/memories/${params.memory_id}/related${relParams}`);
+        }
+        case "memory_link": {
+            const params = args;
+            return apiCall("/memories/crossrefs", {
+                method: "POST",
+                body: JSON.stringify({
+                    source_memory_id: params.source_id,
+                    target_memory_id: params.target_id,
+                    relationship_type: params.relationship_type || "related",
+                }),
+            });
+        }
+        case "memory_semantic_search": {
+            const params = args;
+            const searchParams = [`query=${encodeURIComponent(params.query)}`];
+            if (isIsolated)
+                searchParams.push(`project_id=${context.project_id}`);
+            if (params.min_similarity !== undefined)
+                searchParams.push(`min_similarity=${params.min_similarity}`);
+            if (params.limit !== undefined)
+                searchParams.push(`limit=${params.limit}`);
+            if (params.include_fulltext !== undefined)
+                searchParams.push(`include_fulltext=${params.include_fulltext}`);
+            return apiCall(`/memories/semantic-search?${searchParams.join('&')}`);
+        }
+        default:
+            throw new Error(`Unknown tool: ${name}`);
+    }
 }
 // ============================================================================
 // Resource Reading with Project Isolation
 // ============================================================================
-function readResource(uri_1, apiCall_1) {
-    return __awaiter(this, arguments, void 0, function (uri, apiCall, context) {
-        var isIsolated, _a, _b, project, tasks, project;
-        if (context === void 0) { context = {}; }
-        return __generator(this, function (_c) {
-            switch (_c.label) {
-                case 0:
-                    isIsolated = Boolean(context.project_id && !context.adminMode);
-                    _a = uri;
-                    switch (_a) {
-                        case "solaria://dashboard/overview": return [3 /*break*/, 1];
-                        case "solaria://projects/list": return [3 /*break*/, 4];
-                        case "solaria://tasks/list": return [3 /*break*/, 7];
-                        case "solaria://agents/list": return [3 /*break*/, 8];
-                    }
-                    return [3 /*break*/, 9];
-                case 1:
-                    if (!isIsolated) return [3 /*break*/, 3];
-                    return [4 /*yield*/, Promise.all([
-                            apiCall("/projects/".concat(context.project_id)),
-                            apiCall("/tasks?project_id=".concat(context.project_id)),
-                        ])];
-                case 2:
-                    _b = _c.sent(), project = _b[0], tasks = _b[1];
-                    return [2 /*return*/, {
-                            project: project,
-                            tasks_count: (tasks || []).length,
-                            isolation_mode: true,
-                            project_id: context.project_id,
-                        }];
-                case 3: return [2 /*return*/, apiCall("/dashboard/overview")];
-                case 4:
-                    if (!isIsolated) return [3 /*break*/, 6];
-                    return [4 /*yield*/, apiCall("/projects/".concat(context.project_id))];
-                case 5:
-                    project = _c.sent();
-                    return [2 /*return*/, [project]];
-                case 6: return [2 /*return*/, apiCall("/projects")];
-                case 7:
-                    if (isIsolated) {
-                        return [2 /*return*/, apiCall("/tasks?project_id=".concat(context.project_id))];
-                    }
-                    return [2 /*return*/, apiCall("/tasks")];
-                case 8: return [2 /*return*/, apiCall("/agents")];
-                case 9: throw new Error("Unknown resource: ".concat(uri));
+export async function readResource(uri, apiCall, context = {}) {
+    const isIsolated = Boolean(context.project_id && !context.adminMode);
+    switch (uri) {
+        case "solaria://dashboard/overview":
+            if (isIsolated) {
+                const [project, tasks] = await Promise.all([
+                    apiCall(`/projects/${context.project_id}`),
+                    apiCall(`/tasks?project_id=${context.project_id}`),
+                ]);
+                return {
+                    project,
+                    tasks_count: (tasks || []).length,
+                    isolation_mode: true,
+                    project_id: context.project_id,
+                };
             }
-        });
-    });
+            return apiCall("/dashboard/overview");
+        case "solaria://projects/list":
+            if (isIsolated) {
+                const project = await apiCall(`/projects/${context.project_id}`);
+                return [project];
+            }
+            return apiCall("/projects");
+        case "solaria://tasks/list":
+            if (isIsolated) {
+                return apiCall(`/tasks?project_id=${context.project_id}`);
+            }
+            return apiCall("/tasks");
+        case "solaria://agents/list":
+            return apiCall("/agents");
+        default:
+            throw new Error(`Unknown resource: ${uri}`);
+    }
 }

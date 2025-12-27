@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useMemories, useMemoryStats, useMemoryTags, useSearchMemories } from '@/hooks/useApi';
 import { cn, formatRelativeTime, formatNumber } from '@/lib/utils';
+import { MemoryDetailModal } from '@/components/memories/MemoryDetailModal';
 import type { Memory } from '@/types';
 
 const TAG_COLORS: Record<string, { bg: string; color: string }> = {
@@ -35,6 +36,9 @@ function MemoryCard({ memory, onClick }: { memory: Memory; onClick?: () => void 
     const importancePercent = Math.round(memory.importance * 100);
     const tags = memory.tags || [];
 
+    // Determine importance level class
+    const importanceClass = importancePercent >= 70 ? 'high' : importancePercent >= 40 ? 'medium' : 'low';
+
     return (
         <div
             onClick={onClick}
@@ -49,7 +53,7 @@ function MemoryCard({ memory, onClick }: { memory: Memory; onClick?: () => void 
                     <h3 className="memory-title">{memory.summary || memory.content.substring(0, 60)}</h3>
                     <span className="memory-id">#{memory.id}</span>
                 </div>
-                <div className="memory-importance">
+                <div className={cn('memory-importance', importanceClass)}>
                     <TrendingUp className="h-3 w-3" />
                     <span>{importancePercent}%</span>
                 </div>
@@ -148,8 +152,26 @@ export function MemoriesPage() {
     const [search, setSearch] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
+    const [selectedMemoryId, setSelectedMemoryId] = useState<number | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const { data: memories, isLoading } = useMemories({ tags: selectedTags });
+    const { data: memories, isLoading, isError, error } = useMemories({ tags: selectedTags });
+
+    const handleMemoryClick = (memoryId: number) => {
+        setSelectedMemoryId(memoryId);
+        setIsModalOpen(true);
+    };
+
+    const handleModalClose = () => {
+        setIsModalOpen(false);
+        setSelectedMemoryId(null);
+    };
+
+    const handleTagClickFromModal = (tag: string) => {
+        if (!selectedTags.includes(tag)) {
+            setSelectedTags([...selectedTags, tag]);
+        }
+    };
     const { data: stats } = useMemoryStats();
     const { data: tags } = useMemoryTags();
     const { data: searchResults } = useSearchMemories(search, selectedTags);
@@ -167,6 +189,16 @@ export function MemoriesPage() {
         return (
             <div className="flex h-full items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
+    if (isError) {
+        return (
+            <div className="flex h-full flex-col items-center justify-center gap-4">
+                <AlertCircle className="h-12 w-12 text-destructive" />
+                <p className="text-muted-foreground">Error al cargar memorias</p>
+                <pre className="text-xs text-destructive">{String(error)}</pre>
             </div>
         );
     }
@@ -210,7 +242,7 @@ export function MemoriesPage() {
                     </div>
                     <div className="stat-content">
                         <div className="stat-label">Total Memorias</div>
-                        <div className="stat-value">{formatNumber(stats?.total_memories || 0)}</div>
+                        <div className="stat-value">{formatNumber(stats?.totalMemories || 0)}</div>
                     </div>
                 </div>
                 <div className="stat-card">
@@ -220,7 +252,7 @@ export function MemoriesPage() {
                     <div className="stat-content">
                         <div className="stat-label">Importancia Prom.</div>
                         <div className="stat-value">
-                            {((stats?.avg_importance || 0) * 100).toFixed(0)}%
+                            {((stats?.avgImportance || 0) * 100).toFixed(0)}%
                         </div>
                     </div>
                 </div>
@@ -230,7 +262,7 @@ export function MemoriesPage() {
                     </div>
                     <div className="stat-content">
                         <div className="stat-label">Accesos Totales</div>
-                        <div className="stat-value">{formatNumber(stats?.total_accesses || 0)}</div>
+                        <div className="stat-value">{formatNumber(stats?.totalAccesses || 0)}</div>
                     </div>
                 </div>
                 <div className="stat-card">
@@ -239,7 +271,7 @@ export function MemoriesPage() {
                     </div>
                     <div className="stat-content">
                         <div className="stat-label">Proyectos</div>
-                        <div className="stat-value">{formatNumber(stats?.projects_with_memories || 0)}</div>
+                        <div className="stat-value">{formatNumber(stats?.projectsWithMemories || 0)}</div>
                     </div>
                 </div>
             </div>
@@ -299,6 +331,7 @@ export function MemoriesPage() {
                             <MemoryCard
                                 key={memory.id}
                                 memory={memory}
+                                onClick={() => handleMemoryClick(memory.id)}
                             />
                         ))
                     ) : (
@@ -330,6 +363,7 @@ export function MemoriesPage() {
                                     <MemoryRow
                                         key={memory.id}
                                         memory={memory}
+                                        onClick={() => handleMemoryClick(memory.id)}
                                     />
                                 ))
                             ) : (
@@ -350,6 +384,14 @@ export function MemoriesPage() {
                     </table>
                 </div>
             )}
+
+            {/* Memory Detail Modal */}
+            <MemoryDetailModal
+                memoryId={selectedMemoryId}
+                isOpen={isModalOpen}
+                onClose={handleModalClose}
+                onTagClick={handleTagClickFromModal}
+            />
         </div>
     );
 }

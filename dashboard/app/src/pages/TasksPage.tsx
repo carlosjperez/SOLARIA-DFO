@@ -209,9 +209,9 @@ export function TasksPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="flex flex-col h-full gap-4">
             {/* Header */}
-            <div className="section-header">
+            <div className="section-header shrink-0">
                 <div>
                     <h1 className="section-title">Tareas</h1>
                     <p className="section-subtitle">
@@ -230,7 +230,7 @@ export function TasksPage() {
             </div>
 
             {/* Stats row */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-4 shrink-0">
                 <div className="stat-card">
                     <div className="stat-icon tasks">
                         <CheckCircle2 className="h-5 w-5" />
@@ -270,7 +270,7 @@ export function TasksPage() {
             </div>
 
             {/* Filters */}
-            <div className="filters-row">
+            <div className="filters-row shrink-0">
                 <div className="filter-search">
                     <Search className="filter-search-icon" />
                     <input
@@ -339,30 +339,36 @@ export function TasksPage() {
                 </div>
             </div>
 
-            {/* Content */}
-            {viewMode === 'kanban' && (
-                <div className="kanban-container">
-                    {KANBAN_COLUMNS.map((column) => (
-                        <KanbanColumn
-                            key={column.id}
-                            column={column}
-                            tasks={tasksByStatus[column.id]}
+            {/* Content - fills remaining viewport */}
+            <div className="flex-1 min-h-0 flex flex-col">
+                {viewMode === 'kanban' && (
+                    <div className="kanban-container">
+                        {KANBAN_COLUMNS.map((column) => (
+                            <KanbanColumn
+                                key={column.id}
+                                column={column}
+                                tasks={tasksByStatus[column.id]}
+                                onTaskClick={handleTaskClick}
+                            />
+                        ))}
+                    </div>
+                )}
+
+                {viewMode === 'list' && (
+                    <div className="flex-1 min-h-0 overflow-auto">
+                        <ListView tasks={filteredTasks || []} onTaskClick={handleTaskClick} />
+                    </div>
+                )}
+
+                {viewMode === 'gantt' && (
+                    <div className="flex-1 min-h-0 overflow-auto">
+                        <GanttView
+                            tasks={filteredTasks || []}
                             onTaskClick={handleTaskClick}
                         />
-                    ))}
-                </div>
-            )}
-
-            {viewMode === 'list' && (
-                <ListView tasks={filteredTasks || []} onTaskClick={handleTaskClick} />
-            )}
-
-            {viewMode === 'gantt' && (
-                <GanttView
-                    tasks={filteredTasks || []}
-                    onTaskClick={handleTaskClick}
-                />
-            )}
+                    </div>
+                )}
+            </div>
 
             {/* Task Detail Drawer */}
             <TaskDetailDrawer

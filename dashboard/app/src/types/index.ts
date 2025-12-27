@@ -16,7 +16,8 @@ export interface Project {
     name: string;
     code: string;
     description?: string;
-    status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled';
+    // API canonical values only - use getStatusDisplay() for UI labels
+    status: 'planning' | 'development' | 'testing' | 'deployment' | 'on_hold' | 'completed' | 'cancelled';
     priority: 'critical' | 'high' | 'medium' | 'low';
     businessId?: number;
     progress: number;
@@ -31,6 +32,7 @@ export interface Project {
     // Extended fields from joins
     tasksTotal?: number;
     tasksCompleted?: number;
+    tasksPending?: number;
     activeAgents?: number;
     // Optional URL fields
     productionUrl?: string;

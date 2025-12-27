@@ -6,6 +6,7 @@ import {
     Server,
     Palette,
     Brain,
+    Archive,
     ChevronLeft,
     ChevronRight,
     ExternalLink,
@@ -20,6 +21,7 @@ const navigation = [
     { name: 'Infraestructura', href: '/infrastructure', icon: Server },
     { name: 'Design Hub', href: '/design-hub', icon: Palette },
     { name: 'Memorias', href: '/memories', icon: Brain },
+    { name: 'Archivo', href: '/projects/archived', icon: Archive },
 ];
 
 const externalLinks = [
@@ -150,7 +152,7 @@ export function Sidebar() {
                             <span className="solaria-text-gradient font-semibold">SOLARIA</span>
                             <span> DFO</span>
                         </div>
-                        <div className="mt-1 text-[10px] text-muted-foreground">v3.2.0</div>
+                        <div className="mt-1 text-[10px] text-muted-foreground">v3.5.1</div>
                     </div>
                 </div>
             )}

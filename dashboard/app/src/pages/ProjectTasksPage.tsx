@@ -6,7 +6,6 @@ import {
     LayoutGrid,
     List,
     GanttChartSquare,
-    CheckCircle2,
     Clock,
     Loader2,
     Bot,
@@ -18,14 +17,20 @@ import {
     Tags,
     X,
     ChevronRight,
+    ArrowUp,
+    ArrowDown,
+    ArrowUpDown,
+    Archive,
 } from 'lucide-react';
 import { useProject, useProjectTasks, useAgents, useCreateTask, useTaskTags, useAllTags, useAddTaskTag, useRemoveTaskTag } from '@/hooks/useApi';
 import { Modal } from '@/components/common/Modal';
+import { TaskItemsList } from '@/components/tasks/TaskItemsList';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import type { Task, Agent, TaskTag } from '@/types';
 
 type ViewMode = 'kanban' | 'list' | 'gantt';
-type SortBy = 'priority' | 'status' | 'progress';
+type SortColumn = 'code' | 'title' | 'priority' | 'status' | 'progress' | 'agent' | 'date';
+type SortDirection = 'asc' | 'desc';
 
 // Sort order mappings
 const PRIORITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -109,13 +114,6 @@ function TaskCard({
                     )}
                 </div>
             </div>
-
-            {/* Description */}
-            {task.description && (
-                <p className="text-[11px] text-muted-foreground mb-2.5 line-clamp-2">
-                    {task.description}
-                </p>
-            )}
 
             {/* Progress Bar - Solo en columna "En Progreso" */}
             {isInProgress && task.progress > 0 && (
@@ -286,149 +284,360 @@ function KanbanView({
 }
 
 // ============================================
-// ListView Component - Exacto como el original
+// SortableHeader Component - Clickable column headers
+// ============================================
+function SortableHeader({
+    label,
+    column,
+    currentColumn,
+    currentDirection,
+    onSort,
+    className = '',
+}: {
+    label: string;
+    column: SortColumn;
+    currentColumn: SortColumn;
+    currentDirection: SortDirection;
+    onSort: (column: SortColumn) => void;
+    className?: string;
+}) {
+    const isActive = currentColumn === column;
+
+    return (
+        <button
+            onClick={() => onSort(column)}
+            className={cn(
+                'flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition-colors group',
+                isActive ? 'text-solaria' : 'text-muted-foreground hover:text-foreground',
+                className
+            )}
+        >
+            {label}
+            <span className="text-muted-foreground group-hover:text-foreground">
+                {isActive ? (
+                    currentDirection === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                    ) : (
+                        <ArrowDown className="h-3 w-3" />
+                    )
+                ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-50" />
+                )}
+            </span>
+        </button>
+    );
+}
+
+// ============================================
+// ListView Component - Proper sortable table
 // ============================================
 function ListView({
     tasks,
     agents,
-    sortBy,
     onTaskClick,
 }: {
     tasks: Task[];
     agents: Agent[];
-    sortBy: SortBy;
     onTaskClick: (taskId: number) => void;
 }) {
+    const [sortColumn, setSortColumn] = useState<SortColumn>('priority');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
     const getAgent = (agentId?: number) => agents.find(a => a.id === agentId);
 
-    // Ordenar tareas según criterio seleccionado
+    const handleSort = useCallback((column: SortColumn) => {
+        if (sortColumn === column) {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+    }, [sortColumn]);
+
+    // Sort tasks based on current column and direction
     const sortedTasks = useMemo(() => {
-        return [...tasks].sort((a, b) => {
-            if (sortBy === 'priority') {
-                return (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
-            } else if (sortBy === 'status') {
-                return (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0);
-            } else if (sortBy === 'progress') {
-                return (b.progress || 0) - (a.progress || 0);
+        const sorted = [...tasks].sort((a, b) => {
+            let comparison = 0;
+
+            switch (sortColumn) {
+                case 'code':
+                    const codeA = a.taskCode || `#${a.id}`;
+                    const codeB = b.taskCode || `#${b.id}`;
+                    comparison = codeA.localeCompare(codeB);
+                    break;
+                case 'title':
+                    comparison = a.title.localeCompare(b.title);
+                    break;
+                case 'priority':
+                    comparison = (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
+                    break;
+                case 'status':
+                    comparison = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0);
+                    break;
+                case 'progress':
+                    comparison = (a.progress || 0) - (b.progress || 0);
+                    break;
+                case 'agent':
+                    const agentA = agents.find(ag => ag.id === a.assignedAgentId)?.name || 'ZZZ';
+                    const agentB = agents.find(ag => ag.id === b.assignedAgentId)?.name || 'ZZZ';
+                    comparison = agentA.localeCompare(agentB);
+                    break;
+                case 'date':
+                    const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+                    const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+                    comparison = dateA - dateB;
+                    break;
             }
-            return 0;
+
+            return sortDirection === 'asc' ? comparison : -comparison;
         });
-    }, [tasks, sortBy]);
+        return sorted;
+    }, [tasks, sortColumn, sortDirection, agents]);
 
     return (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-            {sortedTasks.map(task => {
-                const agent = getAgent(task.assignedAgentId);
-                const isCompleted = task.status === 'completed';
-                const priority = PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.medium;
+        <div className="bg-card rounded-xl border border-border overflow-hidden h-full flex flex-col">
+            {/* Sortable Table Header */}
+            <div className="flex items-center gap-2 px-4 py-3 bg-secondary/50 border-b border-border sticky top-0 z-10">
+                <div className="w-1 flex-shrink-0" /> {/* Priority bar spacer */}
+                <SortableHeader
+                    label="Código"
+                    column="code"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-20"
+                />
+                <SortableHeader
+                    label="Tarea"
+                    column="title"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="flex-1 min-w-0"
+                />
+                <SortableHeader
+                    label="Estado"
+                    column="status"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-24"
+                />
+                <SortableHeader
+                    label="Prioridad"
+                    column="priority"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-20"
+                />
+                <SortableHeader
+                    label="Progreso"
+                    column="progress"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-28"
+                />
+                <SortableHeader
+                    label="Agente"
+                    column="agent"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-28"
+                />
+                <SortableHeader
+                    label="Fecha"
+                    column="date"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-24"
+                />
+                <div className="w-6 flex-shrink-0" /> {/* Chevron spacer */}
+            </div>
 
-                return (
-                    <div
-                        key={task.id}
-                        onClick={() => onTaskClick(task.id)}
-                        className="flex items-center gap-4 p-4 bg-card border-b border-border last:border-b-0 hover:bg-secondary/30 cursor-pointer transition-colors"
-                    >
-                        {/* Priority bar izquierda */}
+            {/* Table Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
+                {sortedTasks.map(task => {
+                    const agent = getAgent(task.assignedAgentId);
+                    const isCompleted = task.status === 'completed';
+                    const priority = PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG] || PRIORITY_CONFIG.medium;
+
+                    return (
                         <div
-                            className="w-1 h-12 rounded-full flex-shrink-0"
-                            style={{ background: priority.color }}
-                        />
+                            key={task.id}
+                            onClick={() => onTaskClick(task.id)}
+                            className="flex items-center gap-2 px-4 py-3 bg-card border-b border-border last:border-b-0 hover:bg-secondary/30 cursor-pointer transition-colors"
+                        >
+                            {/* Priority bar */}
+                            <div
+                                className="w-1 h-10 rounded-full flex-shrink-0"
+                                style={{ background: priority.color }}
+                            />
 
-                        {/* Check si completado */}
-                        {isCompleted && (
-                            <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                        )}
+                            {/* Código */}
+                            <div className="w-20 flex-shrink-0">
+                                <span className="text-xs text-solaria font-mono font-semibold">
+                                    {task.taskCode || `#${task.id}`}
+                                </span>
+                            </div>
 
-                        {/* Info tarea */}
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                                <h4 className={cn(
-                                    'font-medium truncate',
+                            {/* Tarea (título) */}
+                            <div className="flex-1 min-w-0">
+                                <span className={cn(
+                                    'text-sm font-medium truncate block',
                                     isCompleted && 'line-through opacity-70'
                                 )}>
                                     {task.title}
-                                </h4>
+                                </span>
+                            </div>
+
+                            {/* Estado */}
+                            <div className="w-24 flex-shrink-0">
                                 <span
-                                    className="px-2 py-0.5 rounded text-xs"
+                                    className="inline-block px-2 py-1 rounded text-[10px] font-medium"
                                     style={{ background: priority.bg, color: priority.color }}
                                 >
                                     {STATUS_LABELS[task.status] || task.status}
                                 </span>
                             </div>
-                            <p className="text-sm text-muted-foreground truncate">
-                                {task.description || 'Sin descripcion'}
-                            </p>
-                        </div>
 
-                        {/* Progress bar (w-32) */}
-                        <div className="w-32 flex-shrink-0">
-                            <div className="flex justify-between text-xs mb-1">
-                                <span className="text-muted-foreground">Progreso</span>
-                                <span>{task.progress}%</span>
+                            {/* Prioridad */}
+                            <div className="w-20 flex-shrink-0">
+                                <span
+                                    className="inline-block px-2 py-1 rounded text-[10px] font-bold"
+                                    style={{ background: priority.bg, color: priority.color }}
+                                >
+                                    {priority.label}
+                                </span>
                             </div>
-                            <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                                <div
-                                    className={cn(
-                                        'h-full rounded-full transition-all',
-                                        isCompleted ? 'bg-green-500' : 'bg-solaria'
+
+                            {/* Progreso */}
+                            <div className="w-28 flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                                        <div
+                                            className={cn(
+                                                'h-full rounded-full transition-all',
+                                                isCompleted ? 'bg-green-500' : 'bg-solaria'
+                                            )}
+                                            style={{ width: `${task.progress}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs text-muted-foreground w-8 text-right">
+                                        {task.progress}%
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Agente */}
+                            <div className="w-28 flex-shrink-0">
+                                <div className="flex items-center gap-1">
+                                    {agent ? (
+                                        <>
+                                            <Bot className="h-3 w-3 text-solaria" />
+                                            <span className="text-xs truncate">
+                                                {agent.name.replace('SOLARIA-', '')}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">Sin asignar</span>
                                     )}
-                                    style={{ width: `${task.progress}%` }}
-                                />
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Agent info (w-32) */}
-                        <div className="w-32 text-right flex-shrink-0">
-                            <p className="text-sm">{agent?.name?.replace('SOLARIA-', '') || 'Sin asignar'}</p>
-                            <p className="text-xs text-muted-foreground">
-                                {task.estimatedHours || 0}h
-                            </p>
-                        </div>
+                            {/* Fecha */}
+                            <div className="w-24 flex-shrink-0 text-xs text-muted-foreground">
+                                {task.updatedAt
+                                    ? formatRelativeTime(task.updatedAt)
+                                    : task.createdAt
+                                    ? formatRelativeTime(task.createdAt)
+                                    : '-'}
+                            </div>
 
-                        {/* Chevron */}
-                        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                            {/* Chevron */}
+                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        </div>
+                    );
+                })}
+
+                {sortedTasks.length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground">
+                        No hay tareas
                     </div>
-                );
-            })}
-
-            {sortedTasks.length === 0 && (
-                <div className="text-center py-12 text-muted-foreground">
-                    No hay tareas
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }
 
 // ============================================
-// GanttViewOriginal Component - Barras horizontales con progreso
+// GanttViewOriginal Component - Barras horizontales con progreso y sortable headers
 // ============================================
 function GanttViewOriginal({
     tasks,
     agents,
-    sortBy,
     onTaskClick,
 }: {
     tasks: Task[];
     agents: Agent[];
-    sortBy: SortBy;
     onTaskClick: (taskId: number) => void;
 }) {
+    const [sortColumn, setSortColumn] = useState<SortColumn>('priority');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
     const getAgent = (agentId?: number) => agents.find(a => a.id === agentId);
 
-    // Ordenar tareas según criterio
+    const handleSort = useCallback((column: SortColumn) => {
+        if (sortColumn === column) {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortDirection('asc');
+        }
+    }, [sortColumn]);
+
+    // Sort tasks based on current column and direction
     const sortedTasks = useMemo(() => {
-        return [...tasks].sort((a, b) => {
-            if (sortBy === 'priority') {
-                return (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
-            } else if (sortBy === 'status') {
-                return (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0);
-            } else if (sortBy === 'progress') {
-                return (b.progress || 0) - (a.progress || 0);
+        const sorted = [...tasks].sort((a, b) => {
+            let comparison = 0;
+
+            switch (sortColumn) {
+                case 'code':
+                    const codeA = a.taskCode || `#${a.id}`;
+                    const codeB = b.taskCode || `#${b.id}`;
+                    comparison = codeA.localeCompare(codeB);
+                    break;
+                case 'title':
+                    comparison = a.title.localeCompare(b.title);
+                    break;
+                case 'priority':
+                    comparison = (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
+                    break;
+                case 'status':
+                    comparison = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0);
+                    break;
+                case 'progress':
+                    comparison = (a.progress || 0) - (b.progress || 0);
+                    break;
+                case 'agent':
+                    const agentA = agents.find(ag => ag.id === a.assignedAgentId)?.name || 'ZZZ';
+                    const agentB = agents.find(ag => ag.id === b.assignedAgentId)?.name || 'ZZZ';
+                    comparison = agentA.localeCompare(agentB);
+                    break;
+                case 'date':
+                    const dateA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+                    const dateB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+                    comparison = dateA - dateB;
+                    break;
             }
-            return 0;
+
+            return sortDirection === 'asc' ? comparison : -comparison;
         });
-    }, [tasks, sortBy]);
+        return sorted;
+    }, [tasks, sortColumn, sortDirection, agents]);
 
     // Calcular maxHours para escalar las barras
     const maxHours = useMemo(() => {
@@ -447,9 +656,9 @@ function GanttViewOriginal({
     };
 
     return (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="bg-card rounded-xl border border-border overflow-hidden h-full flex flex-col">
             {/* Header con leyenda */}
-            <div className="p-4 border-b border-border flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between flex-shrink-0">
                 <h3 className="font-semibold flex items-center gap-2">
                     <GanttChartSquare className="h-5 w-5 text-solaria" />
                     Vista Gantt
@@ -457,32 +666,72 @@ function GanttViewOriginal({
                 <div className="flex gap-4 text-xs">
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded" style={{ background: '#ef4444' }} />
-                        Crítica
+                        P0
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded" style={{ background: '#f97316' }} />
-                        Alta
+                        P1
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded" style={{ background: '#f6921d' }} />
-                        Media
+                        P2
                     </span>
                     <span className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded" style={{ background: '#6b7280' }} />
-                        Baja
+                        P3
                     </span>
                 </div>
             </div>
 
-            {/* Column headers */}
-            <div className="flex items-center gap-4 px-4 py-2 bg-secondary/30 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                <div className="w-72">Tarea</div>
-                <div className="w-24 text-center">Estado</div>
-                <div className="flex-1">Timeline (horas)</div>
+            {/* Sortable Column Headers */}
+            <div className="flex items-center gap-2 px-4 py-3 bg-secondary/50 border-b border-border flex-shrink-0 sticky top-0 z-10">
+                <SortableHeader
+                    label="Código"
+                    column="code"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-20"
+                />
+                <SortableHeader
+                    label="Tarea"
+                    column="title"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-48"
+                />
+                <SortableHeader
+                    label="Agente"
+                    column="agent"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-24"
+                />
+                <SortableHeader
+                    label="Estado"
+                    column="status"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-24"
+                />
+                <SortableHeader
+                    label="Prioridad"
+                    column="priority"
+                    currentColumn={sortColumn}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                    className="w-20"
+                />
+                <div className="flex-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Timeline / Progreso
+                </div>
             </div>
 
-            {/* Rows */}
-            <div className="divide-y divide-border">
+            {/* Rows - Scrollable */}
+            <div className="flex-1 overflow-y-auto divide-y divide-border">
                 {sortedTasks.map(task => {
                     const agent = getAgent(task.assignedAgentId);
                     const isCompleted = task.status === 'completed';
@@ -494,33 +743,63 @@ function GanttViewOriginal({
                         <div
                             key={task.id}
                             onClick={() => onTaskClick(task.id)}
-                            className="flex items-center gap-4 py-3 px-4 hover:bg-secondary/30 cursor-pointer transition-colors"
+                            className="flex items-center gap-2 py-3 px-4 hover:bg-secondary/30 cursor-pointer transition-colors"
                         >
-                            {/* Task name (w-72) */}
-                            <div className="w-72 min-w-0">
-                                <p className={cn(
-                                    'text-sm truncate font-medium',
+                            {/* Código */}
+                            <div className="w-20 flex-shrink-0">
+                                <span className="text-xs text-solaria font-mono font-semibold">
+                                    {task.taskCode || `#${task.id}`}
+                                </span>
+                            </div>
+
+                            {/* Tarea */}
+                            <div className="w-48 flex-shrink-0 min-w-0">
+                                <span className={cn(
+                                    'text-sm truncate font-medium block',
                                     isCompleted && 'line-through opacity-70'
                                 )}>
                                     {task.title}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                    {agent?.name?.replace('SOLARIA-', '') || 'Sin asignar'}
-                                </p>
+                                </span>
                             </div>
 
-                            {/* Status badge (w-24) */}
-                            <div className="w-24 text-center">
+                            {/* Agente */}
+                            <div className="w-24 flex-shrink-0">
+                                <div className="flex items-center gap-1">
+                                    {agent ? (
+                                        <>
+                                            <Bot className="h-3 w-3 text-solaria" />
+                                            <span className="text-xs truncate">
+                                                {agent.name.replace('SOLARIA-', '')}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">Sin asignar</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Estado */}
+                            <div className="w-24 flex-shrink-0">
                                 <span
-                                    className="inline-block px-2 py-1 rounded text-xs"
+                                    className="inline-block px-2 py-1 rounded text-[10px] font-medium"
                                     style={{ background: priority.bg, color: priority.color }}
                                 >
                                     {STATUS_LABELS[task.status] || task.status}
                                 </span>
                             </div>
 
+                            {/* Prioridad */}
+                            <div className="w-20 flex-shrink-0">
+                                <span
+                                    className="inline-block px-2 py-1 rounded text-[10px] font-bold"
+                                    style={{ background: priority.bg, color: priority.color }}
+                                >
+                                    {priority.label}
+                                </span>
+                            </div>
+
                             {/* Gantt bar (flex-1) */}
-                            <div className="flex-1 h-8 bg-secondary/50 rounded relative overflow-hidden">
+                            <div className="flex-1 h-7 bg-secondary/50 rounded relative overflow-hidden">
                                 {barWidth > 0 && (
                                     <div
                                         className="absolute inset-y-0 left-0 rounded flex items-center transition-all"
@@ -534,7 +813,7 @@ function GanttViewOriginal({
                                             className="absolute inset-y-0 left-0 bg-white/30 rounded"
                                             style={{ width: `${progress}%` }}
                                         />
-                                        <span className="text-xs text-white px-2 font-medium relative z-10 drop-shadow">
+                                        <span className="text-[10px] text-white px-2 font-medium relative z-10 drop-shadow whitespace-nowrap">
                                             {task.estimatedHours || 0}h - {progress}%
                                         </span>
                                     </div>
@@ -667,6 +946,15 @@ function TaskDetailModal({
                         </div>
                     </div>
                 )}
+
+                {/* Subtasks */}
+                <div className="border border-border rounded-lg p-4 bg-secondary/30">
+                    <TaskItemsList
+                        taskId={task.id}
+                        editable={task.status !== 'completed'}
+                        showAddForm={task.status !== 'completed'}
+                    />
+                </div>
 
                 {/* Tags */}
                 <div>
@@ -942,7 +1230,6 @@ export function ProjectTasksPage() {
     const projectId = parseInt(id || '0');
 
     const [viewMode, setViewMode] = useState<ViewMode>('kanban');
-    const [sortBy, setSortBy] = useState<SortBy>('priority');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
 
@@ -1061,19 +1348,6 @@ export function ProjectTasksPage() {
                         </button>
                     </div>
 
-                    {/* Sort Selector - Solo visible en List y Gantt */}
-                    {(viewMode === 'list' || viewMode === 'gantt') && (
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as SortBy)}
-                            className="px-3 py-2 rounded-lg bg-secondary border border-border text-sm focus:border-solaria focus:outline-none transition-colors"
-                        >
-                            <option value="priority">Ordenar: Prioridad</option>
-                            <option value="status">Ordenar: Estado</option>
-                            <option value="progress">Ordenar: Progreso</option>
-                        </select>
-                    )}
-
                     {/* Nueva Tarea */}
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
@@ -1128,27 +1402,38 @@ export function ProjectTasksPage() {
                 )}
 
                 {viewMode === 'list' && (
-                    <div className="h-full overflow-auto">
+                    <div className="h-full">
                         <ListView
                             tasks={tasks || []}
                             agents={agents || []}
-                            sortBy={sortBy}
                             onTaskClick={handleTaskClick}
                         />
                     </div>
                 )}
 
                 {viewMode === 'gantt' && (
-                    <div className="h-full overflow-auto">
+                    <div className="h-full">
                         <GanttViewOriginal
                             tasks={tasks || []}
                             agents={agents || []}
-                            sortBy={sortBy}
                             onTaskClick={handleTaskClick}
                         />
                     </div>
                 )}
             </div>
+
+            {/* Footer - Archivo */}
+            {stats.done > 0 && (
+                <div className="flex items-center justify-center py-3 border-t border-border flex-shrink-0">
+                    <button
+                        onClick={() => navigate('/tasks/archived')}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors"
+                    >
+                        <Archive className="h-4 w-4" />
+                        Ver {stats.done} tareas archivadas
+                    </button>
+                </div>
+            )}
 
             {/* Modals */}
             <CreateTaskModal

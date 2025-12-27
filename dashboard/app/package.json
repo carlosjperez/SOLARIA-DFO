@@ -1,6 +1,6 @@
 {
   "name": "solaria-dfo-dashboard",
-  "version": "3.0.0",
+  "version": "3.5.1",
   "description": "SOLARIA DFO Dashboard - React + Vite + TypeScript",
   "type": "module",
   "scripts": {

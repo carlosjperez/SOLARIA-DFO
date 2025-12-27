@@ -3,9 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Viewport - accessible (allows zoom) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="SOLARIA DFO - Digital Field Operations Dashboard" />
     <meta name="theme-color" content="#f6921d" />
+
+    <!-- Apple PWA/iPad Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SOLARIA DFO" />
+    <link rel="apple-touch-icon" href="/solaria-logo.png" />
+
+    <!-- Disable automatic telephone number detection -->
+    <meta name="format-detection" content="telephone=no" />
+
     <title>SOLARIA DFO Dashboard</title>
   </head>
   <body class="min-h-screen bg-background font-sans antialiased">

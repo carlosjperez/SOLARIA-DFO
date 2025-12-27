@@ -1,11 +1,20 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useUIStore } from '@/store/ui';
 import { cn } from '@/lib/utils';
 
+// Pages that need full viewport (minimal padding)
+const FULL_VIEWPORT_ROUTES = ['/tasks', '/projects'];
+
 export function Layout() {
     const sidebarOpen = useUIStore((state) => state.sidebarOpen);
+    const location = useLocation();
+
+    // Check if current route needs full viewport
+    const isFullViewport = FULL_VIEWPORT_ROUTES.some(
+        route => location.pathname === route || location.pathname.startsWith(`${route}/`)
+    );
 
     return (
         <div className="flex h-screen overflow-hidden bg-background">
@@ -17,7 +26,12 @@ export function Layout() {
                 )}
             >
                 <Header />
-                <main className="flex-1 overflow-auto p-6">
+                <main
+                    className={cn(
+                        'main-content flex-1 overflow-auto',
+                        isFullViewport ? 'p-3' : 'p-6'
+                    )}
+                >
                     <Outlet />
                 </main>
             </div>

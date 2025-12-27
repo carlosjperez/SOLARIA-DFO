@@ -1,0 +1,12 @@
+import { type ClassValue } from 'clsx';
+export declare function cn(...inputs: ClassValue[]): string;
+export declare function formatDate(date: string | Date): string;
+export declare function formatDateTime(date: string | Date): string;
+export declare function formatRelativeTime(date: string | Date): string;
+export declare function formatCurrency(amount: number): string;
+export declare function formatNumber(num: number): string;
+export declare function formatPercentage(value: number, decimals?: number): string;
+export declare function truncate(str: string, length: number): string;
+export declare function getInitials(name: string): string;
+export declare function getStatusColor(status: string): string;
+export declare function getPriorityColor(priority: string): string;

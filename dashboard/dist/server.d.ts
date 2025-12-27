@@ -56,7 +56,7 @@ declare class SolariaDashboardServer {
     private getRecentTasksByProject;
     private getTaskTags;
     /**
-     * Helper: Log activity to database
+     * Helper: Log activity to database and emit Socket.IO event
      */
     private logActivity;
     private getProjects;

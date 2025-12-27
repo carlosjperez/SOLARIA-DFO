@@ -83,6 +83,7 @@ export const projectsApi = {
 // Epics API
 export const epicsApi = {
     getByProject: (projectId: number) => api.get(`/projects/${projectId}/epics`),
+    getById: (id: number) => api.get(`/epics/${id}`),
     create: (projectId: number, data: Record<string, unknown>) =>
         api.post(`/projects/${projectId}/epics`, data),
     update: (id: number, data: Record<string, unknown>) => api.put(`/epics/${id}`, data),
@@ -92,6 +93,7 @@ export const epicsApi = {
 // Sprints API
 export const sprintsApi = {
     getByProject: (projectId: number) => api.get(`/projects/${projectId}/sprints`),
+    getById: (id: number) => api.get(`/sprints/${id}`),
     create: (projectId: number, data: Record<string, unknown>) =>
         api.post(`/projects/${projectId}/sprints`, data),
     update: (id: number, data: Record<string, unknown>) => api.put(`/sprints/${id}`, data),

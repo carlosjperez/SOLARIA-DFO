@@ -1,10 +1,14 @@
 # SOLARIA Digital Field Operations
 
-**Oficina Digital de Construccion en Campo** - Version 3.2.0
+**Oficina Digital de Construccion en Campo** - Version 3.3.0
 
 Sistema centralizado para gestion de proyectos de software con supervision ejecutiva (CEO/CTO/COO/CFO) e integracion con agentes IA via MCP.
 
-## Estado Actual
+> 📋 **Enhancement Plan 2025**: Consulta [docs/DFO-ENHANCEMENT-PLAN-2025.md](docs/DFO-ENHANCEMENT-PLAN-2025.md) para el roadmap completo (7 sprints, 190 horas).
+
+---
+
+## 🎯 Estado Actual
 
 | Servicio | Estado | URL |
 |----------|--------|-----|
@@ -29,7 +33,114 @@ curl -X POST https://dfo.solaria.agency/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-## Arquitectura Centralizada
+---
+
+## 🏗️ Arquitectura del Sistema
+
+### Vista de Alto Nivel
+
+```mermaid
+graph TB
+    subgraph "Proyectos Remotos"
+        PA[Proyecto A<br/>MCP Client]
+        PB[Proyecto B<br/>MCP Client]
+        PC[Proyecto C<br/>MCP Client]
+    end
+
+    subgraph "SOLARIA DFO Server dfo.solaria.agency"
+        NGINX[Nginx<br/>80/443]
+        MCP[MCP HTTP<br/>:3031]
+        DASH[Dashboard<br/>:3030]
+        OFFICE[Office<br/>:3030]
+        DB[(MariaDB)]
+        REDIS[(Redis)]
+
+        NGINX --> MCP
+        NGINX --> DASH
+        NGINX --> OFFICE
+        MCP --> DB
+        DASH --> DB
+        OFFICE --> DB
+        MCP --> REDIS
+    end
+
+    PA -->|HTTPS| NGINX
+    PB -->|HTTPS| NGINX
+    PC -->|HTTPS| NGINX
+
+    style PA fill:#e1f5ff
+    style PB fill:#e1f5ff
+    style PC fill:#e1f5ff
+    style MCP fill:#fff4e6
+    style DASH fill:#e8f5e9
+    style OFFICE fill:#f3e5f5
+```
+
+### Arquitectura Interna MCP Server
+
+```mermaid
+graph LR
+    subgraph "MCP Server mcp-server/"
+        HTTP[http-server.ts<br/>Express + CORS]
+        HANDLERS[handlers.ts<br/>Tool Handlers]
+
+        subgraph "src/"
+            ENDPOINTS[endpoints/<br/>ready-tasks.ts<br/>...]
+            UTILS[utils/<br/>response-builder.ts<br/>formatters.ts]
+            TESTS[__tests__/<br/>*.test.ts]
+        end
+
+        HTTP --> HANDLERS
+        HANDLERS --> ENDPOINTS
+        ENDPOINTS --> UTILS
+    end
+
+    subgraph "Database"
+        DB[(MariaDB<br/>Schema)]
+        TABLES[tasks<br/>projects<br/>agents<br/>sprints<br/>epics<br/>memories<br/>task_dependencies]
+    end
+
+    HANDLERS --> DB
+
+    style HTTP fill:#fff4e6
+    style HANDLERS fill:#e8f5e9
+    style ENDPOINTS fill:#e1f5ff
+    style UTILS fill:#f3e5f5
+```
+
+### Flujo de Petición MCP
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client<br/>(Claude Code)
+    participant HTTP as HTTP Server
+    participant Handler as Handler
+    participant Endpoint as Endpoint
+    participant Utils as Response Builder
+    participant DB as MariaDB
+
+    Client->>HTTP: POST /mcp<br/>tools/call: get_ready_tasks
+    HTTP->>Handler: handleToolsCall()
+    Handler->>Endpoint: getReadyTasks.execute(params)
+
+    Endpoint->>Endpoint: Validate input (Zod)
+    Endpoint->>DB: Complex SQL query<br/>(CTEs, scoring)
+    DB-->>Endpoint: Raw task data
+
+    Endpoint->>Endpoint: Calculate readiness_score<br/>Generate readiness_reasons
+    Endpoint->>Utils: ResponseBuilder.success()
+    Utils-->>Endpoint: Standardized response
+
+    Endpoint-->>Handler: JSON response
+    Handler-->>HTTP: MCP protocol response
+    HTTP-->>Client: {"success": true, "data": {...}}
+
+    Note over Client,DB: Respuesta en <100ms (promedio)
+```
+
+---
+
+## 🚀 Arquitectura Centralizada
 
 A partir de la version 3.1, DFO opera como un **servicio centralizado** al que los proyectos se conectan remotamente via MCP HTTP:
 
@@ -58,7 +169,9 @@ A partir de la version 3.1, DFO opera como un **servicio centralizado** al que l
 └────────────────────────────────────────────────────────────────┘
 ```
 
-## Conexion Rapida (Para Proyectos)
+---
+
+## ⚡ Conexion Rapida (Para Proyectos)
 
 ### Opcion 1: Script automatico
 
@@ -136,7 +249,9 @@ Editar `~/.config/windsurf/mcp_config.json` (Linux) o `~/Library/Application Sup
 
 Despues de configurar, reinicia tu IDE para activar la conexion MCP.
 
-## Aislamiento de Proyectos (Multi-Agente)
+---
+
+## 🔐 Aislamiento de Proyectos (Multi-Agente)
 
 Cuando multiples agentes Claude trabajan simultaneamente en diferentes proyectos, cada uno debe establecer su contexto de proyecto al inicio de la sesion.
 
@@ -195,11 +310,15 @@ Agente: Contexto establecido. Ahora creo la tarea...
 Tarea creada en proyecto PRILABSA Website (aislado de otros proyectos)
 ```
 
-## Dashboard
+---
+
+## 🎨 Dashboard
 
 - **URL:** https://dfo.solaria.agency
 
-## SOLARIA OFFICE
+---
+
+## 🏢 SOLARIA OFFICE
 
 `office.solaria.agency` es el dashboard de gestión orientado a Project Managers y Account Managers.
 
@@ -211,18 +330,19 @@ Tarea creada en proyecto PRILABSA Website (aislado de otros proyectos)
 - **Usuario:** carlosjperez
 - **Password:** bypass
 
-## MCP Tools Disponibles
+---
 
-Una vez conectado, tu agente IA tendra acceso a:
+## 🛠️ MCP Tools Disponibles
 
-### Proyectos
+### Gestión de Proyectos
 - `list_projects` - Listar todos los proyectos
 - `create_project` - Crear nuevo proyecto
 - `get_project` - Obtener detalle de proyecto
 - `update_project` - Actualizar proyecto
 
-### Tareas
+### Gestión de Tareas
 - `list_tasks` - Listar tareas (filtrable por proyecto, estado, prioridad)
+- `get_ready_tasks` - **🆕 [DFN-004]** Tareas listas para trabajar (sin bloqueadores, con scoring inteligente)
 - `create_task` - Crear nueva tarea
 - `update_task` - Actualizar tarea
 - `complete_task` - Marcar tarea como completada
@@ -232,13 +352,14 @@ Una vez conectado, tu agente IA tendra acceso a:
 - `get_agent` - Obtener estado de agente
 - `update_agent_status` - Actualizar estado
 
-### Dashboard
+### Dashboard & Analytics
 - `get_dashboard_overview` - KPIs ejecutivos
 - `get_dashboard_alerts` - Alertas activas
 - `log_activity` - Registrar actividad
 
 ### Memoria Persistente (Integrado de Memora)
-Sistema de memoria persistente para agentes IA con busqueda full-text y referencias cruzadas.
+
+Sistema de memoria persistente para agentes IA con busqueda full-text, semantic search y referencias cruzadas.
 
 - `memory_create` - Crear nueva memoria (decisiones, contexto, aprendizajes)
 - `memory_list` - Listar memorias con filtros por tags, importancia
@@ -246,6 +367,7 @@ Sistema de memoria persistente para agentes IA con busqueda full-text y referenc
 - `memory_update` - Actualizar contenido de memoria
 - `memory_delete` - Eliminar memoria
 - `memory_search` - Busqueda full-text en memorias
+- `memory_semantic_search` - **🔍 Búsqueda semántica** con vectores de embeddings
 - `memory_tags` - Listar tags disponibles
 - `memory_stats` - Estadisticas de uso de memoria
 - `memory_boost` - Aumentar importancia de una memoria util
@@ -267,7 +389,95 @@ Claude: Voy a crear una memoria para esta decision:
 Memoria creada con ID #15. Puedo recuperarla mas tarde con memory_search.
 ```
 
-## Ejemplo de Uso con Claude Code
+---
+
+## 📊 Nuevas Características (Sprint 1 - 2025)
+
+### DFN-002: JSON-First API Standardization ✅
+
+Todos los endpoints ahora siguen un estándar de respuesta unificado:
+
+```typescript
+interface StandardResponse {
+  success: boolean;
+  data?: any;                    // En success: true
+  error?: ErrorObject;           // En success: false
+  metadata?: {
+    timestamp: string;
+    request_id: string;
+    execution_time_ms: number;
+    version: string;             // Semantic versioning
+  };
+  format?: 'json' | 'human';     // Formato de salida
+  formatted?: string;            // Human-readable output
+}
+```
+
+**Beneficios:**
+- Discriminated unions para type safety
+- Metadata automático en todas las respuestas
+- Formato `human` opcional para mejor UX
+- Versionado semántico de API
+- Error handling consistente
+
+📖 [Ver especificación completa](docs/specs/DFN-002-json-api-standardization.md)
+
+### DFN-004: Ready Tasks Endpoint ✅
+
+Nuevo endpoint inteligente para identificar tareas listas para trabajar:
+
+```typescript
+get_ready_tasks({
+  project_id?: number,
+  agent_id?: number,
+  sprint_id?: number,
+  priority?: 'low' | 'medium' | 'high' | 'critical',
+  limit?: number,              // Default: 10, Max: 100
+  format?: 'json' | 'human'
+})
+```
+
+**Algoritmo de Readiness Score (0-100):**
+- Base: 50 puntos
+- +30 prioridad critical, +20 high, +10 medium
+- +15 sprint activo
+- +5 asignado a agente
+- +5 con estimación de horas
+- +10 deadline próximo (≤7 días)
+- -10 deadline vencido
+
+**Filtrado Inteligente:**
+- ✅ Solo tareas `pending`
+- ✅ Sin bloqueadores incompletos (check de `task_dependencies`)
+- ✅ Sprint activo o planeado
+- ✅ Epic no cancelado
+- 🔄 Fallback si tabla `task_dependencies` no existe
+
+**Ejemplo de Uso:**
+
+```bash
+# Comando Claude Code
+/dfo ready --priority high --sprint 1
+
+# Respuesta
+📋 Ready Tasks (3):
+
+1. 🔴 DFN-003: Health Check Automatizado
+   Readiness: 85/100 | Priority: high
+   Sprint: Sprint 1 - Foundation
+   Estimated: 4h
+   ✓ No blocking dependencies | ✓ HIGH priority | ✓ Part of active sprint
+
+2. 🟡 DFN-005: Stats Dashboard DFO
+   Readiness: 75/100 | Priority: medium
+   ...
+```
+
+📖 [Ver especificación completa](docs/specs/DFN-004-ready-tasks-endpoint.md)
+
+---
+
+## 📚 Ejemplo de Uso con Claude Code
 
 ```
 Usuario: Crea una tarea para implementar autenticacion JWT
@@ -286,7 +496,7 @@ Tarea creada exitosamente con ID #42. Esta asignada al proyecto y visible en el 
 
 ---
 
-## Desarrollo Local (Solo para contribuidores)
+## 💻 Desarrollo Local (Solo para contribuidores)
 
 Si necesitas ejecutar DFO localmente para desarrollo:
 
@@ -327,11 +537,17 @@ pnpm test:ui                      # Tests UI
 # MCP Local
 cd mcp-server && npm run dev      # MCP stdio (local)
 cd mcp-server && npm run dev:http # MCP HTTP (servidor)
+
+# Tests MCP Server
+cd mcp-server/src
+npm test                          # Run all tests
+npm test -- ready-tasks.test.ts   # Test específico
+npm run test:coverage             # Coverage report
 ```
 
 ---
 
-## Despliegue en Produccion
+## 🚢 Despliegue en Produccion
 
 ### Deploy a VPS (Hostinger/Hetzner/etc)
 
@@ -370,7 +586,7 @@ curl https://dfo.your-domain.com/mcp/health
 
 ---
 
-## API Publica (Sin Autenticacion)
+## 🌐 API Publica (Sin Autenticacion)
 
 Endpoints disponibles para el PWA Dashboard y acceso publico (solo lectura):
 
@@ -408,7 +624,7 @@ curl https://dfo.solaria.agency/api/public/projects
 
 ---
 
-## API REST (Requiere Autenticacion)
+## 🔒 API REST (Requiere Autenticacion)
 
 ### Autenticacion
 ```
@@ -442,33 +658,50 @@ GET /api/csuite/cfo   - Vista CFO
 
 ---
 
-## Estructura del Proyecto
+## 📁 Estructura del Proyecto
 
 ```
 solaria-digital-field--operations/
-├── dashboard/                    # C-Suite Dashboard
-│   ├── server.js                # Express + Socket.IO
-│   └── public/                  # Frontend
-├── mcp-server/                  # MCP Server
-│   ├── server.js                # Stdio transport (local)
-│   ├── http-server.js           # HTTP transport (remoto)
-│   └── handlers.js              # Handlers compartidos
+├── dashboard/                     # C-Suite Dashboard
+│   ├── server.js                  # Express + Socket.IO
+│   └── public/                    # Frontend
+├── mcp-server/                    # MCP Server
+│   ├── server.ts                  # Stdio transport (local)
+│   ├── http-server.ts             # HTTP transport (remoto)
+│   ├── handlers.ts                # Handlers compartidos
+│   └── src/                       # 🆕 Source organizado
+│       ├── endpoints/             # Tool implementations
+│       │   └── ready-tasks.ts     # DFN-004
+│       ├── utils/                 # Utilities compartidas
+│       │   ├── response-builder.ts # DFN-002
+│       │   └── formatters.ts      # DFN-002
+│       └── __tests__/             # Test suites
+│           ├── response-builder.test.ts
+│           ├── formatters.test.ts
+│           └── ready-tasks.test.ts
+├── docs/                          # 🆕 Documentación técnica
+│   ├── DFO-ENHANCEMENT-PLAN-2025.md
+│   ├── BATCH-COMPLETED-DFN-004.md
+│   └── specs/                     # Especificaciones técnicas
+│       ├── DFN-002-json-api-standardization.md
+│       ├── DFN-004-ready-tasks-endpoint.md
+│       └── endpoint-migration-example.ts
 ├── infrastructure/
 │   ├── database/
-│   │   └── mysql-init.sql       # Schema inicial
+│   │   └── mysql-init.sql         # Schema inicial
 │   └── nginx/
-│       └── nginx.prod.conf      # Config produccion
+│       └── nginx.prod.conf        # Config produccion
 ├── scripts/
-│   ├── install-mcp-remote.sh    # Instalador cliente MCP
-│   └── install-mcp.sh           # Instalador local
-├── docker-compose.yml           # Desarrollo local
-├── docker-compose.prod.yml      # Produccion
+│   ├── install-mcp-remote.sh      # Instalador cliente MCP
+│   └── install-mcp.sh             # Instalador local
+├── docker-compose.yml             # Desarrollo local
+├── docker-compose.prod.yml        # Produccion
 └── README.md
 ```
 
 ---
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### No puedo conectar via MCP
 ```bash
@@ -499,7 +732,7 @@ docker compose restart office
 
 ---
 
-## Contribuir
+## 🤝 Contribuir
 
 1. Fork el repositorio
 2. Crear branch: `git checkout -b feature/mi-feature`
@@ -509,7 +742,23 @@ docker compose restart office
 
 ---
 
-## Licencia
+## 📋 Roadmap 2025
+
+Consulta [docs/DFO-ENHANCEMENT-PLAN-2025.md](docs/DFO-ENHANCEMENT-PLAN-2025.md) para el plan completo:
+
+**Sprint 1 (Completado):**
+- ✅ DFN-001: Agent Capabilities Registry
+- ✅ DFN-002: JSON-First API Standardization
+- 🔄 DFN-003: Health Check Automatizado
+- ✅ DFN-004: Comando /dfo ready
+- ⏳ DFN-005: Stats Dashboard DFO
+- ⏳ DFN-006: Fix endpoint inline documents
+
+**Sprints 2-7:** Ver plan completo para infrastructure, security, metrics y optimization.
+
+---
+
+## 📄 Licencia
 
 MIT License - Ver [LICENSE](LICENSE)
 

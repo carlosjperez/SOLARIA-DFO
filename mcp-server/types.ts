@@ -89,6 +89,7 @@ export type ApiCallFunction = (
 export interface ApiClient {
   apiCall: ApiCallFunction;
   authenticate: () => Promise<AuthResponse>;
+  setToken: (token: string) => void;
 }
 
 export interface AuthResponse {

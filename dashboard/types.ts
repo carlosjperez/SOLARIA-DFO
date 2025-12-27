@@ -578,6 +578,18 @@ export interface CFODashboard {
 // Socket.IO Types
 // ============================================================================
 
+export interface ActivityLoggedEvent {
+  id: number;
+  action: string;
+  message: string;
+  category: string;
+  level: string;
+  projectId: number | null;
+  agentId: number | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 export interface ServerToClientEvents {
   authenticated: (data: { user: UserPublic }) => void;
   authentication_error: (data: { error: string }) => void;
@@ -592,6 +604,14 @@ export interface ServerToClientEvents {
   task_tag_removed: (data: { task_id: number; tag_id: number }) => void;
   project_updated: (project: Project) => void;
   notification: (notification: { type: string; message: string }) => void;
+  activity_logged: (activity: ActivityLoggedEvent) => void;
+  epic_created: (data: { id: number; epicNumber: number; name: string; projectId: number }) => void;
+  sprint_created: (data: { id: number; sprintNumber: number; name: string; projectId: number }) => void;
+  // Real-time notification events (colon-style)
+  'project:created': (data: { projectId: number; name: string; code: string; priority: string }) => void;
+  'project:updated': (data: { projectId: number; name?: string; status?: string; progress?: number }) => void;
+  'project:deleted': (data: { projectId: number; name: string; code: string }) => void;
+  'project:archived': (data: { projectId: number; name: string; archived: boolean }) => void;
 }
 
 export interface ClientToServerEvents {

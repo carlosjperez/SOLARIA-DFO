@@ -23,3 +23,9 @@ export * from './memories.js';
 
 // Businesses
 export * from './businesses.js';
+
+// Office CRM (clients, contacts, payments)
+export * from './office-clients.js';
+
+// Permissions (RBAC)
+export * from './permissions.js';

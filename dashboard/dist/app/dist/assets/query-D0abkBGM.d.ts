@@ -1,0 +1,45 @@
+declare var Hs: {
+    new (e?: {}): {
+        mount(): void;
+        unmount(): void;
+        isFetching(e: any): any;
+        isMutating(e: any): any;
+        getQueryData(e: any): any;
+        ensureQueryData(e: any): any;
+        getQueriesData(e: any): any;
+        setQueryData(e: any, t: any, s: any): any;
+        setQueriesData(e: any, t: any, s: any): any;
+        getQueryState(e: any): any;
+        removeQueries(e: any): void;
+        resetQueries(e: any, t: any): any;
+        cancelQueries(e: any, t?: {}): Promise<void>;
+        invalidateQueries(e: any, t?: {}): any;
+        refetchQueries(e: any, t?: {}): Promise<void>;
+        fetchQuery(e: any): any;
+        prefetchQuery(e: any): any;
+        fetchInfiniteQuery(e: any): any;
+        prefetchInfiniteQuery(e: any): any;
+        ensureInfiniteQueryData(e: any): any;
+        resumePausedMutations(): any;
+        getQueryCache(): any;
+        getMutationCache(): any;
+        getDefaultOptions(): any;
+        setDefaultOptions(e: any): void;
+        setQueryDefaults(e: any, t: any): void;
+        getQueryDefaults(e: any): {};
+        setMutationDefaults(e: any, t: any): void;
+        getMutationDefaults(e: any): {};
+        defaultQueryOptions(e: any): any;
+        defaultMutationOptions(e: any): any;
+        clear(): void;
+    };
+};
+declare function Gs(e: any, t: any): any;
+declare function Bs(e: any, t: any): any;
+declare function Ns({ client: e, children: t }: {
+    client: any;
+    children: any;
+}): any;
+declare var as: {};
+declare function ss(e: any): any;
+export { Hs as Q, Gs as a, Bs as b, Ns as c, as as j, ss as u };

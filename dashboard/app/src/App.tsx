@@ -7,8 +7,12 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { ProjectsPage } from '@/pages/ProjectsPage';
 import { ProjectDetailPage } from '@/pages/ProjectDetailPage';
 import { ProjectTasksPage } from '@/pages/ProjectTasksPage';
+import { ProjectLinksPage } from '@/pages/ProjectLinksPage';
+import { ProjectSettingsPage } from '@/pages/ProjectSettingsPage';
+import { RoadmapPage } from '@/pages/RoadmapPage';
 import { TasksPage } from '@/pages/TasksPage';
 import { ArchivedTasksPage } from '@/pages/ArchivedTasksPage';
+import { ArchivedProjectsPage } from '@/pages/ArchivedProjectsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AgentsPage } from '@/pages/AgentsPage';
 import { BusinessesPage } from '@/pages/BusinessesPage';
@@ -28,7 +32,13 @@ function LoadingScreen() {
 }
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const { isAuthenticated, _hasHydrated } = useAuthStore();
+
+    // Wait for Zustand to hydrate from localStorage before checking auth
+    if (!_hasHydrated) {
+        return <LoadingScreen />;
+    }
+
     return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
@@ -53,8 +63,12 @@ function App() {
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="projects" element={<ProjectsPage />} />
+                <Route path="projects/archived" element={<ArchivedProjectsPage />} />
                 <Route path="projects/:id" element={<ProjectDetailPage />} />
                 <Route path="projects/:id/tasks" element={<ProjectTasksPage />} />
+                <Route path="projects/:id/links" element={<ProjectLinksPage />} />
+                <Route path="projects/:id/settings" element={<ProjectSettingsPage />} />
+                <Route path="projects/:id/roadmap" element={<RoadmapPage />} />
                 <Route path="tasks" element={<TasksPage />} />
                 <Route path="tasks/archived" element={<ArchivedTasksPage />} />
                 <Route path="agents" element={<AgentsPage />} />

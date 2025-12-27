@@ -12,6 +12,24 @@ import {
 } from '@/lib/api';
 import type { Project, Task, TaskItem, TaskTag, Agent, Memory, ActivityLog, DashboardStats, Epic, Sprint } from '@/types';
 
+/**
+ * Transform raw API project data to frontend Project type
+ * Handles both snake_case (raw API) and camelCase (axios interceptor transformed) fields
+ */
+function transformProjectData(p: Record<string, unknown>): Project {
+    const base = p as unknown as Project;
+    return {
+        ...base,
+        tasksTotal: (p.totalTasks ?? p.total_tasks ?? 0) as number,
+        tasksCompleted: (p.completedTasks ?? p.completed_tasks ?? 0) as number,
+        tasksPending: (p.pendingTasks ?? p.pending_tasks ?? 0) as number,
+        activeAgents: (p.agentsAssigned ?? p.agents_assigned ?? 0) as number,
+        // Prefer budgetAllocated, fallback to budget
+        budgetAllocated: (p.budgetAllocated ?? p.budget ?? 0) as number,
+        budgetSpent: (p.actualCost ?? p.actual_cost ?? 0) as number,
+    };
+}
+
 // Auth hooks
 export function useVerifyAuth() {
     return useQuery({
@@ -53,8 +71,9 @@ export function useDashboardAlerts() {
         queryKey: ['dashboard', 'alerts'],
         queryFn: async () => {
             const { data } = await dashboardApi.getAlerts();
-            // API returns alerts array directly or wrapped
-            return data.data || data.alerts || data || [];
+            // API returns alerts array directly or wrapped - ensure always an array
+            const result = data.data || data.alerts || data;
+            return Array.isArray(result) ? result : [];
         },
         refetchInterval: 15000, // Refresh every 15 seconds
     });
@@ -67,7 +86,10 @@ export function useProjects() {
         queryFn: async () => {
             const { data } = await projectsApi.getAll();
             // API returns { projects: [...] } not { data: [...] }
-            return (data.projects || data.data || []) as Project[];
+            const projects = data.projects || data.data || [];
+            // Map API fields to frontend types
+            // Note: axios interceptor transforms snake_case to camelCase (total_tasks -> totalTasks)
+            return projects.map((p: Record<string, unknown>) => transformProjectData(p));
         },
     });
 }
@@ -78,7 +100,8 @@ export function useProject(id: number) {
         queryFn: async () => {
             const { data } = await projectsApi.getById(id);
             // API returns { project: {...}, tasks: [...] }
-            return (data.project || data.data || data) as Project;
+            const p = data.project || data.data || data;
+            return transformProjectData(p as Record<string, unknown>);
         },
         enabled: !!id,
     });
@@ -123,9 +146,10 @@ export function useTask(id: number) {
         queryKey: ['tasks', id],
         queryFn: async () => {
             const { data } = await tasksApi.getById(id);
-            return data.data as Task;
+            // API returns { task: {...} } or { data: {...} } or task directly
+            return (data.task || data.data || data) as Task;
         },
-        enabled: !!id,
+        enabled: !!id && id > 0,
     });
 }
 
@@ -181,9 +205,10 @@ export function useAgent(id: number) {
         queryKey: ['agents', id],
         queryFn: async () => {
             const { data } = await agentsApi.getById(id);
-            return data.data as Agent;
+            // API returns { agent: {...} } or { data: {...} } or agent directly
+            return (data.agent || data.data || data) as Agent;
         },
-        enabled: !!id,
+        enabled: !!id && id > 0,
     });
 }
 
@@ -192,20 +217,31 @@ export function useAgentTasks(agentId: number, status?: string) {
         queryKey: ['agents', agentId, 'tasks', status],
         queryFn: async () => {
             const { data } = await agentsApi.getTasks(agentId, status);
-            return data.data as Task[];
+            // API returns { tasks: [...] } or { data: [...] } or array directly
+            return (data.tasks || data.data || data || []) as Task[];
         },
-        enabled: !!agentId,
+        enabled: !!agentId && agentId > 0,
     });
 }
 
 // Memories hooks
 export function useMemories(filters?: { projectId?: number; tags?: string[] }) {
+    // Create stable queryKey - only include non-empty values
+    const tagsKey = filters?.tags?.length ? filters.tags.join(',') : '';
+    const projectId = filters?.projectId;
+
     return useQuery({
-        queryKey: ['memories', filters],
+        queryKey: ['memories', { projectId, tags: tagsKey }],
         queryFn: async () => {
-            const { data } = await memoriesApi.getAll(filters);
+            // Only send params if they have values
+            const params: Record<string, unknown> = {};
+            if (projectId) params.projectId = projectId;
+            if (tagsKey) params.tags = JSON.stringify(filters!.tags);
+
+            const { data } = await memoriesApi.getAll(Object.keys(params).length > 0 ? params : undefined);
             // API returns { memories: [...] }
-            return (data.memories || data.data || data || []) as Memory[];
+            const memories = data?.memories || data?.data || data || [];
+            return Array.isArray(memories) ? memories as Memory[] : [];
         },
     });
 }
@@ -215,9 +251,10 @@ export function useMemory(id: number) {
         queryKey: ['memories', id],
         queryFn: async () => {
             const { data } = await memoriesApi.getById(id);
-            return data.data as Memory;
+            // API returns { memory: {...} } or { data: {...} } or memory directly
+            return (data.memory || data.data || data) as Memory;
         },
-        enabled: !!id,
+        enabled: !!id && id > 0,
     });
 }
 
@@ -274,6 +311,22 @@ export function useBoostMemory() {
             queryClient.invalidateQueries({ queryKey: ['memories'] });
             queryClient.invalidateQueries({ queryKey: ['memories', id] });
         },
+    });
+}
+
+export function useMemoryRelated(id: number) {
+    return useQuery({
+        queryKey: ['memories', id, 'related'],
+        queryFn: async () => {
+            const { data } = await memoriesApi.getRelated(id);
+            // API returns { related: [...] } or array directly
+            return (data.related || data.data || data || []) as Array<{
+                id: number;
+                relationshipType: string;
+                relatedMemory: Memory;
+            }>;
+        },
+        enabled: !!id,
     });
 }
 
@@ -539,6 +592,19 @@ export function useDeleteEpic() {
     });
 }
 
+// Get single epic with tasks
+export function useEpic(epicId: number | null) {
+    return useQuery({
+        queryKey: ['epics', epicId],
+        queryFn: async () => {
+            if (!epicId) return null;
+            const { data } = await epicsApi.getById(epicId);
+            return data as { epic: Epic & { tasks_count: number; tasks_completed: number; project_name: string; project_code: string }; tasks: Task[] };
+        },
+        enabled: !!epicId,
+    });
+}
+
 // ============================================================
 // Sprints hooks
 // ============================================================
@@ -585,5 +651,18 @@ export function useDeleteSprint() {
             queryClient.invalidateQueries({ queryKey: ['projects', variables.projectId, 'sprints'] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] }); // Tasks may have sprint assignments
         },
+    });
+}
+
+// Get single sprint with tasks
+export function useSprint(sprintId: number | null) {
+    return useQuery({
+        queryKey: ['sprints', sprintId],
+        queryFn: async () => {
+            if (!sprintId) return null;
+            const { data } = await sprintsApi.getById(sprintId);
+            return data as { sprint: Sprint & { tasks_count: number; tasks_completed: number; total_estimated_hours: number; project_name: string; project_code: string }; tasks: Task[] };
+        },
+        enabled: !!sprintId,
     });
 }

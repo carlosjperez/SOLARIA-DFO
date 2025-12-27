@@ -286,7 +286,7 @@ export function ProjectsPage() {
     const [sortBy, setSortBy] = useState<SortOption>('name');
 
     // Calculate board stats per project from real task data
-    const projectBoardStats = (projects || []).reduce((acc, project: Project) => {
+    const projectBoardStats = (projects || []).reduce((acc: Record<number, { backlog: number; todo: number; doing: number; done: number; blocked: number }>, project: Project) => {
         const projectTasks = (allTasks || []).filter((t: { projectId: number }) => t.projectId === project.id);
         acc[project.id] = {
             backlog: projectTasks.filter((t: { status: string }) => t.status === 'pending').length,

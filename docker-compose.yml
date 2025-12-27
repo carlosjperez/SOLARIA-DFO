@@ -13,6 +13,7 @@ services:
   # PRIMARY SERVICE: Office (Dashboard + Database)
   # ============================================================================
   office:
+    container_name: solaria-dfo-office
     build:
       context: .
       dockerfile: office.Dockerfile
@@ -29,6 +30,8 @@ services:
       - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
       - PORT=3030
       - NODE_ENV=${NODE_ENV:-production}
+      # Redis for caching and job queues
+      - REDIS_URL=redis://redis:6379
       # Project ingestion
       - REPO_PATH=/repo
       - CI_MODE=${CI_MODE:-false}
@@ -50,6 +53,7 @@ services:
   # REDIS: Cache and Queue
   # ============================================================================
   redis:
+    container_name: solaria-dfo-redis
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -70,6 +74,7 @@ services:
   # Includes Transformers.js for local vector embeddings
   # ============================================================================
   worker:
+    container_name: solaria-dfo-worker
     build:
       context: .
       dockerfile: worker.Dockerfile
@@ -106,6 +111,36 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # MCP: Model Context Protocol HTTP Server
+  # ============================================================================
+  mcp:
+    container_name: solaria-dfo-mcp
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile.http
+    ports:
+      - "3031:3031"
+    environment:
+      - MCP_PORT=3031
+      - DASHBOARD_API_URL=http://office:3030/api
+      - DASHBOARD_USER=carlosjperez
+      - DASHBOARD_PASS=bypass
+      - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
+      - NODE_ENV=${NODE_ENV:-production}
+    depends_on:
+      office:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3031/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - solaria-network
 

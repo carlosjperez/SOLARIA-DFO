@@ -1,7 +1,7 @@
 # SOLARIA Digital Field Operations - Oficina de Construcción en Campo
 
-**Versión:** 3.3.0
-**Última actualización:** 2025-12-21
+**Versión:** 3.5.0
+**Última actualización:** 2025-12-23
 
 ---
 
@@ -11,8 +11,8 @@
 
 | Recurso | URL |
 |---------|-----|
-| Dashboard (Original) | https://dfo.solaria.agency |
-| Dashboard (React v2) | https://dfo.solaria.agency/v2/ |
+| Dashboard (React) | https://dfo.solaria.agency |
+| Dashboard (Legacy) | https://dfo.solaria.agency/legacy |
 | API (Auth) | https://dfo.solaria.agency/api |
 | API Publica | https://dfo.solaria.agency/api/public |
 | MCP HTTP | https://dfo.solaria.agency/mcp |
@@ -71,15 +71,16 @@ ssh -i ~/.ssh/id_ed25519 root@148.230.118.124
 
 ---
 
-## React Dashboard v2
+## React Dashboard (Principal)
 
-**URL:** https://dfo.solaria.agency/v2/
+**URL:** https://dfo.solaria.agency
 
 | Componente | Ubicación |
 |------------|-----------|
-| Build output | `/var/www/dfo-v2/` |
+| Build local | `dashboard/app/dist/` |
+| Servidor | `/var/www/dfo-v2/` |
 | Nginx mount | `/usr/share/nginx/v2` |
-| Config | `/var/www/solaria-dfo/infrastructure/nginx/nginx.unified.conf` |
+| Legacy (vanilla) | https://dfo.solaria.agency/legacy |
 
 **Deploy desde local:**
 ```bash
@@ -89,17 +90,11 @@ rsync -avz --delete dist/ root@148.230.118.124:/var/www/dfo-v2/
 ssh -i ~/.ssh/id_ed25519 root@148.230.118.124 "docker exec solaria-dfo-nginx nginx -s reload"
 ```
 
-**Docker nginx con todos los volúmenes:**
-```bash
-docker run -d --name solaria-dfo-nginx \
-  --network solaria-dfo_solaria-dfo-network \
-  -p 80:80 -p 443:443 \
-  -v /var/www/solaria-dfo/infrastructure/nginx/nginx.unified.conf:/etc/nginx/nginx.conf:ro \
-  -v /etc/letsencrypt:/etc/letsencrypt:ro \
-  -v /var/www/dfo-v2:/usr/share/nginx/v2:ro \
-  --restart unless-stopped \
-  nginx:alpine
-```
+**Notas de deploy:**
+- El dashboard React se sirve via Nginx desde `/usr/share/nginx/v2`
+- El volumen Docker mapea `/var/www/dfo-v2/` → `/usr/share/nginx/v2`
+- Nginx maneja el routing SPA con `try_files $uri $uri/ /index.html`
+- El dashboard vanilla está disponible en `/legacy/` para referencia
 
 ---
 

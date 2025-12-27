@@ -15,11 +15,15 @@ interface ProjectHeaderProps {
     onSettingsClick?: () => void;
 }
 
-const statusConfig = {
-    planning: { label: 'Planificacion', color: 'text-gray-500', bg: 'bg-gray-500/10' },
-    active: { label: 'Activo', color: 'text-green-500', bg: 'bg-green-500/10' },
-    paused: { label: 'Pausado', color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
-    completed: { label: 'Completado', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
+    planning: { label: 'Planificacion', color: 'text-violet-500', bg: 'bg-violet-500/10' },
+    active: { label: 'Activo', color: 'text-solaria', bg: 'bg-solaria/10' },
+    development: { label: 'En Desarrollo', color: 'text-solaria', bg: 'bg-solaria/10' },
+    testing: { label: 'Testing', color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+    deployment: { label: 'Despliegue', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    paused: { label: 'Pausado', color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    on_hold: { label: 'En Espera', color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    completed: { label: 'Completado', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
     cancelled: { label: 'Cancelado', color: 'text-red-500', bg: 'bg-red-500/10' },
 };
 

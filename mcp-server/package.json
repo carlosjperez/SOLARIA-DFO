@@ -23,7 +23,8 @@
     "@modelcontextprotocol/sdk": "^1.24.3",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "helmet": "^7.1.0"
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3"
   },
   "keywords": [
     "mcp",
@@ -36,6 +37,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.0.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

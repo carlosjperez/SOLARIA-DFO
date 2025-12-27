@@ -7,6 +7,7 @@ import {
     int,
     varchar,
     text,
+    json,
     decimal,
     date,
     timestamp,
@@ -49,7 +50,18 @@ export const projects = mysqlTable('projects', {
     completionPercentage: int('completion_percentage').default(0),
     startDate: date('start_date'),
     deadline: date('deadline'),
+    // Project URLs
+    productionUrl: varchar('production_url', { length: 500 }),
+    stagingUrl: varchar('staging_url', { length: 500 }),
+    localUrl: varchar('local_url', { length: 500 }),
+    repoUrl: varchar('repo_url', { length: 500 }),
+    // Tags (JSON array of strings)
+    tags: json('tags').$type<string[]>(), // ["SAAS", "REACT", "B2B"]
+    // Stack (JSON array of tech names)
+    stack: json('stack').$type<string[]>(), // ["React", "Node.js", "MariaDB"]
     createdBy: int('created_by').references(() => users.id, { onDelete: 'set null' }),
+    // Office CRM link
+    officeClientId: int('office_client_id'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
 });

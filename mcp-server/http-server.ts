@@ -16,6 +16,7 @@ import express, { Request, Response, NextFunction, Application } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import crypto from "crypto";
+import jwt, { JwtPayload, VerifyErrors } from "jsonwebtoken";
 import {
   toolDefinitions,
   resourceDefinitions,
@@ -183,14 +184,26 @@ async function authenticateRequest(req: Request): Promise<AuthResult> {
       }
     }
 
-    // It's a JWT token - validate it
-    // For simplicity, we just try to use it with the dashboard
-    const apiClient = createApiClient(DASHBOARD_API, {
-      user: process.env.DASHBOARD_USER || "carlosjperez",
-      password: process.env.DASHBOARD_PASS || "bypass",
-    });
-    await apiClient.authenticate();
-    return { type: "jwt", token, apiClient };
+    // It's a JWT token - verify signature with JWT_SECRET
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+
+      // JWT is valid, create authenticated API client
+      const apiClient = createApiClient(DASHBOARD_API, {
+        user: process.env.DASHBOARD_USER || "carlosjperez",
+        password: process.env.DASHBOARD_PASS || "bypass",
+      });
+
+      // Use the verified JWT token directly instead of re-authenticating
+      apiClient.setToken(token);
+
+      console.log(`[AUTH] JWT verified for user: ${decoded.sub || decoded.userId || 'unknown'}`);
+      return { type: "jwt", token, apiClient };
+    } catch (jwtError) {
+      const error = jwtError as VerifyErrors;
+      console.log(`[AUTH] JWT verification failed: ${error.message}`);
+      throw new Error(`Invalid JWT token: ${error.message}`);
+    }
   }
 
   throw new Error("Invalid authorization format");

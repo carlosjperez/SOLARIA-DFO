@@ -63,6 +63,7 @@ export type ApiCallFunction = (endpoint: string, options?: RequestInit) => Promi
 export interface ApiClient {
     apiCall: ApiCallFunction;
     authenticate: () => Promise<AuthResponse>;
+    setToken: (token: string) => void;
 }
 export interface AuthResponse {
     token: string;

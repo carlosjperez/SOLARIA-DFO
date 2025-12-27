@@ -5,6 +5,8 @@ node_modules/
 playwright-report/
 test-results/
 backups/
-
 .backups/
 dashboard/public/office-backup-*/
+
+# TypeScript build cache (auto-generated)
+*.tsbuildinfo
