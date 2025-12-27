@@ -4,6 +4,13 @@
  *
  * @module handlers
  */
+// Import endpoint tools
+import { addDependency, removeDependency, getDependencies, detectDependencyCycles, getBlockedTasks, } from './src/endpoints/dependencies.js';
+import { getDependencyTree } from './src/endpoints/dependency-tree.js';
+import { getReadyTasks } from './src/endpoints/ready-tasks.js';
+import { getHealth } from './src/endpoints/health.js';
+import { getStats } from './src/endpoints/stats.js';
+import { createInlineDocument, getInlineDocument, listInlineDocuments, updateInlineDocument, deleteInlineDocument, searchDocuments, } from './src/endpoints/inline-documents.js';
 // ============================================================================
 // Tool Definitions
 // ============================================================================
@@ -834,6 +841,364 @@ export const toolDefinitions = [
             required: ["query"],
         },
     },
+    // ============================================================================
+    // Task Dependency Tools (DFN-007, DFN-008, DFN-004)
+    // ============================================================================
+    {
+        name: "add_dependency",
+        description: "Create a dependency relationship between two tasks. The task_id depends on (is blocked by) the depends_on_task_id task.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                task_id: {
+                    type: "number",
+                    description: "Task that depends on another (the child/blocked task)",
+                },
+                depends_on_task_id: {
+                    type: "number",
+                    description: "Task that must be completed first (the parent/blocking task)",
+                },
+                dependency_type: {
+                    type: "string",
+                    enum: ["blocks", "requires", "related", "child_of"],
+                    description: "Type of dependency (default: blocks)",
+                },
+                notes: {
+                    type: "string",
+                    description: "Optional notes about why this dependency exists",
+                },
+            },
+            required: ["task_id", "depends_on_task_id"],
+        },
+    },
+    {
+        name: "remove_dependency",
+        description: "Remove a dependency relationship between two tasks",
+        inputSchema: {
+            type: "object",
+            properties: {
+                task_id: { type: "number", description: "Dependent task ID" },
+                depends_on_task_id: { type: "number", description: "Dependency task ID" },
+            },
+            required: ["task_id", "depends_on_task_id"],
+        },
+    },
+    {
+        name: "get_dependencies",
+        description: "Get all dependencies for a task (both upstream and downstream)",
+        inputSchema: {
+            type: "object",
+            properties: {
+                task_id: { type: "number", description: "Task ID to get dependencies for" },
+                direction: {
+                    type: "string",
+                    enum: ["upstream", "downstream", "both"],
+                    description: "Direction of dependencies (default: both)",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+            required: ["task_id"],
+        },
+    },
+    {
+        name: "detect_dependency_cycles",
+        description: "Detect circular dependency cycles in task relationships",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Optional: filter by project" },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+        },
+    },
+    {
+        name: "get_blocked_tasks",
+        description: "Get all tasks that are blocked by incomplete dependencies",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Optional: filter by project" },
+                include_blockers: {
+                    type: "boolean",
+                    description: "Include details of blocking tasks (default: true)",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+        },
+    },
+    {
+        name: "get_dependency_tree",
+        description: "Get a hierarchical tree visualization of task dependencies",
+        inputSchema: {
+            type: "object",
+            properties: {
+                task_id: {
+                    type: "number",
+                    description: "Root task ID to build tree from",
+                },
+                direction: {
+                    type: "string",
+                    enum: ["upstream", "downstream"],
+                    description: "Tree direction (default: downstream)",
+                },
+                max_depth: {
+                    type: "number",
+                    description: "Maximum tree depth (default: 5)",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+            required: ["task_id"],
+        },
+    },
+    {
+        name: "get_ready_tasks",
+        description: "Get tasks that are ready to be worked on (no blocking dependencies)",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Optional: filter by project" },
+                priority: {
+                    type: "string",
+                    enum: ["critical", "high", "medium", "low"],
+                    description: "Optional: filter by priority",
+                },
+                assigned_agent_id: {
+                    type: "number",
+                    description: "Optional: filter by assigned agent",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+        },
+    },
+    // ============================================================================
+    // System Health & Stats (DFN-003, DFN-005)
+    // ============================================================================
+    {
+        name: "get_health",
+        description: "Check system health status including database, cache, disk, memory, and CPU",
+        inputSchema: {
+            type: "object",
+            properties: {
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+                include_details: {
+                    type: "boolean",
+                    description: "Include detailed metrics (default: true)",
+                },
+            },
+        },
+    },
+    {
+        name: "get_stats",
+        description: "Get aggregated system statistics for tasks, velocity, and agent workload",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: {
+                    type: "number",
+                    description: "Optional: filter by project (system-wide if not provided)",
+                },
+                sprint_id: {
+                    type: "number",
+                    description: "Optional: filter by sprint",
+                },
+                date_from: {
+                    type: "string",
+                    description: "Optional: start date (ISO 8601 format)",
+                },
+                date_to: {
+                    type: "string",
+                    description: "Optional: end date (ISO 8601 format)",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+        },
+    },
+    // ============================================================================
+    // Inline Documents (DFN-006)
+    // ============================================================================
+    {
+        name: "create_inline_document",
+        description: "Create a new inline document stored directly in the system",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Optional: project ID (for remote clients)" },
+                name: {
+                    type: "string",
+                    description: "Document name (minimum 3 characters)",
+                },
+                type: {
+                    type: "string",
+                    enum: ["plan", "spec", "report", "manual", "adr", "roadmap", "audit", "other"],
+                    description: "Document type (default: plan)",
+                },
+                content_md: {
+                    type: "string",
+                    description: "Markdown content of the document",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+            required: ["name", "content_md"],
+        },
+    },
+    {
+        name: "get_inline_document",
+        description: "Get a specific inline document by ID with full content",
+        inputSchema: {
+            type: "object",
+            properties: {
+                document_id: { type: "number", description: "Document ID" },
+                project_id: { type: "number", description: "Optional: project ID" },
+                include_content: {
+                    type: "boolean",
+                    description: "Include full markdown content (default: true)",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+            required: ["document_id"],
+        },
+    },
+    {
+        name: "list_inline_documents",
+        description: "List all inline documents for a project",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project_id: { type: "number", description: "Optional: project ID" },
+                type: {
+                    type: "string",
+                    enum: ["plan", "spec", "report", "manual", "adr", "roadmap", "audit", "other"],
+                    description: "Optional: filter by document type",
+                },
+                limit: {
+                    type: "number",
+                    minimum: 1,
+                    maximum: 100,
+                    description: "Maximum results (default: 20)",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+        },
+    },
+    {
+        name: "update_inline_document",
+        description: "Update an inline document, creating a new version",
+        inputSchema: {
+            type: "object",
+            properties: {
+                document_id: { type: "number", description: "Document ID to update" },
+                project_id: { type: "number", description: "Optional: project ID" },
+                name: {
+                    type: "string",
+                    description: "New document name",
+                },
+                type: {
+                    type: "string",
+                    enum: ["plan", "spec", "report", "manual", "adr", "roadmap", "audit", "other"],
+                    description: "New document type",
+                },
+                content_md: { type: "string", description: "New markdown content" },
+                change_summary: {
+                    type: "string",
+                    description: "Summary of changes made (max 500 characters)",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+            required: ["document_id"],
+        },
+    },
+    {
+        name: "delete_inline_document",
+        description: "Delete an inline document (soft delete - marks as inactive)",
+        inputSchema: {
+            type: "object",
+            properties: {
+                document_id: { type: "number", description: "Document ID to delete" },
+                project_id: { type: "number", description: "Optional: project ID" },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+            required: ["document_id"],
+        },
+    },
+    {
+        name: "search_documents",
+        description: "Search across all inline documents using full-text search. Returns results with relevance scoring.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                query: {
+                    type: "string",
+                    description: "Search query (minimum 2 characters)",
+                },
+                project_id: { type: "number", description: "Optional: filter by project" },
+                type: {
+                    type: "string",
+                    enum: ["plan", "spec", "report", "manual", "adr", "roadmap", "audit", "other"],
+                    description: "Optional: filter by document type",
+                },
+                limit: {
+                    type: "number",
+                    minimum: 1,
+                    maximum: 50,
+                    description: "Maximum results (default: 20)",
+                },
+                format: {
+                    type: "string",
+                    enum: ["json", "human"],
+                    description: "Output format (default: json)",
+                },
+            },
+            required: ["query"],
+        },
+    },
 ];
 // ============================================================================
 // Resource Definitions
@@ -1603,6 +1968,45 @@ export async function executeTool(name, args, apiCall, context = {}) {
                 searchParams.push(`include_fulltext=${params.include_fulltext}`);
             return apiCall(`/memories/semantic-search?${searchParams.join('&')}`);
         }
+        // ============================================================================
+        // Task Dependency Tools (DFN-007, DFN-008, DFN-004)
+        // ============================================================================
+        case "add_dependency":
+            return addDependency.execute(args);
+        case "remove_dependency":
+            return removeDependency.execute(args);
+        case "get_dependencies":
+            return getDependencies.execute(args);
+        case "detect_dependency_cycles":
+            return detectDependencyCycles.execute(args);
+        case "get_blocked_tasks":
+            return getBlockedTasks.execute(args);
+        case "get_dependency_tree":
+            return getDependencyTree.execute(args);
+        case "get_ready_tasks":
+            return getReadyTasks.execute(args);
+        // ============================================================================
+        // System Health & Stats (DFN-003, DFN-005)
+        // ============================================================================
+        case "get_health":
+            return getHealth.execute(args);
+        case "get_stats":
+            return getStats.execute(args);
+        // ============================================================================
+        // Inline Documents (DFN-006)
+        // ============================================================================
+        case "create_inline_document":
+            return createInlineDocument.execute(args);
+        case "get_inline_document":
+            return getInlineDocument.execute(args);
+        case "list_inline_documents":
+            return listInlineDocuments.execute(args);
+        case "update_inline_document":
+            return updateInlineDocument.execute(args);
+        case "delete_inline_document":
+            return deleteInlineDocument.execute(args);
+        case "search_documents":
+            return searchDocuments.execute(args);
         default:
             throw new Error(`Unknown tool: ${name}`);
     }

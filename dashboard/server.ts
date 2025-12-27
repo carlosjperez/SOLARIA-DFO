@@ -329,6 +329,15 @@ class SolariaDashboardServer {
         this.app.get('/api/projects/:id/documents', this.getProjectDocuments.bind(this));
         this.app.post('/api/projects/:id/documents', this.createProjectDocument.bind(this));
         this.app.delete('/api/projects/:id/documents/:docId', this.deleteProjectDocument.bind(this));
+
+        // Inline Documents
+        this.app.get('/api/projects/:id/documents/inline', this.getProjectInlineDocuments.bind(this));
+        this.app.post('/api/projects/:id/documents/inline', this.createInlineDocument.bind(this));
+        this.app.get('/api/documents/inline/:id', this.getInlineDocument.bind(this));
+        this.app.put('/api/documents/inline/:id', this.updateInlineDocument.bind(this));
+        this.app.delete('/api/documents/inline/:id', this.deleteInlineDocument.bind(this));
+        this.app.get('/api/documents/inline/search', this.searchInlineDocuments.bind(this));
+
         this.app.get('/api/projects/:id/requests', this.getProjectRequests.bind(this));
         this.app.post('/api/projects/:id/requests', this.createProjectRequest.bind(this));
         this.app.put('/api/projects/:id/requests/:reqId', this.updateProjectRequest.bind(this));
@@ -438,6 +447,42 @@ class SolariaDashboardServer {
         this.app.post('/api/webhooks/:id/test', this.testWebhook.bind(this));
         this.app.put('/api/webhooks/:id', this.updateWebhook.bind(this));
         this.app.delete('/api/webhooks/:id', this.deleteWebhook.bind(this));
+
+        // ========================================================================
+        // Office CRM API - RBAC Protected
+        // ========================================================================
+
+        // Office Dashboard
+        this.app.get('/api/office/dashboard', this.authenticateToken.bind(this), this.getOfficeDashboard.bind(this));
+
+        // Office Clients CRUD
+        this.app.get('/api/office/clients', this.authenticateToken.bind(this), this.getOfficeClients.bind(this));
+        this.app.get('/api/office/clients/:id', this.authenticateToken.bind(this), this.getOfficeClient.bind(this));
+        this.app.post('/api/office/clients', this.authenticateToken.bind(this), this.createOfficeClient.bind(this));
+        this.app.put('/api/office/clients/:id', this.authenticateToken.bind(this), this.updateOfficeClient.bind(this));
+        this.app.delete('/api/office/clients/:id', this.authenticateToken.bind(this), this.deleteOfficeClient.bind(this));
+
+        // Office Client Contacts
+        this.app.get('/api/office/clients/:id/contacts', this.authenticateToken.bind(this), this.getClientContacts.bind(this));
+        this.app.post('/api/office/clients/:id/contacts', this.authenticateToken.bind(this), this.createClientContact.bind(this));
+        this.app.put('/api/office/clients/:clientId/contacts/:id', this.authenticateToken.bind(this), this.updateClientContact.bind(this));
+        this.app.delete('/api/office/clients/:clientId/contacts/:id', this.authenticateToken.bind(this), this.deleteClientContact.bind(this));
+
+        // Office Client Projects
+        this.app.get('/api/office/clients/:id/projects', this.authenticateToken.bind(this), this.getClientProjects.bind(this));
+
+        // Office Payments
+        this.app.get('/api/office/payments', this.authenticateToken.bind(this), this.getOfficePayments.bind(this));
+        this.app.get('/api/office/payments/:id', this.authenticateToken.bind(this), this.getOfficePayment.bind(this));
+        this.app.post('/api/office/payments', this.authenticateToken.bind(this), this.createOfficePayment.bind(this));
+        this.app.put('/api/office/payments/:id', this.authenticateToken.bind(this), this.updateOfficePayment.bind(this));
+
+        // Office Projects (filtered for office visibility)
+        this.app.get('/api/office/projects', this.authenticateToken.bind(this), this.getOfficeProjects.bind(this));
+
+        // Permissions API
+        this.app.get('/api/office/permissions', this.authenticateToken.bind(this), this.getPermissions.bind(this));
+        this.app.get('/api/office/permissions/my', this.authenticateToken.bind(this), this.getMyPermissions.bind(this));
 
         // Static files
         this.app.use(express.static(path.join(__dirname, 'public')));
@@ -2599,6 +2644,218 @@ class SolariaDashboardServer {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             console.error('Error deleting project document:', errorMessage);
             res.status(500).json({ error: 'Failed to delete project document' });
+        }
+    }
+
+    // ===================================================================
+    // Inline Documents Methods
+    // ===================================================================
+
+    private async getProjectInlineDocuments(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { type } = req.query;
+
+            let query = `
+                SELECT id, project_id, name, type, version, is_active,
+                       created_at, updated_at, created_by_agent_id
+                FROM inline_documents
+                WHERE project_id = ? AND is_active = 1
+            `;
+            const params: any[] = [id];
+
+            if (type) {
+                query += ' AND type = ?';
+                params.push(type);
+            }
+
+            query += ' ORDER BY updated_at DESC';
+
+            const [rows] = await this.db!.execute<RowDataPacket[]>(query, params);
+            res.json({ documents: rows });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Error getting inline documents:', errorMessage);
+            res.status(500).json({ error: 'Failed to get inline documents' });
+        }
+    }
+
+    private async createInlineDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { name, type, content_md } = req.body;
+            const created_by_agent_id = req.user?.userId || null;
+
+            if (!name || !content_md) {
+                res.status(400).json({ error: 'Name and content_md are required' });
+                return;
+            }
+
+            const [result] = await this.db!.execute<ResultSetHeader>(`
+                INSERT INTO inline_documents (project_id, name, type, content_md, version, is_active, created_by_agent_id)
+                VALUES (?, ?, ?, ?, 1, 1, ?)
+            `, [id, name, type || 'plan', content_md, created_by_agent_id]);
+
+            const [newDoc] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT * FROM inline_documents WHERE id = ?
+            `, [result.insertId]);
+
+            res.status(201).json({
+                document: newDoc[0],
+                message: 'Inline document created successfully'
+            });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Error creating inline document:', errorMessage);
+            res.status(500).json({ error: 'Failed to create inline document' });
+        }
+    }
+
+    private async getInlineDocument(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            const [rows] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT * FROM inline_documents WHERE id = ? AND is_active = 1
+            `, [id]);
+
+            if (rows.length === 0) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+
+            res.json({ document: rows[0] });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Error getting inline document:', errorMessage);
+            res.status(500).json({ error: 'Failed to get inline document' });
+        }
+    }
+
+    private async updateInlineDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const { name, type, content_md, change_summary } = req.body;
+
+            // Get existing document
+            const [existing] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT * FROM inline_documents WHERE id = ? AND is_active = 1
+            `, [id]);
+
+            if (existing.length === 0) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+
+            const doc = existing[0];
+
+            // Archive old version
+            await this.db!.execute(`
+                UPDATE inline_documents SET is_active = 0, archived_at = NOW() WHERE id = ?
+            `, [id]);
+
+            // Insert new version
+            const [result] = await this.db!.execute<ResultSetHeader>(`
+                INSERT INTO inline_documents (
+                    project_id, name, type, content_md, version, is_active,
+                    parent_version_id, change_summary, created_by_agent_id
+                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
+            `, [
+                doc.project_id,
+                name || doc.name,
+                type || doc.type,
+                content_md !== undefined ? content_md : doc.content_md,
+                doc.version + 1,
+                id,
+                change_summary || null,
+                req.user?.userId || null
+            ]);
+
+            const [newDoc] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT * FROM inline_documents WHERE id = ?
+            `, [result.insertId]);
+
+            res.json({
+                document: newDoc[0],
+                previous_version: doc.version,
+                message: 'Document updated to version ' + (doc.version + 1)
+            });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Error updating inline document:', errorMessage);
+            res.status(500).json({ error: 'Failed to update inline document' });
+        }
+    }
+
+    private async deleteInlineDocument(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            const [result] = await this.db!.execute<ResultSetHeader>(`
+                UPDATE inline_documents SET is_active = 0, archived_at = NOW() WHERE id = ?
+            `, [id]);
+
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Document not found' });
+                return;
+            }
+
+            res.json({ message: 'Document deleted successfully' });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Error deleting inline document:', errorMessage);
+            res.status(500).json({ error: 'Failed to delete inline document' });
+        }
+    }
+
+    private async searchInlineDocuments(req: Request, res: Response): Promise<void> {
+        try {
+            const { query, project_id, type, limit } = req.query;
+
+            if (!query) {
+                res.status(400).json({ error: 'Query parameter is required' });
+                return;
+            }
+
+            const searchPattern = `%${query}%`;
+            let sql = `
+                SELECT id, project_id, name, type, version, created_at, updated_at
+                FROM inline_documents
+                WHERE is_active = 1 AND (name LIKE ? OR content_md LIKE ?)
+            `;
+            const params: any[] = [searchPattern, searchPattern];
+
+            if (project_id) {
+                sql += ' AND project_id = ?';
+                params.push(project_id);
+            }
+
+            if (type) {
+                sql += ' AND type = ?';
+                params.push(type);
+            }
+
+            sql += ' ORDER BY updated_at DESC';
+
+            if (limit) {
+                sql += ' LIMIT ?';
+                params.push(parseInt(limit as string));
+            } else {
+                sql += ' LIMIT 20';
+            }
+
+            const [rows] = await this.db!.execute<RowDataPacket[]>(sql, params);
+            res.json({ documents: rows, total: rows.length });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Error searching inline documents:', errorMessage);
+            res.status(500).json({ error: 'Failed to search inline documents' });
         }
     }
 
@@ -5760,6 +6017,602 @@ class SolariaDashboardServer {
         }
 
         await this.webhookService.dispatch(eventType, data, projectId);
+    }
+
+    // ========================================================================
+    // Office CRM API Handlers
+    // ========================================================================
+
+    private async getOfficeDashboard(_req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            // Get client stats
+            const [clientStats] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+                    SUM(CASE WHEN status = 'lead' THEN 1 ELSE 0 END) as leads,
+                    SUM(CASE WHEN status = 'prospect' THEN 1 ELSE 0 END) as prospects,
+                    SUM(lifetime_value) as total_ltv
+                FROM office_clients
+            `);
+
+            // Get project stats (office visible only)
+            const [projectStats] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'development' THEN 1 ELSE 0 END) as in_development,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(budget) as total_budget
+                FROM projects WHERE office_visible = 1
+            `);
+
+            // Get payment stats
+            const [paymentStats] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'received' THEN amount ELSE 0 END) as received,
+                    SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) as pending
+                FROM office_payments
+            `);
+
+            // Recent activity
+            const [recentClients] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT id, name, status, created_at
+                FROM office_clients
+                ORDER BY created_at DESC LIMIT 5
+            `);
+
+            res.json({
+                success: true,
+                dashboard: {
+                    clients: clientStats[0] || { total: 0, active: 0, leads: 0, prospects: 0, total_ltv: 0 },
+                    projects: projectStats[0] || { total: 0, in_development: 0, completed: 0, total_budget: 0 },
+                    payments: paymentStats[0] || { total: 0, received: 0, pending: 0 },
+                    recent_clients: recentClients
+                }
+            });
+        } catch (error) {
+            console.error('Error getting office dashboard:', error);
+            res.status(500).json({ error: 'Failed to get dashboard' });
+        }
+    }
+
+    private async getOfficeClients(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { status, industry, search, limit = 50, offset = 0 } = req.query;
+
+            let query = 'SELECT * FROM office_clients WHERE 1=1';
+            const params: unknown[] = [];
+
+            if (status) {
+                query += ' AND status = ?';
+                params.push(status);
+            }
+            if (industry) {
+                query += ' AND industry = ?';
+                params.push(industry);
+            }
+            if (search) {
+                query += ' AND (name LIKE ? OR commercial_name LIKE ? OR primary_email LIKE ?)';
+                const searchTerm = `%${search}%`;
+                params.push(searchTerm, searchTerm, searchTerm);
+            }
+
+            query += ' ORDER BY updated_at DESC LIMIT ? OFFSET ?';
+            params.push(Number(limit), Number(offset));
+
+            const [clients] = await this.db!.execute<RowDataPacket[]>(query, params);
+
+            // Get total count
+            let countQuery = 'SELECT COUNT(*) as total FROM office_clients WHERE 1=1';
+            const countParams: unknown[] = [];
+            if (status) { countQuery += ' AND status = ?'; countParams.push(status); }
+            if (industry) { countQuery += ' AND industry = ?'; countParams.push(industry); }
+            if (search) {
+                countQuery += ' AND (name LIKE ? OR commercial_name LIKE ? OR primary_email LIKE ?)';
+                const searchTerm = `%${search}%`;
+                countParams.push(searchTerm, searchTerm, searchTerm);
+            }
+
+            const [countResult] = await this.db!.execute<RowDataPacket[]>(countQuery, countParams);
+
+            res.json({
+                success: true,
+                clients,
+                total: countResult[0]?.total || 0,
+                limit: Number(limit),
+                offset: Number(offset)
+            });
+        } catch (error) {
+            console.error('Error getting office clients:', error);
+            res.status(500).json({ error: 'Failed to get clients' });
+        }
+    }
+
+    private async getOfficeClient(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            const [clients] = await this.db!.execute<RowDataPacket[]>(
+                'SELECT * FROM office_clients WHERE id = ?',
+                [id]
+            );
+
+            if (clients.length === 0) {
+                res.status(404).json({ error: 'Client not found' });
+                return;
+            }
+
+            // Get contacts
+            const [contacts] = await this.db!.execute<RowDataPacket[]>(
+                'SELECT * FROM office_client_contacts WHERE client_id = ? ORDER BY is_primary DESC, name',
+                [id]
+            );
+
+            // Get projects linked to this client
+            const [projects] = await this.db!.execute<RowDataPacket[]>(
+                'SELECT id, name, code, status, budget, deadline FROM projects WHERE office_client_id = ?',
+                [id]
+            );
+
+            // Get payments
+            const [payments] = await this.db!.execute<RowDataPacket[]>(
+                'SELECT * FROM office_payments WHERE client_id = ? ORDER BY payment_date DESC LIMIT 10',
+                [id]
+            );
+
+            res.json({
+                success: true,
+                client: {
+                    ...clients[0],
+                    contacts,
+                    projects,
+                    payments
+                }
+            });
+        } catch (error) {
+            console.error('Error getting office client:', error);
+            res.status(500).json({ error: 'Failed to get client' });
+        }
+    }
+
+    private async createOfficeClient(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const {
+                name, commercial_name, industry, company_size, status,
+                primary_email, primary_phone, website,
+                address_line1, address_line2, city, state, postal_code, country,
+                tax_id, fiscal_name, notes, assigned_to
+            } = req.body;
+
+            if (!name) {
+                res.status(400).json({ error: 'Client name is required' });
+                return;
+            }
+
+            // Convert undefined to null for SQL compatibility
+            const toNull = (v: unknown) => v === undefined ? null : v;
+
+            const [result] = await this.db!.execute<ResultSetHeader>(
+                `INSERT INTO office_clients
+                (name, commercial_name, industry, company_size, status,
+                 primary_email, primary_phone, website,
+                 address_line1, address_line2, city, state, postal_code, country,
+                 tax_id, fiscal_name, notes, created_by, assigned_to)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [name, toNull(commercial_name), toNull(industry), company_size || 'small', status || 'lead',
+                 toNull(primary_email), toNull(primary_phone), toNull(website),
+                 toNull(address_line1), toNull(address_line2), toNull(city), toNull(state), toNull(postal_code), country || 'Mexico',
+                 toNull(tax_id), toNull(fiscal_name), toNull(notes), req.user?.userId || null, toNull(assigned_to)]
+            );
+
+            res.status(201).json({
+                success: true,
+                message: 'Client created',
+                client_id: result.insertId
+            });
+        } catch (error) {
+            console.error('Error creating office client:', error);
+            res.status(500).json({ error: 'Failed to create client' });
+        }
+    }
+
+    private async updateOfficeClient(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const updates = req.body;
+
+            const allowedFields = [
+                'name', 'commercial_name', 'industry', 'company_size', 'status',
+                'primary_email', 'primary_phone', 'website',
+                'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country',
+                'tax_id', 'fiscal_name', 'notes', 'assigned_to', 'lifetime_value', 'logo_url'
+            ];
+
+            const fields: string[] = [];
+            const values: unknown[] = [];
+
+            for (const field of allowedFields) {
+                if (updates[field] !== undefined) {
+                    fields.push(`${field} = ?`);
+                    values.push(updates[field]);
+                }
+            }
+
+            if (fields.length === 0) {
+                res.status(400).json({ error: 'No valid fields to update' });
+                return;
+            }
+
+            values.push(id);
+
+            await this.db!.execute(
+                `UPDATE office_clients SET ${fields.join(', ')} WHERE id = ?`,
+                values
+            );
+
+            res.json({ success: true, message: 'Client updated' });
+        } catch (error) {
+            console.error('Error updating office client:', error);
+            res.status(500).json({ error: 'Failed to update client' });
+        }
+    }
+
+    private async deleteOfficeClient(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            // Soft delete - change status to churned
+            await this.db!.execute(
+                'UPDATE office_clients SET status = ? WHERE id = ?',
+                ['churned', id]
+            );
+
+            res.json({ success: true, message: 'Client archived' });
+        } catch (error) {
+            console.error('Error deleting office client:', error);
+            res.status(500).json({ error: 'Failed to delete client' });
+        }
+    }
+
+    private async getClientContacts(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            const [contacts] = await this.db!.execute<RowDataPacket[]>(
+                'SELECT * FROM office_client_contacts WHERE client_id = ? ORDER BY is_primary DESC, name',
+                [id]
+            );
+
+            res.json({ success: true, contacts });
+        } catch (error) {
+            console.error('Error getting client contacts:', error);
+            res.status(500).json({ error: 'Failed to get contacts' });
+        }
+    }
+
+    private async createClientContact(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id: client_id } = req.params;
+            const { name, title, email, phone, is_primary, notes } = req.body;
+
+            if (!name) {
+                res.status(400).json({ error: 'Contact name is required' });
+                return;
+            }
+
+            // If setting as primary, unset other primaries
+            if (is_primary) {
+                await this.db!.execute(
+                    'UPDATE office_client_contacts SET is_primary = 0 WHERE client_id = ?',
+                    [client_id]
+                );
+            }
+
+            // Convert undefined to null for SQL compatibility
+            const toNull = (v: unknown) => v === undefined ? null : v;
+
+            const [result] = await this.db!.execute<ResultSetHeader>(
+                `INSERT INTO office_client_contacts (client_id, name, title, email, phone, is_primary, notes)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [client_id, name, toNull(title), toNull(email), toNull(phone), is_primary ? 1 : 0, toNull(notes)]
+            );
+
+            res.status(201).json({
+                success: true,
+                message: 'Contact created',
+                contact_id: result.insertId
+            });
+        } catch (error) {
+            console.error('Error creating client contact:', error);
+            res.status(500).json({ error: 'Failed to create contact' });
+        }
+    }
+
+    private async updateClientContact(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { clientId, id } = req.params;
+            const { name, title, email, phone, is_primary, notes } = req.body;
+
+            if (is_primary) {
+                await this.db!.execute(
+                    'UPDATE office_client_contacts SET is_primary = 0 WHERE client_id = ?',
+                    [clientId]
+                );
+            }
+
+            await this.db!.execute(
+                `UPDATE office_client_contacts
+                 SET name = COALESCE(?, name), title = ?, email = ?, phone = ?,
+                     is_primary = ?, notes = ?
+                 WHERE id = ? AND client_id = ?`,
+                [name, title, email, phone, is_primary ? 1 : 0, notes, id, clientId]
+            );
+
+            res.json({ success: true, message: 'Contact updated' });
+        } catch (error) {
+            console.error('Error updating client contact:', error);
+            res.status(500).json({ error: 'Failed to update contact' });
+        }
+    }
+
+    private async deleteClientContact(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { clientId, id } = req.params;
+
+            await this.db!.execute(
+                'DELETE FROM office_client_contacts WHERE id = ? AND client_id = ?',
+                [id, clientId]
+            );
+
+            res.json({ success: true, message: 'Contact deleted' });
+        } catch (error) {
+            console.error('Error deleting client contact:', error);
+            res.status(500).json({ error: 'Failed to delete contact' });
+        }
+    }
+
+    private async getClientProjects(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            const [projects] = await this.db!.execute<RowDataPacket[]>(
+                `SELECT p.*,
+                        (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as task_count,
+                        (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks
+                 FROM projects p
+                 WHERE p.office_client_id = ?
+                 ORDER BY p.created_at DESC`,
+                [id]
+            );
+
+            res.json({ success: true, projects });
+        } catch (error) {
+            console.error('Error getting client projects:', error);
+            res.status(500).json({ error: 'Failed to get projects' });
+        }
+    }
+
+    private async getOfficePayments(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { status, client_id, project_id, limit = 50, offset = 0 } = req.query;
+
+            let query = `
+                SELECT p.*,
+                       c.name as client_name,
+                       pr.name as project_name
+                FROM office_payments p
+                LEFT JOIN office_clients c ON p.client_id = c.id
+                LEFT JOIN projects pr ON p.project_id = pr.id
+                WHERE 1=1
+            `;
+            const params: unknown[] = [];
+
+            if (status) { query += ' AND p.status = ?'; params.push(status); }
+            if (client_id) { query += ' AND p.client_id = ?'; params.push(client_id); }
+            if (project_id) { query += ' AND p.project_id = ?'; params.push(project_id); }
+
+            query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
+            params.push(Number(limit), Number(offset));
+
+            const [payments] = await this.db!.execute<RowDataPacket[]>(query, params);
+
+            res.json({ success: true, payments });
+        } catch (error) {
+            console.error('Error getting office payments:', error);
+            res.status(500).json({ error: 'Failed to get payments' });
+        }
+    }
+
+    private async getOfficePayment(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            const [payments] = await this.db!.execute<RowDataPacket[]>(
+                `SELECT p.*,
+                        c.name as client_name,
+                        pr.name as project_name
+                 FROM office_payments p
+                 LEFT JOIN office_clients c ON p.client_id = c.id
+                 LEFT JOIN projects pr ON p.project_id = pr.id
+                 WHERE p.id = ?`,
+                [id]
+            );
+
+            if (payments.length === 0) {
+                res.status(404).json({ error: 'Payment not found' });
+                return;
+            }
+
+            res.json({ success: true, payment: payments[0] });
+        } catch (error) {
+            console.error('Error getting office payment:', error);
+            res.status(500).json({ error: 'Failed to get payment' });
+        }
+    }
+
+    private async createOfficePayment(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const {
+                client_id, project_id, amount, currency, status,
+                payment_type, payment_date, due_date, reference, invoice_number, notes
+            } = req.body;
+
+            if (!amount) {
+                res.status(400).json({ error: 'Amount is required' });
+                return;
+            }
+
+            // Convert undefined to null for SQL compatibility
+            const toNull = (v: unknown) => v === undefined ? null : v;
+
+            const [result] = await this.db!.execute<ResultSetHeader>(
+                `INSERT INTO office_payments
+                (client_id, project_id, amount, currency, status, payment_type,
+                 payment_date, due_date, reference, invoice_number, notes, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [toNull(client_id), toNull(project_id), amount, currency || 'MXN', status || 'pending',
+                 payment_type || 'milestone', toNull(payment_date), toNull(due_date), toNull(reference), toNull(invoice_number),
+                 toNull(notes), req.user?.userId || null]
+            );
+
+            res.status(201).json({
+                success: true,
+                message: 'Payment created',
+                payment_id: result.insertId
+            });
+        } catch (error) {
+            console.error('Error creating office payment:', error);
+            res.status(500).json({ error: 'Failed to create payment' });
+        }
+    }
+
+    private async updateOfficePayment(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const updates = req.body;
+
+            const allowedFields = [
+                'amount', 'currency', 'status', 'payment_type',
+                'payment_date', 'due_date', 'reference', 'invoice_number', 'notes'
+            ];
+
+            const fields: string[] = [];
+            const values: unknown[] = [];
+
+            for (const field of allowedFields) {
+                if (updates[field] !== undefined) {
+                    fields.push(`${field} = ?`);
+                    values.push(updates[field]);
+                }
+            }
+
+            if (fields.length === 0) {
+                res.status(400).json({ error: 'No valid fields to update' });
+                return;
+            }
+
+            values.push(id);
+
+            await this.db!.execute(
+                `UPDATE office_payments SET ${fields.join(', ')} WHERE id = ?`,
+                values
+            );
+
+            res.json({ success: true, message: 'Payment updated' });
+        } catch (error) {
+            console.error('Error updating office payment:', error);
+            res.status(500).json({ error: 'Failed to update payment' });
+        }
+    }
+
+    private async getOfficeProjects(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const { status, client_id, limit = 50, offset = 0 } = req.query;
+
+            let query = `
+                SELECT p.*,
+                       c.name as client_name,
+                       (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as task_count,
+                       (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks
+                FROM projects p
+                LEFT JOIN office_clients c ON p.office_client_id = c.id
+                WHERE p.office_visible = 1
+            `;
+            const params: unknown[] = [];
+
+            if (status) { query += ' AND p.status = ?'; params.push(status); }
+            if (client_id) { query += ' AND p.office_client_id = ?'; params.push(client_id); }
+
+            query += ' ORDER BY p.updated_at DESC LIMIT ? OFFSET ?';
+            params.push(Number(limit), Number(offset));
+
+            const [projects] = await this.db!.execute<RowDataPacket[]>(query, params);
+
+            res.json({ success: true, projects });
+        } catch (error) {
+            console.error('Error getting office projects:', error);
+            res.status(500).json({ error: 'Failed to get projects' });
+        }
+    }
+
+    private async getPermissions(_req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const [permissions] = await this.db!.execute<RowDataPacket[]>(
+                'SELECT * FROM permissions ORDER BY category, code'
+            );
+
+            const [rolePermissions] = await this.db!.execute<RowDataPacket[]>(
+                `SELECT rp.role, p.code as permission
+                 FROM role_permissions rp
+                 JOIN permissions p ON rp.permission_id = p.id`
+            );
+
+            // Group permissions by role
+            const roleMap: Record<string, string[]> = {};
+            for (const rp of rolePermissions) {
+                if (!roleMap[rp.role]) roleMap[rp.role] = [];
+                roleMap[rp.role].push(rp.permission);
+            }
+
+            res.json({
+                success: true,
+                permissions,
+                roles: roleMap
+            });
+        } catch (error) {
+            console.error('Error getting permissions:', error);
+            res.status(500).json({ error: 'Failed to get permissions' });
+        }
+    }
+
+    private async getMyPermissions(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const userRole = req.user?.role;
+            if (!userRole) {
+                res.status(401).json({ error: 'Not authenticated' });
+                return;
+            }
+
+            const [permissions] = await this.db!.execute<RowDataPacket[]>(
+                `SELECT p.code, p.name, p.description, p.category
+                 FROM permissions p
+                 JOIN role_permissions rp ON p.id = rp.permission_id
+                 WHERE rp.role = ?
+                 ORDER BY p.category, p.code`,
+                [userRole]
+            );
+
+            res.json({
+                success: true,
+                role: userRole,
+                permissions: permissions.map((p: RowDataPacket) => p.code),
+                details: permissions
+            });
+        } catch (error) {
+            console.error('Error getting my permissions:', error);
+            res.status(500).json({ error: 'Failed to get permissions' });
+        }
     }
 
     // ========================================================================

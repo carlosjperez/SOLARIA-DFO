@@ -15,6 +15,7 @@ declare class SolariaDashboardServer {
     private repoPath;
     private _dbHealthInterval;
     private workerUrl;
+    private webhookService;
     constructor();
     private initializeMiddleware;
     private initializeDatabase;
@@ -64,12 +65,16 @@ declare class SolariaDashboardServer {
     private createProject;
     private updateProject;
     private deleteProject;
+    private archiveProject;
+    private unarchiveProject;
     private checkProjectCode;
     private getProjectEpics;
+    private getEpicById;
     private createEpic;
     private updateEpic;
     private deleteEpic;
     private getProjectSprints;
+    private getSprintById;
     private createSprint;
     private updateSprint;
     private deleteSprint;
@@ -78,6 +83,12 @@ declare class SolariaDashboardServer {
     private getProjectDocuments;
     private createProjectDocument;
     private deleteProjectDocument;
+    private getProjectInlineDocuments;
+    private createInlineDocument;
+    private getInlineDocument;
+    private updateInlineDocument;
+    private deleteInlineDocument;
+    private searchInlineDocuments;
     private getProjectRequests;
     private createProjectRequest;
     private updateProjectRequest;
@@ -108,12 +119,15 @@ declare class SolariaDashboardServer {
     private getTasksByTag;
     private getBusinesses;
     private getBusiness;
+    private createBusiness;
     private updateBusiness;
+    private deleteBusiness;
     private getLogs;
     private getAuditLogs;
     private getProjectReports;
     private getAgentReports;
     private getFinancialReports;
+    private getOpenAPISpec;
     private getDocumentsList;
     private getProjectSpecs;
     private getProjectCredentials;
@@ -145,6 +159,36 @@ declare class SolariaDashboardServer {
     private boostMemory;
     private getRelatedMemories;
     private createMemoryCrossref;
+    private getWebhooks;
+    private getWebhook;
+    private getWebhookDeliveries;
+    private createWebhook;
+    private updateWebhook;
+    private deleteWebhook;
+    private testWebhook;
+    /**
+     * Dispatch webhook event (internal use)
+     * Called when task/project events occur
+     */
+    dispatchWebhookEvent(eventType: string, data: Record<string, unknown>, projectId?: number): Promise<void>;
+    private getOfficeDashboard;
+    private getOfficeClients;
+    private getOfficeClient;
+    private createOfficeClient;
+    private updateOfficeClient;
+    private deleteOfficeClient;
+    private getClientContacts;
+    private createClientContact;
+    private updateClientContact;
+    private deleteClientContact;
+    private getClientProjects;
+    private getOfficePayments;
+    private getOfficePayment;
+    private createOfficePayment;
+    private updateOfficePayment;
+    private getOfficeProjects;
+    private getPermissions;
+    private getMyPermissions;
     start(): void;
 }
 export default SolariaDashboardServer;

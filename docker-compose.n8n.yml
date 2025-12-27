@@ -1,0 +1,97 @@
+# SOLARIA DFO - n8n Workflow Automation Stack
+# Version: 1.0.0
+#
+# This stack runs alongside the main DFO services (docker-compose.prod.yml)
+# Provides workflow automation, webhooks, and external service integrations
+#
+# Usage:
+#   docker compose -f docker-compose.n8n.yml up -d
+#
+# Access:
+#   https://n8n.solaria.agency (after SSL setup)
+#   http://localhost:5678 (local development)
+
+services:
+  # ===========================================
+  # N8N: Workflow Automation Platform
+  # ===========================================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: solaria-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      # Database
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres-n8n
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n_user
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:-n8nSecure2024}
+      # Security
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-SolariaAdmin2024}
+      # Webhook configuration
+      - WEBHOOK_URL=https://n8n.solaria.agency/
+      - N8N_HOST=n8n.solaria.agency
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      # Timezone
+      - GENERIC_TIMEZONE=America/Mexico_City
+      - TZ=America/Mexico_City
+      # Execution settings
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      # Node environment
+      - NODE_ENV=production
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres-n8n:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - solaria-dfo-network
+
+  # ===========================================
+  # POSTGRES-N8N: Dedicated Database for n8n
+  # ===========================================
+  postgres-n8n:
+    image: postgres:15-alpine
+    container_name: solaria-n8n-postgres
+    environment:
+      - POSTGRES_DB=n8n
+      - POSTGRES_USER=n8n_user
+      - POSTGRES_PASSWORD=${N8N_DB_PASSWORD:-n8nSecure2024}
+      - POSTGRES_NON_ROOT_USER=n8n_user
+    volumes:
+      - postgres_n8n_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n_user -d n8n"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - solaria-dfo-network
+
+volumes:
+  n8n_data:
+    driver: local
+  postgres_n8n_data:
+    driver: local
+
+networks:
+  solaria-dfo-network:
+    external: true
+    name: solaria-dfo_solaria-dfo-network
