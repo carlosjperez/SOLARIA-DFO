@@ -90,12 +90,181 @@ export interface DashboardStats {
     activeAgents: number;
 }
 
-// Client types
+// Client types (legacy simple)
 export interface Client {
     name: string;
     projects: number;
     totalBudget: number;
     activeProjects: number;
+}
+
+// Office Client types (full CRM)
+export interface OfficeClient {
+    id: number;
+    name: string;
+    commercial_name?: string;
+    industry?: string;
+    company_size?: 'startup' | 'small' | 'medium' | 'enterprise';
+    status: ClientStatus;
+    primary_email?: string;
+    primary_phone?: string;
+    website?: string;
+    address_line1?: string;
+    address_line2?: string;
+    city?: string;
+    state?: string;
+    postal_code?: string;
+    country?: string;
+    tax_id?: string;
+    fiscal_name?: string;
+    lifetime_value?: number;
+    total_projects?: number;
+    logo_url?: string;
+    notes?: string;
+    created_at: string;
+    updated_at?: string;
+    assigned_to?: {
+        id: number;
+        name: string;
+    };
+}
+
+export type ClientStatus = 'lead' | 'prospect' | 'active' | 'inactive' | 'churned';
+
+export interface ClientContact {
+    id: number;
+    client_id: number;
+    name: string;
+    title?: string;
+    email?: string;
+    phone?: string;
+    is_primary: boolean;
+    notes?: string;
+    created_at: string;
+}
+
+export interface ClientPayment {
+    id: number;
+    client_id: number;
+    project_id?: number;
+    project_name?: string;
+    amount: number;
+    currency: string;
+    status: PaymentStatus;
+    payment_date?: string;
+    due_date?: string;
+    reference?: string;
+    notes?: string;
+    created_at: string;
+}
+
+export type PaymentStatus = 'pending' | 'received' | 'cancelled';
+
+// Extended Project types for detail view
+export interface ProjectDetail extends Omit<Project, 'client'> {
+    client_name?: string; // Original simple client name
+    client_info?: {
+        id: number;
+        name: string;
+        logo_url?: string;
+    };
+    manager?: {
+        id: number;
+        name: string;
+        role: string;
+    };
+    spent?: number;
+    currency?: string;
+    start_date?: string;
+}
+
+export interface ProjectDocument {
+    id: number;
+    project_id: number;
+    name: string;
+    type: 'spec' | 'contract' | 'manual' | 'design' | 'report' | 'other';
+    url: string;
+    description?: string;
+    uploaded_by?: string;
+    created_at: string;
+}
+
+export interface ProjectSprint {
+    id: number;
+    project_id: number;
+    name: string;
+    phase_type: 'planning' | 'development' | 'testing' | 'deployment' | 'maintenance' | 'custom';
+    status: 'planned' | 'active' | 'completed' | 'cancelled';
+    start_date?: string;
+    end_date?: string;
+    goal?: string;
+    phase_order: number;
+    epics_count?: number;
+    tasks_count?: number;
+    progress?: number;
+}
+
+export interface ProjectEpic {
+    id: number;
+    project_id: number;
+    sprint_id?: number;
+    name: string;
+    description?: string;
+    status: 'open' | 'in_progress' | 'completed' | 'cancelled';
+    color?: string;
+    start_date?: string;
+    target_date?: string;
+    tasks_count?: number;
+    tasks_completed?: number;
+}
+
+// Extended Agent types for detail view
+export interface AgentDetail extends Agent {
+    type: 'human' | 'ai';
+    email?: string;
+    phone?: string;
+    bio?: string;
+    skills?: string[];
+    model?: string;
+    capabilities?: string[];
+    config?: Record<string, unknown>;
+    metrics?: AgentMetrics;
+    projects?: { id: number; name: string; role: string }[];
+}
+
+export interface AgentMetrics {
+    tasks_completed: number;
+    tasks_in_progress: number;
+    tasks_total: number;
+    avg_completion_time: number;
+    // Human-specific
+    on_time_rate?: number;
+    quality_score?: number;
+    projects_count?: number;
+    // AI-specific
+    success_rate?: number;
+    uptime?: number;
+    tokens_used?: number;
+    cost_mtd?: number;
+}
+
+export interface AgentPerformanceHistory {
+    date: string;
+    tasks_completed: number;
+    hours_worked?: number;
+    tokens_used?: number;
+}
+
+export interface ActivityLogEntry {
+    id: number;
+    action: string;
+    description?: string;
+    type: 'task' | 'project' | 'status' | 'note' | 'payment' | 'contact' | 'document';
+    entity_type?: string;
+    entity_id?: number;
+    user_id?: number;
+    user_name?: string;
+    created_at: string;
 }
 
 // Budget breakdown (SOLARIA formula)
