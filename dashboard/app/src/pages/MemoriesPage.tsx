@@ -299,10 +299,10 @@ export function MemoriesPage() {
                 </div>
             </div>
 
-            {/* Search and Filters */}
-            <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="relative flex-1">
+            {/* Search and Filters - Responsive Container */}
+            <div className="bg-card border border-border rounded-xl p-5 overflow-visible">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                    <div className="relative flex-1 min-w-0">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <input
                             type="text"
@@ -312,66 +312,70 @@ export function MemoriesPage() {
                             className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                     </div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
                         {memoryCount} memorias
                     </span>
                 </div>
 
-                {/* Tags filter */}
+                {/* Tags filter - Responsive Wrap */}
                 {tags && tags.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap mb-3">
-                        <Tag className="h-4 w-4 text-muted-foreground" />
-                        {tags.map((tag: { name: string; usageCount: number }) => {
-                            const colorConfig = TAG_COLORS[tag.name] || { bg: 'rgba(100, 116, 139, 0.15)', color: '#64748b' };
-                            const isSelected = selectedTags.includes(tag.name);
+                    <div className="flex items-start gap-2 flex-wrap mb-3">
+                        <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1.5" />
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {tags.map((tag: { name: string; usageCount: number }) => {
+                                const colorConfig = TAG_COLORS[tag.name] || { bg: 'rgba(100, 116, 139, 0.15)', color: '#64748b' };
+                                const isSelected = selectedTags.includes(tag.name);
+                                return (
+                                    <button
+                                        key={tag.name}
+                                        onClick={() => toggleTag(tag.name)}
+                                        className={cn(
+                                            'memory-tag-filter flex-shrink-0',
+                                            isSelected && 'selected'
+                                        )}
+                                        style={
+                                            isSelected
+                                                ? { backgroundColor: colorConfig.color, color: '#fff' }
+                                                : { backgroundColor: colorConfig.bg, color: colorConfig.color }
+                                        }
+                                    >
+                                        {tag.name} ({tag.usageCount})
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* Importance filter - Responsive Wrap */}
+                <div className="flex items-start gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0 mt-1.5">Importancia:</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {(['high', 'medium', 'low'] as const).map((level) => {
+                            const isSelected = selectedImportance.includes(level);
+                            const count = (baseMemories || []).filter((m: Memory) => getImportanceLevel(m.importance) === level).length;
+                            if (count === 0) return null;
+                            const config = {
+                                high: { label: '🔴 Alta (≥70%)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
+                                medium: { label: '🟡 Media (40-69%)', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+                                low: { label: '🟢 Baja (<40%)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
+                            }[level];
                             return (
                                 <button
-                                    key={tag.name}
-                                    onClick={() => toggleTag(tag.name)}
-                                    className={cn(
-                                        'memory-tag-filter',
-                                        isSelected && 'selected'
-                                    )}
+                                    key={level}
+                                    onClick={() => toggleImportance(level)}
+                                    className="memory-tag-filter flex-shrink-0"
                                     style={
                                         isSelected
-                                            ? { backgroundColor: colorConfig.color, color: '#fff' }
-                                            : { backgroundColor: colorConfig.bg, color: colorConfig.color }
+                                            ? { backgroundColor: config.color, color: '#fff' }
+                                            : { backgroundColor: config.bg, color: config.color }
                                     }
                                 >
-                                    {tag.name} ({tag.usageCount})
+                                    {config.label} ({count})
                                 </button>
                             );
                         })}
                     </div>
-                )}
-
-                {/* Importance filter */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Importancia:</span>
-                    {(['high', 'medium', 'low'] as const).map((level) => {
-                        const isSelected = selectedImportance.includes(level);
-                        const count = (baseMemories || []).filter((m: Memory) => getImportanceLevel(m.importance) === level).length;
-                        if (count === 0) return null;
-                        const config = {
-                            high: { label: '🔴 Alta (≥70%)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
-                            medium: { label: '🟡 Media (40-69%)', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
-                            low: { label: '🟢 Baja (<40%)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
-                        }[level];
-                        return (
-                            <button
-                                key={level}
-                                onClick={() => toggleImportance(level)}
-                                className="memory-tag-filter"
-                                style={
-                                    isSelected
-                                        ? { backgroundColor: config.color, color: '#fff' }
-                                        : { backgroundColor: config.bg, color: config.color }
-                                }
-                            >
-                                {config.label} ({count})
-                            </button>
-                        );
-                    })}
                 </div>
             </div>
 

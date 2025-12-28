@@ -171,11 +171,13 @@ export function AgentsPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div>
-                <h1 className="text-2xl font-bold">Agentes IA</h1>
-                <p className="text-muted-foreground">
-                    {agents?.length || 0} agentes configurados
-                </p>
+            <div className="section-header">
+                <div>
+                    <h1 className="section-title">Agentes IA</h1>
+                    <p className="section-subtitle">
+                        {agents?.length || 0} agentes configurados
+                    </p>
+                </div>
             </div>
 
             {/* Stats */}

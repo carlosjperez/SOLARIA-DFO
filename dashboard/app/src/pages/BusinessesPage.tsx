@@ -340,10 +340,10 @@ export function BusinessesPage() {
                 </div>
             </div>
 
-            {/* Search and Filters */}
-            <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="relative flex-1">
+            {/* Search and Filters - Responsive Container */}
+            <div className="bg-card border border-border rounded-xl p-5 overflow-visible">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+                    <div className="relative flex-1 min-w-0">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <input
                             type="text"
@@ -353,67 +353,71 @@ export function BusinessesPage() {
                             className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                     </div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
                         {filteredBusinesses.length} {filteredBusinesses.length === 1 ? 'negocio' : 'negocios'}
                     </span>
                 </div>
 
-                {/* Status Filters */}
-                <div className="flex items-center gap-2 flex-wrap mb-3">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estado:</span>
-                    {(['active', 'growing', 'paused'] as const).map((status) => {
-                        const isSelected = selectedStatuses.includes(status);
-                        const count = businesses.filter((b) => b.status === status).length;
-                        if (count === 0) return null;
-                        const config = {
-                            active: { label: 'Activo', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
-                            growing: { label: 'Creciendo', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' },
-                            paused: { label: 'Pausado', color: '#64748b', bg: 'rgba(100, 116, 139, 0.15)' },
-                        }[status];
-                        return (
-                            <button
-                                key={status}
-                                onClick={() => toggleStatus(status)}
-                                className="memory-tag-filter"
-                                style={
-                                    isSelected
-                                        ? { backgroundColor: config.color, color: '#fff' }
-                                        : { backgroundColor: config.bg, color: config.color }
-                                }
-                            >
-                                {config.label} ({count})
-                            </button>
-                        );
-                    })}
+                {/* Status Filters - Responsive Wrap */}
+                <div className="flex items-start gap-2 flex-wrap mb-3">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0 mt-1.5">Estado:</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {(['active', 'growing', 'paused'] as const).map((status) => {
+                            const isSelected = selectedStatuses.includes(status);
+                            const count = businesses.filter((b) => b.status === status).length;
+                            if (count === 0) return null;
+                            const config = {
+                                active: { label: 'Activo', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
+                                growing: { label: 'Creciendo', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' },
+                                paused: { label: 'Pausado', color: '#64748b', bg: 'rgba(100, 116, 139, 0.15)' },
+                            }[status];
+                            return (
+                                <button
+                                    key={status}
+                                    onClick={() => toggleStatus(status)}
+                                    className="memory-tag-filter flex-shrink-0"
+                                    style={
+                                        isSelected
+                                            ? { backgroundColor: config.color, color: '#fff' }
+                                            : { backgroundColor: config.bg, color: config.color }
+                                    }
+                                >
+                                    {config.label} ({count})
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
-                {/* Health Filters */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Salud:</span>
-                    {(['healthy', 'warning', 'critical'] as const).map((health) => {
-                        const isSelected = selectedHealth.includes(health);
-                        const count = businesses.filter((b) => getHealth(b) === health).length;
-                        if (count === 0) return null;
-                        const config = {
-                            healthy: { label: '🟢 Saludable', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
-                            warning: { label: '🟡 Advertencia', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
-                            critical: { label: '🔴 Crítico', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
-                        }[health];
-                        return (
-                            <button
-                                key={health}
-                                onClick={() => toggleHealth(health)}
-                                className="memory-tag-filter"
-                                style={
-                                    isSelected
-                                        ? { backgroundColor: config.color, color: '#fff' }
-                                        : { backgroundColor: config.bg, color: config.color }
-                                }
-                            >
-                                {config.label} ({count})
-                            </button>
-                        );
-                    })}
+                {/* Health Filters - Responsive Wrap */}
+                <div className="flex items-start gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0 mt-1.5">Salud:</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {(['healthy', 'warning', 'critical'] as const).map((health) => {
+                            const isSelected = selectedHealth.includes(health);
+                            const count = businesses.filter((b) => getHealth(b) === health).length;
+                            if (count === 0) return null;
+                            const config = {
+                                healthy: { label: '🟢 Saludable', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
+                                warning: { label: '🟡 Advertencia', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+                                critical: { label: '🔴 Crítico', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
+                            }[health];
+                            return (
+                                <button
+                                    key={health}
+                                    onClick={() => toggleHealth(health)}
+                                    className="memory-tag-filter flex-shrink-0"
+                                    style={
+                                        isSelected
+                                            ? { backgroundColor: config.color, color: '#fff' }
+                                            : { backgroundColor: config.bg, color: config.color }
+                                    }
+                                >
+                                    {config.label} ({count})
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 

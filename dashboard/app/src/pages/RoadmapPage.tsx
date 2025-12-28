@@ -22,18 +22,18 @@ import type { Epic, Sprint } from '@/types';
 type FilterType = 'all' | 'epics' | 'sprints';
 type ViewMode = 'timeline' | 'hierarchy';
 
-// Timeline header with months
+// Timeline header with months - Responsive label column
 function TimelineHeader({ months }: { months: { label: string; width: number }[] }) {
     return (
         <div className="flex border-b border-border bg-muted/30 sticky top-0 z-10">
-            <div className="w-64 flex-shrink-0 p-3 border-r border-border font-medium text-sm">
+            <div className="w-32 sm:w-48 md:w-64 flex-shrink-0 p-2 sm:p-3 border-r border-border font-medium text-xs sm:text-sm">
                 Elementos
             </div>
             <div className="flex-1 flex">
                 {months.map((month, idx) => (
                     <div
                         key={idx}
-                        className="border-r border-border p-2 text-xs font-medium text-muted-foreground text-center"
+                        className="border-r border-border p-1 sm:p-2 text-xs font-medium text-muted-foreground text-center"
                         style={{ width: `${month.width}px`, minWidth: `${month.width}px` }}
                     >
                         {month.label}
@@ -68,7 +68,7 @@ function TimelineRow({
             <div className="flex border-b border-border hover:bg-muted/30 transition-colors">
                 <div
                     onClick={onClick}
-                    className="w-64 flex-shrink-0 p-3 border-r border-border flex items-center gap-2 cursor-pointer"
+                    className="w-32 sm:w-48 md:w-64 flex-shrink-0 p-2 sm:p-3 border-r border-border flex items-center gap-2 cursor-pointer"
                 >
                     {type === 'epic' ? (
                         <div
@@ -78,7 +78,7 @@ function TimelineRow({
                     ) : (
                         <Zap className="h-3 w-3 text-green-400" />
                     )}
-                    <span className="text-sm truncate">{item.name}</span>
+                    <span className="text-xs sm:text-sm truncate">{item.name}</span>
                     <span className={cn(
                         'text-[10px] px-1 py-0.5 rounded ml-auto',
                         item.status === 'completed' || item.status === 'active' ? 'bg-green-500/20 text-green-400' :
@@ -88,7 +88,7 @@ function TimelineRow({
                         {item.status}
                     </span>
                 </div>
-                <div className="flex-1 p-3 flex items-center">
+                <div className="flex-1 p-2 sm:p-3 flex items-center">
                     <span className="text-xs text-muted-foreground italic">Sin fechas definidas</span>
                 </div>
             </div>
@@ -109,7 +109,7 @@ function TimelineRow({
         <div className="flex border-b border-border hover:bg-muted/30 transition-colors">
             <div
                 onClick={onClick}
-                className="w-64 flex-shrink-0 p-3 border-r border-border flex items-center gap-2 cursor-pointer"
+                className="w-32 sm:w-48 md:w-64 flex-shrink-0 p-2 sm:p-3 border-r border-border flex items-center gap-2 cursor-pointer"
             >
                 {type === 'epic' ? (
                     <div
@@ -119,7 +119,7 @@ function TimelineRow({
                 ) : (
                     <Zap className={cn("h-3 w-3", isActive ? "text-green-400 animate-pulse" : "text-muted-foreground")} />
                 )}
-                <span className="text-sm truncate flex-1">{item.name}</span>
+                <span className="text-xs sm:text-sm truncate flex-1">{item.name}</span>
                 {isActive && (
                     <span className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded text-white font-medium",
@@ -278,8 +278,8 @@ export function RoadmapPage() {
     return (
         <div className="p-4 sm:p-6 space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4">
+            <div className="section-header">
+                <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigate(`/projects/${projectId}`)}
                         className="p-2 rounded-lg hover:bg-secondary transition-colors"
@@ -288,11 +288,11 @@ export function RoadmapPage() {
                         <ArrowLeft className="h-5 w-5" />
                     </button>
                     <div>
-                        <h1 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
+                        <h1 className="section-title flex items-center gap-2">
                             <Calendar className="h-6 w-6 text-solaria" />
                             Roadmap
                         </h1>
-                        <p className="text-sm text-muted-foreground">{project.name}</p>
+                        <p className="section-subtitle">{project.name}</p>
                     </div>
                 </div>
 
@@ -337,26 +337,16 @@ export function RoadmapPage() {
             </div>
 
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-2 bg-secondary rounded-lg p-1 w-fit">
+            <div className="view-toggle">
                 <button
                     onClick={() => setViewMode('timeline')}
-                    className={cn(
-                        'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                        viewMode === 'timeline'
-                            ? 'bg-background text-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground'
-                    )}
+                    className={cn('view-toggle-btn', viewMode === 'timeline' && 'active')}
                 >
                     Timeline
                 </button>
                 <button
                     onClick={() => setViewMode('hierarchy')}
-                    className={cn(
-                        'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                        viewMode === 'hierarchy'
-                            ? 'bg-background text-foreground shadow-sm'
-                            : 'text-muted-foreground hover:text-foreground'
-                    )}
+                    className={cn('view-toggle-btn', viewMode === 'hierarchy' && 'active')}
                 >
                     Jerarquía
                 </button>
@@ -374,7 +364,7 @@ export function RoadmapPage() {
                         {sortedEpics.length > 0 && (
                             <>
                                 <div className="flex bg-muted/50 border-b border-border">
-                                    <div className="w-64 flex-shrink-0 p-2 px-3 border-r border-border flex items-center gap-2">
+                                    <div className="w-32 sm:w-48 md:w-64 flex-shrink-0 p-2 px-3 border-r border-border flex items-center gap-2">
                                         <Target className="h-4 w-4 text-purple-400" />
                                         <span className="text-xs font-semibold uppercase text-muted-foreground">Epics</span>
                                         <span className="text-xs text-muted-foreground ml-auto">{sortedEpics.length}</span>
@@ -400,7 +390,7 @@ export function RoadmapPage() {
                         {sortedSprints.length > 0 && (
                             <>
                                 <div className="flex bg-muted/50 border-b border-border">
-                                    <div className="w-64 flex-shrink-0 p-2 px-3 border-r border-border flex items-center gap-2">
+                                    <div className="w-32 sm:w-48 md:w-64 flex-shrink-0 p-2 px-3 border-r border-border flex items-center gap-2">
                                         <Zap className="h-4 w-4 text-green-400" />
                                         <span className="text-xs font-semibold uppercase text-muted-foreground">Sprints</span>
                                         <span className="text-xs text-muted-foreground ml-auto">{sortedSprints.length}</span>

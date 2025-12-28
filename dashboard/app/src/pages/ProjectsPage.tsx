@@ -17,12 +17,14 @@ import {
     Search,
 } from 'lucide-react';
 import { useProjects } from '@/hooks/useApi';
+import { MiniTrello as MiniTrelloComponent } from '@/components/common/MiniTrello';
 import { cn, formatDate } from '@/lib/utils';
 import type { Project } from '@/types';
 
 // Project phases with colors
 const PROJECT_PHASES = {
     planning: { label: 'Planificacion', color: '#7c3aed' },
+    development: { label: 'Desarrollo', color: '#0891b2' },
     active: { label: 'Desarrollo', color: '#0891b2' },
     paused: { label: 'Pausado', color: '#f59e0b' },
     completed: { label: 'Produccion', color: '#16a34a' },
@@ -32,49 +34,10 @@ const PROJECT_PHASES = {
 type SortOption = 'name' | 'deadline' | 'budget' | 'completion' | 'status';
 type ViewMode = 'grid' | 'list';
 
-// Mini Trello "Equalizer" Component
-function MiniTrello({ board }: { board: BoardStats }) {
-    const totalSlots = 8;
-
-    const generateSlots = (count: number, colorClass: string) => {
-        const filledCount = Math.min(count, totalSlots);
-        return Array.from({ length: totalSlots }, (_, i) => (
-            <div
-                key={i}
-                className={cn(
-                    'trello-slot',
-                    i < filledCount && `filled ${colorClass}`
-                )}
-            />
-        ));
-    };
-
-    return (
-        <div className="mini-trello">
-            <div className="trello-column backlog">
-                <div className="trello-column-header">BL ({board.backlog})</div>
-                <div className="trello-slots">{generateSlots(board.backlog, 'backlog')}</div>
-            </div>
-            <div className="trello-column todo">
-                <div className="trello-column-header">TODO ({board.todo})</div>
-                <div className="trello-slots">{generateSlots(board.todo, 'todo')}</div>
-            </div>
-            <div className="trello-column doing">
-                <div className="trello-column-header">DOING ({board.doing})</div>
-                <div className="trello-slots">{generateSlots(board.doing, 'doing')}</div>
-            </div>
-            <div className="trello-column done">
-                <div className="trello-column-header">DONE ({board.done})</div>
-                <div className="trello-slots">{generateSlots(board.done, 'done')}</div>
-            </div>
-        </div>
-    );
-}
-
 // Progress Segments Component (Phase indicator)
 function ProgressSegments({ status }: { status: string }) {
-    const phases = ['planning', 'active', 'paused', 'completed'];
-    const phaseIndex = status === 'completed' ? 3 : status === 'paused' ? 2 : status === 'active' ? 1 : 0;
+    const phases = ['planning', 'development', 'paused', 'completed'];
+    const phaseIndex = status === 'completed' ? 3 : status === 'paused' ? 2 : (status === 'development' || status === 'active') ? 1 : 0;
 
     return (
         <div className="progress-segments">
@@ -159,7 +122,7 @@ function ProjectCard({ project, board, onClick }: { project: Project; board: Boa
             </div>
 
             {/* Mini Trello Equalizer */}
-            <MiniTrello board={board} />
+            <MiniTrelloComponent board={board} showLabels={true} showCounts={true} compact={false} />
 
             {/* Progress Segments */}
             <ProgressSegments status={project.status} />
@@ -399,46 +362,6 @@ export function ProjectsPage() {
 
     return (
         <div className="space-y-6">
-            {/* Stats Row */}
-            <div className="dashboard-stats-row">
-                <div className="stat-card">
-                    <div className="stat-icon projects">
-                        <FolderKanban className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Total Proyectos</div>
-                        <div className="stat-value">{totalProjects}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon active">
-                        <Target className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Activos</div>
-                        <div className="stat-value">{activeProjects}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon green">
-                        <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Completados</div>
-                        <div className="stat-value">{completedProjects}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon yellow">
-                        <Pause className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">En Pausa</div>
-                        <div className="stat-value">{pausedProjects}</div>
-                    </div>
-                </div>
-            </div>
-
             {/* Header */}
             <div className="section-header">
                 <div>
@@ -498,6 +421,46 @@ export function ProjectsPage() {
                         >
                             <List className="h-4 w-4" />
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Stats Row */}
+            <div className="dashboard-stats-row">
+                <div className="stat-card">
+                    <div className="stat-icon projects">
+                        <FolderKanban className="h-5 w-5" />
+                    </div>
+                    <div className="stat-content">
+                        <div className="stat-label">Total Proyectos</div>
+                        <div className="stat-value">{totalProjects}</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon active">
+                        <Target className="h-5 w-5" />
+                    </div>
+                    <div className="stat-content">
+                        <div className="stat-label">Activos</div>
+                        <div className="stat-value">{activeProjects}</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon green">
+                        <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    <div className="stat-content">
+                        <div className="stat-label">Completados</div>
+                        <div className="stat-value">{completedProjects}</div>
+                    </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon yellow">
+                        <Pause className="h-5 w-5" />
+                    </div>
+                    <div className="stat-content">
+                        <div className="stat-label">En Pausa</div>
+                        <div className="stat-value">{pausedProjects}</div>
                     </div>
                 </div>
             </div>
