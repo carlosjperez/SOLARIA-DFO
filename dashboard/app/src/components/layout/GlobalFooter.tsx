@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useUIStore } from '@/store/ui';
 import { cn } from '@/lib/utils';
+import VERSION from '@/version';
 
 export function GlobalFooter() {
     const [lastSync, setLastSync] = useState(new Date());
@@ -43,8 +44,11 @@ export function GlobalFooter() {
                 Última sincronización: {formatTime(lastSync)}
             </div>
 
-            {/* Right: Links (optional) */}
+            {/* Right: Version + Links */}
             <div className="flex items-center gap-4">
+                <span className="font-mono text-xs text-muted-foreground">
+                    {VERSION.full}
+                </span>
                 <a
                     href="https://docs.solaria.agency"
                     target="_blank"

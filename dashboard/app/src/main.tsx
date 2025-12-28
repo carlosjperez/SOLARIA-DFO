@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SocketProvider } from '@/contexts/SocketContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import App from './App';
+import './styles/design-tokens.css';
 import './styles/globals.css';
 
 const queryClient = new QueryClient({
