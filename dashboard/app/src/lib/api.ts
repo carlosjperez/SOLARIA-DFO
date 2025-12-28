@@ -94,6 +94,7 @@ export const epicsApi = {
 export const sprintsApi = {
     getByProject: (projectId: number) => api.get(`/projects/${projectId}/sprints`),
     getById: (id: number) => api.get(`/sprints/${id}`),
+    getFullHierarchy: (id: number) => api.get(`/sprints/${id}/full`),
     create: (projectId: number, data: Record<string, unknown>) =>
         api.post(`/projects/${projectId}/sprints`, data),
     update: (id: number, data: Record<string, unknown>) => api.put(`/sprints/${id}`, data),
@@ -164,4 +165,18 @@ export const csuiteApi = {
     getCTO: () => api.get('/csuite/cto'),
     getCOO: () => api.get('/csuite/coo'),
     getCFO: () => api.get('/csuite/cfo'),
+};
+
+// Inline Documents API
+export const documentsApi = {
+    getByProject: (projectId: number, type?: string) =>
+        api.get(`/projects/${projectId}/documents/inline`, { params: { type } }),
+    getById: (id: number) => api.get(`/documents/inline/${id}`),
+    create: (projectId: number, data: Record<string, unknown>) =>
+        api.post(`/projects/${projectId}/documents/inline`, data),
+    update: (id: number, data: Record<string, unknown>) =>
+        api.put(`/documents/inline/${id}`, data),
+    delete: (id: number) => api.delete(`/documents/inline/${id}`),
+    search: (query: string, projectId?: number, type?: string) =>
+        api.get('/documents/inline/search', { params: { query, project_id: projectId, type } }),
 };

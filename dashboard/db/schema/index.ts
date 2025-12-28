@@ -9,6 +9,10 @@ export * from './users.js';
 // Projects (includes clients, documents, requests, metrics)
 export * from './projects.js';
 
+// Sprints & Epics (project phases and feature groupings)
+export * from './sprints.js';
+export * from './epics.js';
+
 // AI Agents (includes states, metrics)
 export * from './agents.js';
 

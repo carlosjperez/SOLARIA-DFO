@@ -15,10 +15,12 @@ import {
 } from '@/hooks/useApi';
 import { EpicDetailModal } from '@/components/epics/EpicDetailModal';
 import { SprintDetailModal } from '@/components/sprints/SprintDetailModal';
+import { SprintHierarchyView } from '@/components/roadmap/SprintHierarchyView';
 import { cn } from '@/lib/utils';
 import type { Epic, Sprint } from '@/types';
 
 type FilterType = 'all' | 'epics' | 'sprints';
+type ViewMode = 'timeline' | 'hierarchy';
 
 // Timeline header with months
 function TimelineHeader({ months }: { months: { label: string; width: number }[] }) {
@@ -166,6 +168,7 @@ export function RoadmapPage() {
     const projectId = Number(id);
 
     const [filter, setFilter] = useState<FilterType>('all');
+    const [viewMode, setViewMode] = useState<ViewMode>('timeline');
     const [selectedEpicId, setSelectedEpicId] = useState<number | null>(null);
     const [selectedSprintId, setSelectedSprintId] = useState<number | null>(null);
 
@@ -333,7 +336,34 @@ export function RoadmapPage() {
                 </div>
             </div>
 
-            {/* Timeline */}
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-2 bg-secondary rounded-lg p-1 w-fit">
+                <button
+                    onClick={() => setViewMode('timeline')}
+                    className={cn(
+                        'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                        viewMode === 'timeline'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                    )}
+                >
+                    Timeline
+                </button>
+                <button
+                    onClick={() => setViewMode('hierarchy')}
+                    className={cn(
+                        'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                        viewMode === 'hierarchy'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                    )}
+                >
+                    Jerarquía
+                </button>
+            </div>
+
+            {/* Timeline View */}
+            {viewMode === 'timeline' ? (
             <div className="bg-card rounded-xl border border-border overflow-hidden">
                 <div className="overflow-x-auto">
                     <div style={{ minWidth: '800px' }}>
@@ -403,6 +433,14 @@ export function RoadmapPage() {
                     </div>
                 </div>
             </div>
+            ) : (
+            <div className="bg-card rounded-xl border border-border p-4">
+                <SprintHierarchyView
+                    sprints={sortedSprints}
+                    onSprintClick={(id) => setSelectedSprintId(id)}
+                />
+            </div>
+            )}
 
             {/* Legend */}
             <div className="flex items-center gap-6 text-xs text-muted-foreground">

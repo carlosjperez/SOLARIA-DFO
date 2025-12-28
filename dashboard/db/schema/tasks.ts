@@ -17,6 +17,8 @@ import { relations } from 'drizzle-orm';
 import { projects, priorityEnum } from './projects.js';
 import { aiAgents } from './agents.js';
 import { users } from './users.js';
+import { epics } from './epics.js';
+import { sprints } from './sprints.js';
 
 // Task status enum
 export const taskStatusEnum = mysqlEnum('status', [
@@ -35,6 +37,8 @@ export const tasks = mysqlTable('tasks', {
     title: varchar('title', { length: 300 }).notNull(),
     description: text('description'),
     projectId: int('project_id').references(() => projects.id, { onDelete: 'cascade' }),
+    epicId: int('epic_id').references(() => epics.id, { onDelete: 'set null' }),
+    sprintId: int('sprint_id').references(() => sprints.id, { onDelete: 'set null' }),
     agentId: int('agent_id').references(() => aiAgents.id, { onDelete: 'set null' }),
     assignedAgentId: int('assigned_agent_id').references(() => aiAgents.id, { onDelete: 'set null' }),
     assignedBy: int('assigned_by').references(() => users.id, { onDelete: 'set null' }),
@@ -100,6 +104,14 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     project: one(projects, {
         fields: [tasks.projectId],
         references: [projects.id],
+    }),
+    epic: one(epics, {
+        fields: [tasks.epicId],
+        references: [epics.id],
+    }),
+    sprint: one(sprints, {
+        fields: [tasks.sprintId],
+        references: [sprints.id],
     }),
     agent: one(aiAgents, {
         fields: [tasks.agentId],

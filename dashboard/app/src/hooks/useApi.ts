@@ -9,8 +9,9 @@ import {
     authApi,
     epicsApi,
     sprintsApi,
+    documentsApi,
 } from '@/lib/api';
-import type { Project, Task, TaskItem, TaskTag, Agent, Memory, ActivityLog, DashboardStats, Epic, Sprint } from '@/types';
+import type { Project, Task, TaskItem, TaskTag, Agent, Memory, ActivityLog, DashboardStats, Epic, Sprint, InlineDocument } from '@/types';
 
 /**
  * Transform raw API project data to frontend Project type
@@ -664,5 +665,88 @@ export function useSprint(sprintId: number | null) {
             return data as { sprint: Sprint & { tasks_count: number; tasks_completed: number; total_estimated_hours: number; project_name: string; project_code: string }; tasks: Task[] };
         },
         enabled: !!sprintId,
+    });
+}
+
+export function useSprintFullHierarchy(sprintId: number | null) {
+    return useQuery({
+        queryKey: ['sprints', sprintId, 'full'],
+        queryFn: async () => {
+            if (!sprintId) return null;
+            const { data } = await sprintsApi.getFullHierarchy(sprintId);
+            return data;
+        },
+        enabled: !!sprintId,
+    });
+}
+
+// ============================================================
+// Inline Documents hooks
+// ============================================================
+
+export function useProjectInlineDocuments(projectId: number, type?: string) {
+    return useQuery({
+        queryKey: ['projects', projectId, 'documents', 'inline', type],
+        queryFn: async () => {
+            const { data } = await documentsApi.getByProject(projectId, type);
+            return (data.documents || data.data || data || []) as InlineDocument[];
+        },
+        enabled: !!projectId,
+    });
+}
+
+export function useInlineDocument(id: number) {
+    return useQuery({
+        queryKey: ['documents', 'inline', id],
+        queryFn: async () => {
+            const { data } = await documentsApi.getById(id);
+            return (data.document || data.data || data) as InlineDocument;
+        },
+        enabled: !!id && id > 0,
+    });
+}
+
+export function useCreateInlineDocument() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ projectId, data }: { projectId: number; data: Partial<InlineDocument> }) =>
+            documentsApi.create(projectId, data as Record<string, unknown>),
+        onSuccess: (_, { projectId }) => {
+            queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'documents', 'inline'] });
+        },
+    });
+}
+
+export function useUpdateInlineDocument() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; projectId: number; data: Partial<InlineDocument> }) =>
+            documentsApi.update(id, data as Record<string, unknown>),
+        onSuccess: (_, { id, projectId }) => {
+            queryClient.invalidateQueries({ queryKey: ['documents', 'inline', id] });
+            queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'documents', 'inline'] });
+        },
+    });
+}
+
+export function useDeleteInlineDocument() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id }: { id: number; projectId: number }) =>
+            documentsApi.delete(id),
+        onSuccess: (_, { projectId }) => {
+            queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'documents', 'inline'] });
+        },
+    });
+}
+
+export function useSearchInlineDocuments(query: string, projectId?: number, type?: string) {
+    return useQuery({
+        queryKey: ['documents', 'inline', 'search', query, projectId, type],
+        queryFn: async () => {
+            const { data } = await documentsApi.search(query, projectId, type);
+            return (data.documents || data.data || data || []) as InlineDocument[];
+        },
+        enabled: query.length > 2,
     });
 }
