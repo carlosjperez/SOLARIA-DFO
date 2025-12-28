@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { getReadyTasks } from './ready-tasks-implementation';
+import { getReadyTasks } from '../endpoints/ready-tasks';
 import { db } from '../database';
 
 // Mock database

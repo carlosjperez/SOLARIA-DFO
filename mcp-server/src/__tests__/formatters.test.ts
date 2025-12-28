@@ -23,7 +23,7 @@ import {
   formatPercentage,
   formatProgressBar,
   Formatters,
-} from './formatters';
+} from '../utils/formatters';
 
 describe('Task Formatters', () => {
   const mockTask = {

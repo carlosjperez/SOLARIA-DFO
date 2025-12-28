@@ -14,7 +14,7 @@ import {
   wrapEndpoint,
   CommonErrors,
   validateResponse,
-} from './response-builder';
+} from '../utils/response-builder';
 
 describe('ResponseBuilder', () => {
   let builder: ResponseBuilder;
