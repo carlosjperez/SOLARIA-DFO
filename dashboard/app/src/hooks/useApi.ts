@@ -21,13 +21,16 @@ function transformProjectData(p: Record<string, unknown>): Project {
     const base = p as unknown as Project;
     return {
         ...base,
-        tasksTotal: (p.totalTasks ?? p.total_tasks ?? 0) as number,
-        tasksCompleted: (p.completedTasks ?? p.completed_tasks ?? 0) as number,
-        tasksPending: (p.pendingTasks ?? p.pending_tasks ?? 0) as number,
-        activeAgents: (p.agentsAssigned ?? p.agents_assigned ?? 0) as number,
-        // Prefer budgetAllocated, fallback to budget
+        // Task counts - API returns tasks_* (not *_tasks)
+        tasksTotal: (p.tasksTotal ?? p.totalTasks ?? p.total_tasks ?? 0) as number,
+        tasksCompleted: (p.tasksCompleted ?? p.completedTasks ?? p.completed_tasks ?? 0) as number,
+        tasksPending: (p.tasksPending ?? p.pendingTasks ?? p.pending_tasks ?? p.tasks_pending ?? 0) as number,
+        tasksInProgress: (p.tasksInProgress ?? p.inProgressTasks ?? p.in_progress_tasks ?? p.tasks_in_progress ?? 0) as number,
+        tasksBlocked: (p.tasksBlocked ?? p.blockedTasks ?? p.blocked_tasks ?? p.tasks_blocked ?? 0) as number,
+        // Other fields
+        activeAgents: (p.activeAgents ?? p.agentsAssigned ?? p.agents_assigned ?? 0) as number,
         budgetAllocated: (p.budgetAllocated ?? p.budget ?? 0) as number,
-        budgetSpent: (p.actualCost ?? p.actual_cost ?? 0) as number,
+        budgetSpent: (p.budgetSpent ?? p.actualCost ?? p.actual_cost ?? 0) as number,
     };
 }
 

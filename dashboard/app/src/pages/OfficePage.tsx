@@ -1,44 +1,70 @@
 import { useState } from 'react';
 import {
-    LayoutGrid,
-    List,
-    Search,
-    Tag,
-    TrendingUp,
-    Clock,
-    Zap,
     Briefcase,
-    Users,
     Target,
+    Users,
+    TrendingUp,
+    Zap,
+    Clock,
     AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+// Design System Components
+import { StandardPageLayout } from '@/components/layouts/StandardPageLayout';
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatsGrid } from '@/components/common/StatsGrid';
+import { StatCard } from '@/components/common/StatCard';
+import type { StatConfig } from '@/components/common/StatCard';
+import { SearchAndFilterBar } from '@/components/common/SearchAndFilterBar';
+import { ContentGrid } from '@/components/common/ContentGrid';
+import { ContentGroup } from '@/components/common/ContentGroup';
 
 /**
  * PÁGINA PLANTILLA - OFICINA
  *
  * Esta página sirve como referencia visual de todos los elementos estándar
- * del diseño SOLARIA DFO. NO contiene datos reales.
+ * del diseño SOLARIA DFO usando el nuevo design system.
  *
  * Elementos incluidos:
- * - Header Section (título, subtítulo, acciones)
- * - Stats Row (4 cards con iconos)
- * - Search & Filters Section
- * - View Toggle (Grid/List)
- * - Content Grid (cards de ejemplo)
- * - Content List (tabla de ejemplo)
+ * - PageHeader (título, subtítulo, acciones)
+ * - StatsGrid (4 stats con iconos)
+ * - SearchAndFilterBar (búsqueda, filtros, view toggle, sort)
+ * - ContentGrid (cards responsive)
+ * - ContentGroup (agrupación de secciones)
  */
 
 type ViewMode = 'grid' | 'list';
 
-// Datos de ejemplo para plantilla
-const EXAMPLE_STATS = [
-    { icon: Briefcase, label: 'Total Items', value: '127', iconClass: 'projects' },
-    { icon: Target, label: 'En Progreso', value: '45', iconClass: 'active' },
-    { icon: Users, label: 'Asignados', value: '12', iconClass: 'agents' },
-    { icon: TrendingUp, label: 'Completados', value: '82', iconClass: 'green' },
+// Datos de ejemplo - Stats
+const EXAMPLE_STATS: StatConfig[] = [
+    {
+        icon: Briefcase,
+        label: 'Total Items',
+        value: '127',
+        variant: 'default',
+    },
+    {
+        icon: Target,
+        label: 'En Progreso',
+        value: '45',
+        variant: 'warning',
+    },
+    {
+        icon: Users,
+        label: 'Asignados',
+        value: '12',
+        variant: 'primary',
+    },
+    {
+        icon: TrendingUp,
+        label: 'Completados',
+        value: '82',
+        variant: 'success',
+    },
 ];
 
+// Datos de ejemplo - Tags para filtros
 const EXAMPLE_TAGS = [
     { name: 'activo', count: 15, bg: 'rgba(34, 197, 94, 0.15)', color: '#22c55e' },
     { name: 'pendiente', count: 8, bg: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' },
@@ -47,6 +73,7 @@ const EXAMPLE_TAGS = [
     { name: 'bajo', count: 10, bg: 'rgba(100, 116, 139, 0.15)', color: '#64748b' },
 ];
 
+// Datos de ejemplo - Items para cards
 const EXAMPLE_ITEMS = [
     {
         id: 1,
@@ -128,6 +155,9 @@ const EXAMPLE_ITEMS = [
     },
 ];
 
+/**
+ * ExampleCard - Card component for grid view
+ */
 function ExampleCard({ item, onClick }: { item: typeof EXAMPLE_ITEMS[0]; onClick?: () => void }) {
     const importancePercent = item.importance;
     const importanceClass = importancePercent >= 70 ? 'high' : importancePercent >= 40 ? 'medium' : 'low';
@@ -187,6 +217,9 @@ function ExampleCard({ item, onClick }: { item: typeof EXAMPLE_ITEMS[0]; onClick
     );
 }
 
+/**
+ * ExampleRow - Row component for list view
+ */
 function ExampleRow({ item, onClick }: { item: typeof EXAMPLE_ITEMS[0]; onClick?: () => void }) {
     const importancePercent = item.importance;
 
@@ -232,6 +265,9 @@ function ExampleRow({ item, onClick }: { item: typeof EXAMPLE_ITEMS[0]; onClick?
     );
 }
 
+/**
+ * OfficePage Component - Refactored with Design System
+ */
 export function OfficePage() {
     const [search, setSearch] = useState('');
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -244,105 +280,71 @@ export function OfficePage() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Header Section */}
-            <div className="section-header">
-                <div>
-                    <h1 className="section-title">Oficina - Plantilla de Diseño</h1>
-                    <p className="section-subtitle">
-                        Página de referencia con todos los elementos estándar del sistema
-                    </p>
-                </div>
-                <div className="section-actions">
-                    {/* View Toggle */}
-                    <div className="view-toggle">
-                        <button
-                            className={cn('view-toggle-btn', viewMode === 'grid' && 'active')}
-                            onClick={() => setViewMode('grid')}
-                            title="Vista Grid"
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                        </button>
-                        <button
-                            className={cn('view-toggle-btn', viewMode === 'list' && 'active')}
-                            onClick={() => setViewMode('list')}
-                            title="Vista Lista"
-                        >
-                            <List className="h-4 w-4" />
-                        </button>
+        <StandardPageLayout maxWidth="7xl">
+            {/* Page Header - Using PageHeader component */}
+            <PageHeader
+                title="Oficina - Plantilla de Diseño"
+                subtitle="Página de referencia con todos los elementos estándar del sistema"
+            />
+
+            {/* Stats Grid - Using StatsGrid component */}
+            <StatsGrid>
+                {EXAMPLE_STATS.map((stat) => (
+                    <StatCard
+                        key={stat.label}
+                        title={stat.label}
+                        value={stat.value}
+                        icon={stat.icon}
+                        variant={stat.variant}
+                    />
+                ))}
+            </StatsGrid>
+
+            {/* Search and Filters - Using SearchAndFilterBar component */}
+            <SearchAndFilterBar
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Buscar items (mínimo 3 caracteres)..."
+                itemCount={EXAMPLE_ITEMS.length}
+                itemSingularLabel="item"
+                itemPluralLabel="items"
+                viewValue={viewMode}
+                onViewChange={setViewMode}
+                showViewSelector={true}
+                filterChildren={
+                    /* Custom tag filters */
+                    <div className="flex items-center gap-2 flex-wrap w-full">
+                        {EXAMPLE_TAGS.map((tag) => {
+                            const isSelected = selectedTags.includes(tag.name);
+                            return (
+                                <button
+                                    key={tag.name}
+                                    onClick={() => toggleTag(tag.name)}
+                                    className={cn(
+                                        'memory-tag-filter',
+                                        isSelected && 'selected'
+                                    )}
+                                    style={
+                                        isSelected
+                                            ? { backgroundColor: tag.color, color: '#fff' }
+                                            : { backgroundColor: tag.bg, color: tag.color }
+                                    }
+                                >
+                                    {tag.name} ({tag.count})
+                                </button>
+                            );
+                        })}
                     </div>
-                </div>
-            </div>
+                }
+            />
 
-            {/* Stats Row */}
-            <div className="dashboard-stats-row">
-                {EXAMPLE_STATS.map((stat, idx) => {
-                    const Icon = stat.icon;
-                    return (
-                        <div key={idx} className="stat-card">
-                            <div className={cn('stat-icon', stat.iconClass)}>
-                                <Icon className="h-5 w-5" />
-                            </div>
-                            <div className="stat-content">
-                                <div className="stat-label">{stat.label}</div>
-                                <div className="stat-value">{stat.value}</div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Search and Filters */}
-            <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <input
-                            type="text"
-                            placeholder="Buscar items (mínimo 3 caracteres)..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                        {EXAMPLE_ITEMS.length} items
-                    </span>
-                </div>
-
-                {/* Tags filter */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    {EXAMPLE_TAGS.map((tag) => {
-                        const isSelected = selectedTags.includes(tag.name);
-                        return (
-                            <button
-                                key={tag.name}
-                                onClick={() => toggleTag(tag.name)}
-                                className={cn(
-                                    'memory-tag-filter',
-                                    isSelected && 'selected'
-                                )}
-                                style={
-                                    isSelected
-                                        ? { backgroundColor: tag.color, color: '#fff' }
-                                        : { backgroundColor: tag.bg, color: tag.color }
-                                }
-                            >
-                                {tag.name} ({tag.count})
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Content Grid/List */}
+            {/* Content Grid/List - Using ContentGrid component */}
             {viewMode === 'grid' ? (
-                <div className="memories-grid">
+                <ContentGrid columns={3} gap="md">
                     {EXAMPLE_ITEMS.map((item) => (
                         <ExampleCard key={item.id} item={item} />
                     ))}
-                </div>
+                </ContentGrid>
             ) : (
                 <div className="bg-card border border-border rounded-xl" style={{ padding: 0, overflow: 'hidden' }}>
                     <table className="list-table" style={{ width: '100%', tableLayout: 'fixed' }}>
@@ -364,31 +366,34 @@ export function OfficePage() {
                 </div>
             )}
 
-            {/* Info Box */}
-            <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-solaria flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <h3 className="font-semibold text-sm mb-2">Página Plantilla de Referencia</h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                            Esta página muestra todos los elementos estándar del sistema de diseño SOLARIA DFO.
-                            Incluye cards de estadísticas, barra de búsqueda, selectores de tags, vista Grid/List,
-                            y todos los tamaños y espaciados estándar. Usa esta página como referencia visual
-                            al implementar nuevas páginas en el dashboard.
-                        </p>
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                            <div>• Título: 24px, font-weight 700</div>
-                            <div>• Subtítulo: 13px, color muted</div>
-                            <div>• Card padding: 16px</div>
-                            <div>• Icon size: 32x32px (cards), 48x48px (stats)</div>
-                            <div>• Card title: 14px, font-weight 600</div>
-                            <div>• Card content: 13px, line-clamp 3</div>
-                            <div>• Tag padding: 3px 8px, font-size 11px</div>
-                            <div>• Grid gap: 16px</div>
+            {/* Info Box - Using ContentGroup component */}
+            <ContentGroup>
+                <div className="bg-card border border-border rounded-xl p-5">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-solaria flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-sm mb-2">Página Plantilla de Referencia (Refactorizada)</h3>
+                            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                                Esta página ha sido refactorizada usando el nuevo design system SOLARIA DFO.
+                                Ahora utiliza componentes estandarizados: <strong>PageHeader</strong>, <strong>StatsGrid</strong>,
+                                <strong>SearchAndFilterBar</strong> (con ViewSelector integrado), <strong>ContentGrid</strong>,
+                                y <strong>ContentGroup</strong> para garantizar consistencia visual y mantenibilidad.
+                            </p>
+                            <div className="mt-3 p-3 bg-muted/30 rounded-lg">
+                                <h4 className="text-xs font-semibold mb-2">Componentes Utilizados:</h4>
+                                <ul className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                                    <li>✓ StandardPageLayout (wrapper)</li>
+                                    <li>✓ PageHeader (título + subtítulo)</li>
+                                    <li>✓ StatsGrid (4 stats cards)</li>
+                                    <li>✓ SearchAndFilterBar (búsqueda + view)</li>
+                                    <li>✓ ContentGrid (responsive grid)</li>
+                                    <li>✓ ContentGroup (agrupación)</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </ContentGroup>
+        </StandardPageLayout>
     );
 }

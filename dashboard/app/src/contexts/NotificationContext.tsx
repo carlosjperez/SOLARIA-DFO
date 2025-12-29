@@ -40,19 +40,19 @@ function formatEventMessage(event: string, data: Record<string, unknown>): { tit
             type: 'task',
             action: 'created',
             title: 'Nueva tarea creada',
-            message: data.title ? `Tarea: ${data.title}` : `Proyecto #${data.projectId}`,
+            message: data.task_code ? `${data.task_code}: ${data.title || 'Nueva tarea'}` : (data.title ? `Tarea: ${data.title}` : `Proyecto #${data.projectId}`),
         }),
         'task:updated': () => ({
             type: 'task',
             action: 'updated',
             title: 'Tarea actualizada',
-            message: data.title ? `${data.title}` : `Tarea #${data.taskId}`,
+            message: data.task_code ? `${data.task_code}: ${data.title || ''}` : (data.title ? `${data.title}` : `Tarea #${data.taskId}`),
         }),
         'task:completed': () => ({
             type: 'task',
             action: 'completed',
             title: 'Tarea completada',
-            message: data.title ? `${data.title}` : `Tarea #${data.taskId}`,
+            message: data.task_code ? `${data.task_code}: ${data.title || ''}` : (data.title ? `${data.title}` : `Tarea #${data.taskId}`),
         }),
         'task:deleted': () => ({
             type: 'task',
