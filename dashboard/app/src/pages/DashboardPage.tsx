@@ -7,8 +7,6 @@ import {
     Bot,
     Loader2,
     AlertCircle,
-    LayoutGrid,
-    List,
     Calendar,
     DollarSign,
     Users,
@@ -18,6 +16,10 @@ import { useDashboardOverview, useProjects } from '@/hooks/useApi';
 import { formatDate, cn } from '@/lib/utils';
 import { MiniTrello as MiniTrelloComponent } from '@/components/common/MiniTrello';
 import type { Project } from '@/types';
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatsGrid } from '@/components/common/StatsGrid';
+import { StatCard } from '@/components/common/StatCard';
+import { ViewSelector, type ViewType } from '@/components/common/ViewSelector';
 
 // Project phases with colors
 const PROJECT_PHASES = {
@@ -238,41 +240,12 @@ function ProjectRow({ project, onClick }: { project: Project; onClick: () => voi
     );
 }
 
-function StatCard({
-    title,
-    value,
-    icon: Icon,
-    iconClass,
-    onClick,
-}: {
-    title: string;
-    value: string | number;
-    icon: React.ElementType;
-    iconClass: string;
-    onClick?: () => void;
-}) {
-    return (
-        <div
-            onClick={onClick}
-            className={`stat-card ${onClick ? 'cursor-pointer' : ''}`}
-            title={onClick ? `Ver ${title.toLowerCase()}` : undefined}
-        >
-            <div className={`stat-icon ${iconClass}`}>
-                <Icon className="h-5 w-5" />
-            </div>
-            <div className="stat-content">
-                <div className="stat-label">{title}</div>
-                <div className="stat-value">{value}</div>
-            </div>
-        </div>
-    );
-}
 
 export function DashboardPage() {
     const navigate = useNavigate();
     const { data: stats, isLoading: statsLoading } = useDashboardOverview();
     const { data: projects, isLoading: projectsLoading } = useProjects();
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [viewMode, setViewMode] = useState<ViewType>('grid');
 
     // Calculate board stats per project using fields from backend
     // MiniTrello mapping: pending -> todo, in_progress -> doing, completed -> done
@@ -293,60 +266,47 @@ export function DashboardPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="section-header">
-                <div>
-                    <h1 className="section-title">Dashboard</h1>
-                    <p className="section-subtitle">Vista ejecutiva del estado de operaciones</p>
-                </div>
-                <div className="section-actions">
-                    {/* View Toggle */}
-                    <div className="view-toggle">
-                        <button
-                            className={cn('view-toggle-btn', viewMode === 'grid' && 'active')}
-                            onClick={() => setViewMode('grid')}
-                            title="Vista Grid"
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                        </button>
-                        <button
-                            className={cn('view-toggle-btn', viewMode === 'list' && 'active')}
-                            onClick={() => setViewMode('list')}
-                            title="Vista Lista"
-                        >
-                            <List className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <PageHeader
+                title="Dashboard"
+                subtitle="Vista ejecutiva del estado de operaciones"
+                actions={
+                    <ViewSelector
+                        value={viewMode}
+                        onChange={setViewMode}
+                        ariaLabel="Toggle dashboard view mode"
+                    />
+                }
+            />
 
             {/* Stats Row */}
-            <div className="dashboard-stats-row">
+            <StatsGrid columns={4} gap="md">
                 <StatCard
                     title="Proyectos Activos"
                     value={statsLoading ? '-' : (stats?.activeProjects || projects?.length || 0)}
                     icon={FolderKanban}
-                    iconClass="projects"
+                    variant="primary"
                     onClick={handleNavigateProjects}
+                    className="cursor-pointer"
                 />
                 <StatCard
                     title="Tareas Completadas"
                     value={statsLoading ? '-' : (stats?.completedTasks || 0)}
                     icon={CheckCircle2}
-                    iconClass="tasks"
+                    variant="success"
                 />
                 <StatCard
                     title="En Progreso"
                     value={statsLoading ? '-' : (stats?.inProgressTasks || 0)}
                     icon={Clock}
-                    iconClass="active"
+                    variant="warning"
                 />
                 <StatCard
                     title="Agentes Activos"
                     value={statsLoading ? '-' : (stats?.activeAgents || 0)}
                     icon={Bot}
-                    iconClass="agents"
+                    variant="default"
                 />
-            </div>
+            </StatsGrid>
 
             {/* Projects Grid/List */}
             {projectsLoading ? (
