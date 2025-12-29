@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus,
-    LayoutGrid,
-    List,
     FolderKanban,
     Calendar,
     DollarSign,
@@ -14,10 +12,17 @@ import {
     Loader2,
     Target,
     Pause,
-    Search,
 } from 'lucide-react';
 import { useProjects } from '@/hooks/useApi';
 import { MiniTrello as MiniTrelloComponent } from '@/components/common/MiniTrello';
+import { PageHeader } from '@/components/common/PageHeader';
+import { ViewSelector } from '@/components/common/ViewSelector';
+import { StatsGrid } from '@/components/common/StatsGrid';
+import { StatCard } from '@/components/common/StatCard';
+import { SearchInput } from '@/components/common/SearchInput';
+import { ItemCounter } from '@/components/common/ItemCounter';
+import { FilterGroup } from '@/components/common/FilterGroup';
+import { SortBar, type SortConfig } from '@/components/common/SortBar';
 import { cn, formatDate } from '@/lib/utils';
 import type { Project } from '@/types';
 
@@ -31,8 +36,16 @@ const PROJECT_PHASES = {
     cancelled: { label: 'Cancelado', color: '#ef4444' },
 };
 
-type SortOption = 'name' | 'deadline' | 'budget' | 'completion' | 'status';
 type ViewMode = 'grid' | 'list';
+
+// Sort options for dropdown
+const SORT_OPTIONS = [
+    { value: 'name', label: 'Nombre' },
+    { value: 'deadline', label: 'Fecha límite' },
+    { value: 'budget', label: 'Presupuesto' },
+    { value: 'completion', label: 'Progreso' },
+    { value: 'status', label: 'Estado/Fase' },
+];
 
 // Progress Segments Component (Phase indicator)
 function ProgressSegments({ status }: { status: string }) {
@@ -247,7 +260,10 @@ export function ProjectsPage() {
     const navigate = useNavigate();
     const { data: projects, isLoading } = useProjects();
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
-    const [sortBy, setSortBy] = useState<SortOption>('name');
+    const [sortConfig, setSortConfig] = useState<SortConfig>({
+        field: 'name',
+        direction: 'asc',
+    });
     const [search, setSearch] = useState('');
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
 
@@ -298,20 +314,30 @@ export function ProjectsPage() {
 
     // Sort projects
     const sortedProjects = [...filteredProjects].sort((a: Project, b: Project) => {
-        switch (sortBy) {
+        let comparison = 0;
+
+        switch (sortConfig.field) {
             case 'name':
-                return a.name.localeCompare(b.name);
+                comparison = a.name.localeCompare(b.name);
+                break;
             case 'deadline':
-                return (new Date(a.endDate || 0)).getTime() - (new Date(b.endDate || 0)).getTime();
+                comparison = (new Date(a.endDate || 0)).getTime() - (new Date(b.endDate || 0)).getTime();
+                break;
             case 'budget':
-                return (b.budgetAllocated || 0) - (a.budgetAllocated || 0);
+                comparison = (a.budgetAllocated || 0) - (b.budgetAllocated || 0);
+                break;
             case 'completion':
-                return (b.progress || 0) - (a.progress || 0);
+                comparison = (a.progress || 0) - (b.progress || 0);
+                break;
             case 'status':
-                return a.status.localeCompare(b.status);
+                comparison = a.status.localeCompare(b.status);
+                break;
             default:
-                return 0;
+                comparison = 0;
         }
+
+        // Apply direction (asc = 1, desc = -1)
+        return sortConfig.direction === 'asc' ? comparison : -comparison;
     });
 
     const handleProjectClick = (id: number) => {
@@ -335,129 +361,77 @@ export function ProjectsPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="section-header">
-                <div>
-                    <h1 className="section-title">Proyectos</h1>
-                    <p className="section-subtitle">
-                        {totalProjects} proyectos en el pipeline
-                    </p>
-                </div>
-                <div className="section-actions">
-                    {/* Sort Buttons */}
-                    <div className="sort-buttons">
-                        <button
-                            className={cn('sort-btn', sortBy === 'name' && 'active')}
-                            onClick={() => setSortBy('name')}
-                        >
-                            NOMBRE
-                        </button>
-                        <button
-                            className={cn('sort-btn', sortBy === 'deadline' && 'active')}
-                            onClick={() => setSortBy('deadline')}
-                        >
-                            FECHA
-                        </button>
-                        <button
-                            className={cn('sort-btn', sortBy === 'budget' && 'active')}
-                            onClick={() => setSortBy('budget')}
-                        >
-                            $$$
-                        </button>
-                        <button
-                            className={cn('sort-btn', sortBy === 'completion' && 'active')}
-                            onClick={() => setSortBy('completion')}
-                        >
-                            %
-                        </button>
-                        <button
-                            className={cn('sort-btn', sortBy === 'status' && 'active')}
-                            onClick={() => setSortBy('status')}
-                        >
-                            FASE
-                        </button>
-                    </div>
+            <PageHeader
+                title="Proyectos"
+                subtitle={`${totalProjects} proyectos en el pipeline`}
+                actions={
+                    <>
+                        {/* Sort Control */}
+                        <SortBar
+                            value={sortConfig}
+                            onChange={setSortConfig}
+                            options={SORT_OPTIONS}
+                            ariaLabel="Sort projects"
+                        />
 
-                    {/* View Toggle */}
-                    <div className="view-toggle">
-                        <button
-                            className={cn('view-toggle-btn', viewMode === 'grid' && 'active')}
-                            onClick={() => setViewMode('grid')}
-                            title="Vista Grid"
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                        </button>
-                        <button
-                            className={cn('view-toggle-btn', viewMode === 'list' && 'active')}
-                            onClick={() => setViewMode('list')}
-                            title="Vista Lista"
-                        >
-                            <List className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
-            </div>
+                        {/* View Toggle */}
+                        <ViewSelector
+                            value={viewMode}
+                            onChange={setViewMode}
+                            ariaLabel="Toggle project view mode"
+                        />
+                    </>
+                }
+            />
 
             {/* Stats Row */}
-            <div className="dashboard-stats-row">
-                <div className="stat-card">
-                    <div className="stat-icon projects">
-                        <FolderKanban className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Total Proyectos</div>
-                        <div className="stat-value">{totalProjects}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon active">
-                        <Target className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Activos</div>
-                        <div className="stat-value">{activeProjects}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon green">
-                        <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Completados</div>
-                        <div className="stat-value">{completedProjects}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon yellow">
-                        <Pause className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">En Pausa</div>
-                        <div className="stat-value">{pausedProjects}</div>
-                    </div>
-                </div>
-            </div>
+            <StatsGrid columns={4} gap="md">
+                <StatCard
+                    title="Total Proyectos"
+                    value={totalProjects}
+                    icon={FolderKanban}
+                    variant="default"
+                />
+                <StatCard
+                    title="Activos"
+                    value={activeProjects}
+                    icon={Target}
+                    variant="primary"
+                />
+                <StatCard
+                    title="Completados"
+                    value={completedProjects}
+                    icon={CheckCircle2}
+                    variant="success"
+                />
+                <StatCard
+                    title="En Pausa"
+                    value={pausedProjects}
+                    icon={Pause}
+                    variant="warning"
+                />
+            </StatsGrid>
 
-            {/* Search Section */}
-            <div className="bg-card border border-border rounded-xl p-5">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <input
-                            type="text"
-                            placeholder="Buscar proyectos (mínimo 3 caracteres)..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                        {sortedProjects.length} {sortedProjects.length === 1 ? 'proyecto' : 'proyectos'}
-                    </span>
+            {/* Search and Filter Section */}
+            <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+                {/* Search Bar with Count */}
+                <div className="flex items-center gap-4">
+                    <SearchInput
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Buscar proyectos (mínimo 3 caracteres)..."
+                        className="flex-1"
+                        ariaLabel="Search projects"
+                    />
+                    <ItemCounter
+                        count={sortedProjects.length}
+                        singularLabel="proyecto"
+                        pluralLabel="proyectos"
+                    />
                 </div>
 
                 {/* Status Filters */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fase:</span>
+                <FilterGroup title="Fase">
                     {Object.entries(PROJECT_PHASES).map(([status, info]) => {
                         const isSelected = selectedStatuses.includes(status);
                         const count = projects?.filter((p: Project) => p.status === status).length || 0;
@@ -475,17 +449,27 @@ export function ProjectsPage() {
                                         ? { backgroundColor: info.color, color: '#fff' }
                                         : { backgroundColor: `${info.color}20`, color: info.color }
                                 }
+                                aria-pressed={isSelected}
+                                aria-label={`Filter by ${info.label}`}
                             >
                                 {info.label} ({count})
                             </button>
                         );
                     })}
-                </div>
+                </FilterGroup>
             </div>
 
             {/* Projects Grid */}
             {viewMode === 'grid' ? (
-                <div className="projects-grid">
+                <div
+                    className={cn(
+                        'grid',
+                        'grid-cols-1 md:grid-cols-2 xl:grid-cols-3',
+                        'gap-[var(--spacing-md)]',
+                    )}
+                    role="list"
+                    aria-label="Projects grid"
+                >
                     {sortedProjects.map((project: Project) => (
                         <ProjectCard
                             key={project.id}
@@ -502,7 +486,13 @@ export function ProjectsPage() {
                     )}
                 </div>
             ) : (
-                <div className="project-card" style={{ padding: 0 }}>
+                <div
+                    className={cn(
+                        'rounded-xl border border-border bg-card overflow-hidden'
+                    )}
+                    role="list"
+                    aria-label="Projects list"
+                >
                     <table className="list-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                         <thead>
                             <tr>
