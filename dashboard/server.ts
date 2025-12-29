@@ -3522,6 +3522,8 @@ class SolariaDashboardServer {
                 taskId: result.insertId,
                 task_code: taskCode,
                 task_number: taskNumber,
+                epic_id: epic_id || null,
+                epic_number: epic_id && epics.length > 0 ? epics[0].epic_number : null,
                 title: title || 'Nueva tarea',
                 description: description || '',
                 projectId: project_id || null,
@@ -3607,16 +3609,23 @@ class SolariaDashboardServer {
 
             // Fetch task data for WebSocket notification
             const [taskDataForEmit] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT t.id, t.task_number, t.title, t.status, t.priority, t.progress, t.project_id,
-                       p.code as project_code, p.name as project_name
+                SELECT t.id, t.task_number, t.title, t.status, t.priority, t.progress, t.project_id, t.epic_id,
+                       p.code as project_code, p.name as project_name,
+                       e.epic_number
                 FROM tasks t
                 LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN epics e ON t.epic_id = e.id
                 WHERE t.id = ?
             `, [id]);
             const taskForEmit: any = taskDataForEmit[0] || {};
-            const taskCode = taskForEmit.project_code && taskForEmit.task_number
+            let taskCode = taskForEmit.project_code && taskForEmit.task_number
                 ? `${taskForEmit.project_code}-${String(taskForEmit.task_number).padStart(3, '0')}`
                 : `TASK-${id}`;
+
+            // Add epic suffix to task code if available
+            if (taskForEmit.epic_number) {
+                taskCode += `-EPIC${String(taskForEmit.epic_number).padStart(2, '0')}`;
+            }
 
             // Emit task:updated for real-time updates (colon format for NotificationContext)
             (this.io as any).emit('task:updated', {
@@ -3624,6 +3633,9 @@ class SolariaDashboardServer {
                 task_id: parseInt(id),
                 id: parseInt(id),
                 task_code: taskCode,
+                task_number: taskForEmit.task_number,
+                epic_id: taskForEmit.epic_id || null,
+                epic_number: taskForEmit.epic_number || null,
                 title: taskForEmit.title || updates.title,
                 projectId: taskForEmit.project_id,
                 project_id: taskForEmit.project_id,
@@ -3635,18 +3647,33 @@ class SolariaDashboardServer {
             // Emit task_completed notification if status changed to completed
             if (updates.status === 'completed') {
                 const [taskData] = await this.db!.execute<RowDataPacket[]>(`
-                    SELECT t.*, p.name as project_name, aa.name as agent_name
+                    SELECT t.*, p.name as project_name, p.code as project_code, aa.name as agent_name, e.epic_number
                     FROM tasks t
                     LEFT JOIN projects p ON t.project_id = p.id
                     LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+                    LEFT JOIN epics e ON t.epic_id = e.id
                     WHERE t.id = ?
                 `, [id]);
 
                 const task: any = taskData[0] || {};
+
+                // Generate task_code with epic suffix
+                let completedTaskCode = task.project_code && task.task_number
+                    ? `${task.project_code}-${String(task.task_number).padStart(3, '0')}`
+                    : `TASK-${id}`;
+
+                if (task.epic_number) {
+                    completedTaskCode += `-EPIC${String(task.epic_number).padStart(2, '0')}`;
+                }
+
                 // Emit task:completed (colon format for NotificationContext)
                 (this.io as any).emit('task:completed', {
                     taskId: parseInt(id),
                     id: parseInt(id),
+                    task_code: completedTaskCode,
+                    task_number: task.task_number,
+                    epic_id: task.epic_id || null,
+                    epic_number: task.epic_number || null,
                     title: task.title || `Tarea #${id}`,
                     projectId: task.project_id,
                     project_id: task.project_id,
