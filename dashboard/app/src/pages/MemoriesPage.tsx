@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
     Brain,
-    Search,
     Tag,
     TrendingUp,
     Clock,
@@ -16,6 +15,13 @@ import { useMemories, useMemoryStats, useMemoryTags, useSearchMemories } from '@
 import { cn, formatRelativeTime, formatNumber } from '@/lib/utils';
 import { MemoryDetailModal } from '@/components/memories/MemoryDetailModal';
 import type { Memory } from '@/types';
+
+// Design System Components
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatsGrid } from '@/components/common/StatsGrid';
+import { StatCard } from '@/components/common/StatCard';
+import { SearchAndFilterBar } from '@/components/common/SearchAndFilterBar';
+import { ContentGrid } from '@/components/common/ContentGrid';
 
 const TAG_COLORS: Record<string, { bg: string; color: string }> = {
     decision: { bg: 'rgba(168, 85, 247, 0.15)', color: '#a855f7' },
@@ -228,161 +234,162 @@ export function MemoriesPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="section-header">
-                <div>
-                    <h1 className="section-title">Memorias</h1>
-                    <p className="section-subtitle">
-                        Sistema de memoria persistente para agentes IA
-                    </p>
-                </div>
-                <div className="section-actions">
-                    {/* View Toggle */}
-                    <div className="view-toggle">
+            {/* Header - Using PageHeader component */}
+            <PageHeader
+                title="Memorias"
+                subtitle="Sistema de memoria persistente para agentes IA"
+                actions={
+                    <div className="flex gap-2">
                         <button
-                            className={cn('view-toggle-btn', viewMode === 'grid' && 'active')}
                             onClick={() => setViewMode('grid')}
                             title="Vista Grid"
+                            className={cn(
+                                'p-2 rounded-lg transition-colors',
+                                viewMode === 'grid'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'hover:bg-accent'
+                            )}
                         >
-                            <LayoutGrid className="h-4 w-4" />
+                            <LayoutGrid className="h-5 w-5" />
                         </button>
                         <button
-                            className={cn('view-toggle-btn', viewMode === 'list' && 'active')}
                             onClick={() => setViewMode('list')}
                             title="Vista Lista"
+                            className={cn(
+                                'p-2 rounded-lg transition-colors',
+                                viewMode === 'list'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'hover:bg-accent'
+                            )}
                         >
-                            <List className="h-4 w-4" />
+                            <List className="h-5 w-5" />
                         </button>
                     </div>
-                </div>
-            </div>
+                }
+            />
 
-            {/* Stats Row */}
-            <div className="dashboard-stats-row">
-                <div className="stat-card">
-                    <div className="stat-icon projects">
-                        <Brain className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Total Memorias</div>
-                        <div className="stat-value">{formatNumber(stats?.totalMemories || 0)}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon green">
-                        <TrendingUp className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Importancia Prom.</div>
-                        <div className="stat-value">
-                            {((stats?.avgImportance || 0) * 100).toFixed(0)}%
+            {/* Summary Stats - Using StatsGrid component */}
+            <StatsGrid columns={4}>
+                <StatCard
+                    title="Total Memorias"
+                    value={formatNumber(stats?.totalMemories || 0)}
+                    icon={Brain}
+                    variant="default"
+                />
+                <StatCard
+                    title="Importancia Prom."
+                    value={`${((stats?.avgImportance || 0) * 100).toFixed(0)}%`}
+                    icon={TrendingUp}
+                    variant="success"
+                />
+                <StatCard
+                    title="Accesos Totales"
+                    value={formatNumber(stats?.totalAccesses || 0)}
+                    icon={Zap}
+                    variant="primary"
+                />
+                <StatCard
+                    title="Proyectos"
+                    value={formatNumber(stats?.projectsWithMemories || 0)}
+                    icon={Link2}
+                    variant="default"
+                />
+            </StatsGrid>
+
+            {/* Search and Filters - Using SearchAndFilterBar component */}
+            <SearchAndFilterBar
+                searchValue={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Buscar en memorias (mín. 3 caracteres)..."
+                itemCount={memoryCount}
+                itemSingularLabel="memoria"
+                itemPluralLabel="memorias"
+                showViewSelector={false}
+                showSortBar={false}
+                filterChildren={
+                    <div className="space-y-3">
+                        {/* Tags filter */}
+                        {tags && tags.length > 0 && (
+                            <div className="flex items-start gap-2 flex-wrap">
+                                <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1.5" />
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {tags.map((tag: { name: string; usageCount: number }) => {
+                                        const colorConfig = TAG_COLORS[tag.name] || { bg: 'rgba(100, 116, 139, 0.15)', color: '#64748b' };
+                                        const isSelected = selectedTags.includes(tag.name);
+                                        return (
+                                            <button
+                                                key={tag.name}
+                                                onClick={() => toggleTag(tag.name)}
+                                                className={cn(
+                                                    'memory-tag-filter flex-shrink-0',
+                                                    isSelected && 'selected'
+                                                )}
+                                                style={
+                                                    isSelected
+                                                        ? { backgroundColor: colorConfig.color, color: '#fff' }
+                                                        : { backgroundColor: colorConfig.bg, color: colorConfig.color }
+                                                }
+                                            >
+                                                {tag.name} ({tag.usageCount})
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Importance filter */}
+                        <div className="flex items-start gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0 mt-1.5">
+                                Importancia:
+                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {(['high', 'medium', 'low'] as const).map((level) => {
+                                    const isSelected = selectedImportance.includes(level);
+                                    const count = (baseMemories || []).filter((m: Memory) => getImportanceLevel(m.importance) === level).length;
+                                    if (count === 0) return null;
+                                    const config = {
+                                        high: { label: '🔴 Alta (≥70%)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
+                                        medium: { label: '🟡 Media (40-69%)', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+                                        low: { label: '🟢 Baja (<40%)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
+                                    }[level];
+                                    return (
+                                        <button
+                                            key={level}
+                                            onClick={() => toggleImportance(level)}
+                                            className="memory-tag-filter flex-shrink-0"
+                                            style={
+                                                isSelected
+                                                    ? { backgroundColor: config.color, color: '#fff' }
+                                                    : { backgroundColor: config.bg, color: config.color }
+                                            }
+                                        >
+                                            {config.label} ({count})
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon active">
-                        <Zap className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Accesos Totales</div>
-                        <div className="stat-value">{formatNumber(stats?.totalAccesses || 0)}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon agents">
-                        <Link2 className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Proyectos</div>
-                        <div className="stat-value">{formatNumber(stats?.projectsWithMemories || 0)}</div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Search and Filters - Responsive Container */}
-            <div className="bg-card border border-border rounded-xl p-5 overflow-visible">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
-                    <div className="relative flex-1 min-w-0">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <input
-                            type="text"
-                            placeholder="Buscar en memorias (min. 3 caracteres)..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                    </div>
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
-                        {memoryCount} memorias
-                    </span>
-                </div>
-
-                {/* Tags filter - Responsive Wrap */}
-                {tags && tags.length > 0 && (
-                    <div className="flex items-start gap-2 flex-wrap mb-3">
-                        <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-1.5" />
-                        <div className="flex items-center gap-2 flex-wrap">
-                            {tags.map((tag: { name: string; usageCount: number }) => {
-                                const colorConfig = TAG_COLORS[tag.name] || { bg: 'rgba(100, 116, 139, 0.15)', color: '#64748b' };
-                                const isSelected = selectedTags.includes(tag.name);
-                                return (
-                                    <button
-                                        key={tag.name}
-                                        onClick={() => toggleTag(tag.name)}
-                                        className={cn(
-                                            'memory-tag-filter flex-shrink-0',
-                                            isSelected && 'selected'
-                                        )}
-                                        style={
-                                            isSelected
-                                                ? { backgroundColor: colorConfig.color, color: '#fff' }
-                                                : { backgroundColor: colorConfig.bg, color: colorConfig.color }
-                                        }
-                                    >
-                                        {tag.name} ({tag.usageCount})
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Importance filter - Responsive Wrap */}
-                <div className="flex items-start gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0 mt-1.5">Importancia:</span>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {(['high', 'medium', 'low'] as const).map((level) => {
-                            const isSelected = selectedImportance.includes(level);
-                            const count = (baseMemories || []).filter((m: Memory) => getImportanceLevel(m.importance) === level).length;
-                            if (count === 0) return null;
-                            const config = {
-                                high: { label: '🔴 Alta (≥70%)', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
-                                medium: { label: '🟡 Media (40-69%)', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
-                                low: { label: '🟢 Baja (<40%)', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' },
-                            }[level];
-                            return (
-                                <button
-                                    key={level}
-                                    onClick={() => toggleImportance(level)}
-                                    className="memory-tag-filter flex-shrink-0"
-                                    style={
-                                        isSelected
-                                            ? { backgroundColor: config.color, color: '#fff' }
-                                            : { backgroundColor: config.bg, color: config.color }
-                                    }
-                                >
-                                    {config.label} ({count})
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
+                }
+            />
 
             {/* Memories Grid/List */}
             {viewMode === 'grid' ? (
-                <div className="memories-grid">
-                    {displayMemories && displayMemories.length > 0 ? (
+                <ContentGrid
+                    columns={3}
+                    gap="md"
+                    emptyState={{
+                        icon: <Brain className="h-12 w-12" />,
+                        title: search.length > 2
+                            ? 'No se encontraron memorias'
+                            : 'No hay memorias registradas',
+                        description: search.length > 2
+                            ? 'Intenta ajustar los filtros de búsqueda para ver más resultados.'
+                            : 'Las memorias guardadas aparecerán aquí.',
+                    }}
+                >
+                    {displayMemories && displayMemories.length > 0 &&
                         displayMemories.map((memory: Memory) => (
                             <MemoryCard
                                 key={memory.id}
@@ -390,17 +397,8 @@ export function MemoriesPage() {
                                 onClick={() => handleMemoryClick(memory.id)}
                             />
                         ))
-                    ) : (
-                        <div className="col-span-full py-12 text-center text-muted-foreground">
-                            <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p>
-                                {search.length > 2
-                                    ? 'No se encontraron memorias con ese criterio'
-                                    : 'No hay memorias registradas'}
-                            </p>
-                        </div>
-                    )}
-                </div>
+                    }
+                </ContentGrid>
             ) : (
                 <div className="bg-card border border-border rounded-xl" style={{ padding: 0, overflow: 'hidden' }}>
                     <table className="list-table">
