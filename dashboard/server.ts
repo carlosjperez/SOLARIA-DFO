@@ -6345,7 +6345,7 @@ class SolariaDashboardServer {
             // Log to activity log
             await this.db!.execute(
                 `INSERT INTO activity_logs (action, category, level, agent_id, project_id, details)
-                 VALUES (?, 'agent_execution', 'info', ?, ?, ?)`,
+                 VALUES (?, 'system', 'info', ?, ?, ?)`,
                 [
                     `Agent job queued: ${task.code}`,
                     agentId,
