@@ -88,12 +88,10 @@ CREATE INDEX idx_agent_jobs_agent_status ON agent_jobs(agent_id, status);
 CREATE INDEX idx_agent_jobs_task_status ON agent_jobs(task_id, status);
 
 -- Active jobs query optimization
-CREATE INDEX idx_agent_jobs_active ON agent_jobs(status, started_at)
-  WHERE status IN ('waiting', 'active', 'delayed');
+CREATE INDEX idx_agent_jobs_active ON agent_jobs(status, started_at);
 
 -- Failed jobs for retry analysis
-CREATE INDEX idx_agent_jobs_failed ON agent_jobs(status, attempts_made)
-  WHERE status = 'failed';
+CREATE INDEX idx_agent_jobs_failed ON agent_jobs(status, attempts_made);
 
 -- =============================================================================
 -- Table: agent_mcp_configs
@@ -156,8 +154,7 @@ CREATE INDEX idx_agent_mcp_configs_enabled ON agent_mcp_configs(enabled);
 CREATE INDEX idx_agent_mcp_configs_status ON agent_mcp_configs(connection_status);
 
 -- Active configs query
-CREATE INDEX idx_agent_mcp_configs_active ON agent_mcp_configs(agent_id, enabled)
-  WHERE enabled = true;
+CREATE INDEX idx_agent_mcp_configs_active ON agent_mcp_configs(agent_id, enabled);
 
 -- Health check queries
 CREATE INDEX idx_agent_mcp_configs_health ON agent_mcp_configs(connection_status, last_connected_at);
