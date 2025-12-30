@@ -72,7 +72,7 @@ export PORT=${PORT}
 
 # Start dashboard
 cd /app
-node server.js &
+node dist/server.js &
 NODE_PID=$!
 
 echo "[office] Dashboard running on port ${PORT}"
