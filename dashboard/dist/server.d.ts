@@ -16,6 +16,7 @@ declare class SolariaDashboardServer {
     private _dbHealthInterval;
     private workerUrl;
     private webhookService;
+    private agentExecutionService;
     constructor();
     private initializeMiddleware;
     private initializeDatabase;
@@ -171,12 +172,41 @@ declare class SolariaDashboardServer {
     private boostMemory;
     private getRelatedMemories;
     private createMemoryCrossref;
+    /**
+     * Handle GitHub push webhook
+     * SOL-5: Auto-sync commits → DFO tasks
+     *
+     * When GitHub pushes to main branch with commits containing [DFO-XXX]:
+     * - Logs commit reference in activity logs
+     * - Auto-completes task if commit message contains "completes/closes/fixes/resolves DFO-XXX"
+     */
+    private handleGitHubWebhook;
     private getWebhooks;
     private getWebhook;
     private getWebhookDeliveries;
     private createWebhook;
     private updateWebhook;
     private deleteWebhook;
+    /**
+     * Queue a new agent execution job
+     * POST /api/agent-execution/queue
+     */
+    private queueAgentJob;
+    /**
+     * Get agent job status
+     * GET /api/agent-execution/jobs/:id
+     */
+    private getAgentJobStatus;
+    /**
+     * Cancel an agent job
+     * POST /api/agent-execution/jobs/:id/cancel
+     */
+    private cancelAgentJob;
+    /**
+     * Get worker status and queue metrics
+     * GET /api/agent-execution/workers
+     */
+    private getWorkerStatus;
     private testWebhook;
     /**
      * Dispatch webhook event (internal use)

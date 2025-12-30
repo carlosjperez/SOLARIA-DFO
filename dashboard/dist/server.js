@@ -21,8 +21,38 @@ const compression_1 = __importDefault(require("compression"));
 const morgan_1 = __importDefault(require("morgan"));
 const path_1 = __importDefault(require("path"));
 require("dotenv/config");
+const zod_1 = require("zod");
 // Import services
 const webhookService_js_1 = require("./services/webhookService.js");
+const agentExecutionService_js_1 = __importDefault(require("./services/agentExecutionService.js"));
+const githubIntegration_js_1 = require("./services/githubIntegration.js");
+// ============================================================================
+// Validation Schemas
+// ============================================================================
+/**
+ * Zod schema for agent job queue request
+ */
+const QueueAgentJobSchema = zod_1.z.object({
+    taskId: zod_1.z.number().int().positive('Task ID must be a positive integer'),
+    agentId: zod_1.z.number().int().positive('Agent ID must be a positive integer'),
+    metadata: zod_1.z.object({
+        priority: zod_1.z.enum(['critical', 'high', 'medium', 'low']).optional(),
+        estimatedHours: zod_1.z.number().positive().optional(),
+        retryCount: zod_1.z.number().int().nonnegative().optional()
+    }).optional(),
+    context: zod_1.z.object({
+        dependencies: zod_1.z.array(zod_1.z.number().int()).optional(),
+        relatedTasks: zod_1.z.array(zod_1.z.number().int()).optional(),
+        memoryIds: zod_1.z.array(zod_1.z.number().int()).optional()
+    }).optional(),
+    mcpConfigs: zod_1.z.array(zod_1.z.object({
+        serverName: zod_1.z.string(),
+        serverUrl: zod_1.z.string().url(),
+        authType: zod_1.z.enum(['bearer', 'basic', 'none']),
+        authCredentials: zod_1.z.record(zod_1.z.unknown()).optional(),
+        enabled: zod_1.z.boolean()
+    })).optional()
+});
 // ============================================================================
 // Server Class
 // ============================================================================
@@ -38,6 +68,7 @@ class SolariaDashboardServer {
     _dbHealthInterval;
     workerUrl;
     webhookService;
+    agentExecutionService;
     constructor() {
         this.app = (0, express_1.default)();
         this.server = http_1.default.createServer(this.app);
@@ -51,6 +82,7 @@ class SolariaDashboardServer {
         this._dbHealthInterval = null;
         this.workerUrl = process.env.WORKER_URL || 'http://worker:3032';
         this.webhookService = null;
+        this.agentExecutionService = null;
         // Trust proxy for rate limiting behind nginx
         this.app.set('trust proxy', true);
         this.repoPath = process.env.REPO_PATH || path_1.default.resolve(__dirname, '..', '..');
@@ -105,6 +137,9 @@ class SolariaDashboardServer {
                 // Initialize webhook service
                 this.webhookService = new webhookService_js_1.WebhookService(this.db);
                 console.log('WebhookService initialized');
+                // Initialize agent execution service
+                this.agentExecutionService = new agentExecutionService_js_1.default(this.db, this.io);
+                console.log('AgentExecutionService initialized');
                 return;
             }
             catch (error) {
@@ -250,6 +285,8 @@ class SolariaDashboardServer {
         this.app.get('/api/public/tasks/recent-completed', this.getRecentCompletedTasks.bind(this));
         this.app.get('/api/public/tasks/recent-by-project', this.getRecentTasksByProject.bind(this));
         this.app.get('/api/public/tags', this.getTaskTags.bind(this));
+        // GitHub Webhook (PUBLIC - no auth, signature verified)
+        this.app.post('/webhooks/github', this.handleGitHubWebhook.bind(this));
         // Auth middleware
         this.app.use('/api/', this.authenticateToken.bind(this));
         // Dashboard
@@ -377,6 +414,13 @@ class SolariaDashboardServer {
         this.app.put('/api/webhooks/:id', this.updateWebhook.bind(this));
         this.app.delete('/api/webhooks/:id', this.deleteWebhook.bind(this));
         // ========================================================================
+        // Agent Execution API - BullMQ Job Management (JWT Protected)
+        // ========================================================================
+        this.app.post('/api/agent-execution/queue', this.authenticateToken.bind(this), this.queueAgentJob.bind(this));
+        this.app.get('/api/agent-execution/jobs/:id', this.authenticateToken.bind(this), this.getAgentJobStatus.bind(this));
+        this.app.post('/api/agent-execution/jobs/:id/cancel', this.authenticateToken.bind(this), this.cancelAgentJob.bind(this));
+        this.app.get('/api/agent-execution/workers', this.authenticateToken.bind(this), this.getWorkerStatus.bind(this));
+        // ========================================================================
         // Office CRM API - RBAC Protected
         // ========================================================================
         // Office Dashboard
@@ -473,6 +517,18 @@ class SolariaDashboardServer {
             socket.on('subscribe_notifications', () => {
                 socket.join('notifications');
                 console.log(`${socket.id} subscribed to notifications`);
+            });
+            // Subscribe to project-specific updates
+            socket.on('subscribe_project', (projectId) => {
+                const roomName = `project:${projectId}`;
+                socket.join(roomName);
+                console.log(`${socket.id} subscribed to project ${projectId} (room: ${roomName})`);
+            });
+            // Unsubscribe from project-specific updates
+            socket.on('unsubscribe_project', (projectId) => {
+                const roomName = `project:${projectId}`;
+                socket.leave(roomName);
+                console.log(`${socket.id} unsubscribed from project ${projectId} (room: ${roomName})`);
             });
             socket.on('disconnect', () => {
                 const client = this.connectedClients.get(socket.id);
@@ -2951,13 +3007,14 @@ class SolariaDashboardServer {
             // Generate task_code with suffix
             let taskCode = `#${taskNumber}`;
             let suffix = '';
+            let epics = [];
             if (project_id) {
                 const [projects] = await this.db.execute('SELECT code FROM projects WHERE id = ?', [project_id]);
                 if (projects.length > 0 && projects[0].code) {
                     taskCode = `${projects[0].code}-${String(taskNumber).padStart(3, '0')}`;
                     // Add suffix based on epic or sprint
                     if (epic_id) {
-                        const [epics] = await this.db.execute('SELECT epic_number FROM epics WHERE id = ?', [epic_id]);
+                        [epics] = await this.db.execute('SELECT epic_number FROM epics WHERE id = ?', [epic_id]);
                         if (epics.length > 0) {
                             suffix = `-EPIC${String(epics[0].epic_number).padStart(2, '0')}`;
                         }
@@ -2977,6 +3034,8 @@ class SolariaDashboardServer {
                 taskId: result.insertId,
                 task_code: taskCode,
                 task_number: taskNumber,
+                epic_id: epic_id || null,
+                epic_number: epic_id && epics.length > 0 ? epics[0].epic_number : null,
                 title: title || 'Nueva tarea',
                 description: description || '',
                 projectId: project_id || null,
@@ -3081,22 +3140,31 @@ class SolariaDashboardServer {
             }
             // Fetch task data for WebSocket notification
             const [taskDataForEmit] = await this.db.execute(`
-                SELECT t.id, t.task_number, t.title, t.status, t.priority, t.progress, t.project_id,
-                       p.code as project_code, p.name as project_name
+                SELECT t.id, t.task_number, t.title, t.status, t.priority, t.progress, t.project_id, t.epic_id,
+                       p.code as project_code, p.name as project_name,
+                       e.epic_number
                 FROM tasks t
                 LEFT JOIN projects p ON t.project_id = p.id
+                LEFT JOIN epics e ON t.epic_id = e.id
                 WHERE t.id = ?
             `, [id]);
             const taskForEmit = taskDataForEmit[0] || {};
-            const taskCode = taskForEmit.project_code && taskForEmit.task_number
+            let taskCode = taskForEmit.project_code && taskForEmit.task_number
                 ? `${taskForEmit.project_code}-${String(taskForEmit.task_number).padStart(3, '0')}`
                 : `TASK-${id}`;
+            // Add epic suffix to task code if available
+            if (taskForEmit.epic_number) {
+                taskCode += `-EPIC${String(taskForEmit.epic_number).padStart(2, '0')}`;
+            }
             // Emit task:updated for real-time updates (colon format for NotificationContext)
             this.io.emit('task:updated', {
                 taskId: parseInt(id),
                 task_id: parseInt(id),
                 id: parseInt(id),
                 task_code: taskCode,
+                task_number: taskForEmit.task_number,
+                epic_id: taskForEmit.epic_id || null,
+                epic_number: taskForEmit.epic_number || null,
                 title: taskForEmit.title || updates.title,
                 projectId: taskForEmit.project_id,
                 project_id: taskForEmit.project_id,
@@ -3107,17 +3175,29 @@ class SolariaDashboardServer {
             // Emit task_completed notification if status changed to completed
             if (updates.status === 'completed') {
                 const [taskData] = await this.db.execute(`
-                    SELECT t.*, p.name as project_name, aa.name as agent_name
+                    SELECT t.*, p.name as project_name, p.code as project_code, aa.name as agent_name, e.epic_number
                     FROM tasks t
                     LEFT JOIN projects p ON t.project_id = p.id
                     LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+                    LEFT JOIN epics e ON t.epic_id = e.id
                     WHERE t.id = ?
                 `, [id]);
                 const task = taskData[0] || {};
+                // Generate task_code with epic suffix
+                let completedTaskCode = task.project_code && task.task_number
+                    ? `${task.project_code}-${String(task.task_number).padStart(3, '0')}`
+                    : `TASK-${id}`;
+                if (task.epic_number) {
+                    completedTaskCode += `-EPIC${String(task.epic_number).padStart(2, '0')}`;
+                }
                 // Emit task:completed (colon format for NotificationContext)
                 this.io.emit('task:completed', {
                     taskId: parseInt(id),
                     id: parseInt(id),
+                    task_code: completedTaskCode,
+                    task_number: task.task_number,
+                    epic_id: task.epic_id || null,
+                    epic_number: task.epic_number || null,
                     title: task.title || `Tarea #${id}`,
                     projectId: task.project_id,
                     project_id: task.project_id,
@@ -5173,6 +5253,59 @@ class SolariaDashboardServer {
         }
     }
     // ========================================================================
+    // GitHub Webhook Handler (Incoming)
+    // ========================================================================
+    /**
+     * Handle GitHub push webhook
+     * SOL-5: Auto-sync commits → DFO tasks
+     *
+     * When GitHub pushes to main branch with commits containing [DFO-XXX]:
+     * - Logs commit reference in activity logs
+     * - Auto-completes task if commit message contains "completes/closes/fixes/resolves DFO-XXX"
+     */
+    async handleGitHubWebhook(req, res) {
+        try {
+            // Verify GitHub signature (if secret is configured)
+            const secret = process.env.GITHUB_WEBHOOK_SECRET;
+            if (secret) {
+                const signature = req.headers['x-hub-signature-256'];
+                if (!signature) {
+                    console.warn('GitHub webhook: Missing signature');
+                    res.status(401).json({ error: 'Missing signature' });
+                    return;
+                }
+                const payload = JSON.stringify(req.body);
+                const isValid = (0, githubIntegration_js_1.verifyGitHubSignature)(payload, signature, secret);
+                if (!isValid) {
+                    console.warn('GitHub webhook: Invalid signature');
+                    res.status(401).json({ error: 'Invalid signature' });
+                    return;
+                }
+            }
+            // Process the push event
+            if (!this.db) {
+                res.status(503).json({ error: 'Database not connected' });
+                return;
+            }
+            const result = await (0, githubIntegration_js_1.handleGitHubPush)(req.body, this.db);
+            console.log(`GitHub webhook processed: ${result.status}, ${result.processed} tasks updated`);
+            if (result.errors.length > 0) {
+                console.error('GitHub webhook errors:', result.errors);
+            }
+            res.json({
+                success: true,
+                ...result,
+            });
+        }
+        catch (error) {
+            console.error('GitHub webhook error:', error);
+            res.status(500).json({
+                error: 'Failed to process GitHub webhook',
+                details: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+    // ========================================================================
     // Webhooks Handlers (n8n Integration)
     // ========================================================================
     async getWebhooks(req, res) {
@@ -5299,6 +5432,256 @@ class SolariaDashboardServer {
         catch (error) {
             console.error('Delete webhook error:', error);
             res.status(500).json({ error: 'Failed to delete webhook' });
+        }
+    }
+    // ========================================================================
+    // Agent Execution Handlers
+    // ========================================================================
+    /**
+     * Queue a new agent execution job
+     * POST /api/agent-execution/queue
+     */
+    async queueAgentJob(req, res) {
+        try {
+            if (!this.agentExecutionService) {
+                res.status(503).json({ error: 'Agent execution service not initialized' });
+                return;
+            }
+            // Validate request body with Zod
+            const validation = QueueAgentJobSchema.safeParse(req.body);
+            if (!validation.success) {
+                res.status(400).json({
+                    error: 'Validation failed',
+                    details: validation.error.format()
+                });
+                return;
+            }
+            const { taskId, agentId, metadata, context, mcpConfigs } = validation.data;
+            // Fetch task and agent info from database
+            const [taskRows] = await this.db.execute('SELECT code, project_id FROM tasks WHERE id = ?', [taskId]);
+            if (!taskRows || taskRows.length === 0) {
+                res.status(404).json({ error: 'Task not found' });
+                return;
+            }
+            const task = taskRows[0];
+            const [agentRows] = await this.db.execute('SELECT name FROM agents WHERE id = ?', [agentId]);
+            if (!agentRows || agentRows.length === 0) {
+                res.status(404).json({ error: 'Agent not found' });
+                return;
+            }
+            const agent = agentRows[0];
+            // Queue the job
+            const job = await this.agentExecutionService.queueJob({
+                taskId,
+                taskCode: task.code,
+                agentId,
+                agentName: agent.name,
+                projectId: task.project_id,
+                mcpConfigs,
+                context,
+                metadata
+            });
+            // Log success
+            console.log(`[AgentExecution] Job queued successfully: ${job.id} | Task: ${task.code} | Agent: ${agent.name}`);
+            // Log to activity log
+            await this.db.execute(`INSERT INTO activity_logs (action, category, level, agent_id, project_id, details)
+                 VALUES (?, 'agent_execution', 'info', ?, ?, ?)`, [
+                `Agent job queued: ${task.code}`,
+                agentId,
+                task.project_id,
+                JSON.stringify({ jobId: job.id, taskId, priority: metadata?.priority || 'medium' })
+            ]);
+            res.status(201).json({
+                success: true,
+                data: {
+                    jobId: job.id,
+                    taskId,
+                    taskCode: task.code,
+                    agentId,
+                    agentName: agent.name,
+                    projectId: task.project_id,
+                    status: 'queued',
+                    priority: metadata?.priority || 'medium',
+                    queuedAt: new Date().toISOString()
+                },
+                message: 'Job queued successfully'
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            console.error('[AgentExecution] Queue agent job error:', {
+                error: errorMessage,
+                stack: errorStack,
+                taskId: req.body.taskId,
+                agentId: req.body.agentId
+            });
+            res.status(500).json({
+                error: 'Failed to queue job',
+                details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+            });
+        }
+    }
+    /**
+     * Get agent job status
+     * GET /api/agent-execution/jobs/:id
+     */
+    async getAgentJobStatus(req, res) {
+        try {
+            if (!this.agentExecutionService) {
+                res.status(503).json({ error: 'Agent execution service not initialized' });
+                return;
+            }
+            const jobId = req.params.id;
+            if (!jobId) {
+                res.status(400).json({ error: 'Job ID is required' });
+                return;
+            }
+            const status = await this.agentExecutionService.getJobStatus(jobId);
+            if (!status) {
+                console.warn(`[AgentExecution] Job not found: ${jobId}`);
+                res.status(404).json({ error: 'Job not found' });
+                return;
+            }
+            console.log(`[AgentExecution] Job status retrieved: ${jobId} | Status: ${status.status}`);
+            res.json({
+                success: true,
+                data: status
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            console.error('[AgentExecution] Get job status error:', {
+                error: errorMessage,
+                stack: errorStack,
+                jobId
+            });
+            res.status(500).json({
+                error: 'Failed to retrieve job status',
+                details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+            });
+        }
+    }
+    /**
+     * Cancel an agent job
+     * POST /api/agent-execution/jobs/:id/cancel
+     */
+    async cancelAgentJob(req, res) {
+        try {
+            if (!this.agentExecutionService) {
+                res.status(503).json({ error: 'Agent execution service not initialized' });
+                return;
+            }
+            const jobId = req.params.id;
+            if (!jobId) {
+                res.status(400).json({ error: 'Job ID is required' });
+                return;
+            }
+            const cancelled = await this.agentExecutionService.cancelJob(jobId);
+            if (!cancelled) {
+                console.warn(`[AgentExecution] Cannot cancel job: ${jobId} (may be completed or not found)`);
+                res.status(404).json({
+                    error: 'Job not found or cannot be cancelled',
+                    details: 'Job may already be completed or does not exist'
+                });
+                return;
+            }
+            console.log(`[AgentExecution] Job cancelled successfully: ${jobId}`);
+            // Log to activity log
+            await this.db.execute(`INSERT INTO activity_logs (action, category, level, details)
+                 VALUES (?, 'agent_execution', 'info', ?)`, [
+                `Agent job cancelled: ${jobId}`,
+                JSON.stringify({ jobId, cancelledAt: new Date().toISOString() })
+            ]);
+            res.json({
+                success: true,
+                data: {
+                    jobId,
+                    status: 'cancelled',
+                    cancelledAt: new Date().toISOString()
+                },
+                message: 'Job cancelled successfully'
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            console.error('[AgentExecution] Cancel job error:', {
+                error: errorMessage,
+                stack: errorStack,
+                jobId
+            });
+            res.status(500).json({
+                error: 'Failed to cancel job',
+                details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+            });
+        }
+    }
+    /**
+     * Get worker status and queue metrics
+     * GET /api/agent-execution/workers
+     */
+    async getWorkerStatus(req, res) {
+        try {
+            if (!this.agentExecutionService) {
+                res.status(503).json({ error: 'Agent execution service not initialized' });
+                return;
+            }
+            // Get queue metrics
+            const metrics = await this.agentExecutionService.getQueueMetrics();
+            // Get active jobs
+            const activeJobs = await this.agentExecutionService.getActiveJobs(10);
+            // Worker configuration (from queue.ts)
+            const workerConfig = {
+                concurrency: 5, // From getWorkerOptions in queue.ts
+                lockDuration: 30000,
+                queueName: 'agent-execution'
+            };
+            console.log(`[AgentExecution] Worker status retrieved | Active: ${metrics.active} | Waiting: ${metrics.waiting} | Success rate: ${metrics.successRate.toFixed(2)}%`);
+            res.json({
+                success: true,
+                data: {
+                    workers: {
+                        concurrency: workerConfig.concurrency,
+                        lockDuration: workerConfig.lockDuration,
+                        queueName: workerConfig.queueName,
+                        status: 'active' // Assume active if service initialized
+                    },
+                    queue: {
+                        waiting: metrics.waiting,
+                        active: metrics.active,
+                        completed: metrics.completed,
+                        failed: metrics.failed,
+                        delayed: metrics.delayed,
+                        cancelled: metrics.cancelled,
+                        avgExecutionTimeMs: Math.round(metrics.avgExecutionTimeMs),
+                        successRate: Math.round(metrics.successRate * 100) / 100
+                    },
+                    activeJobs: activeJobs.map(job => ({
+                        jobId: job.jobId,
+                        taskId: job.taskId,
+                        taskCode: job.taskCode,
+                        agentId: job.agentId,
+                        state: job.state,
+                        progress: job.progress,
+                        startedAt: job.startedAt
+                    })),
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            console.error('[AgentExecution] Get worker status error:', {
+                error: errorMessage,
+                stack: errorStack
+            });
+            res.status(500).json({
+                error: 'Failed to retrieve worker status',
+                details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+            });
         }
     }
     async testWebhook(req, res) {

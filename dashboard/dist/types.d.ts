@@ -498,6 +498,52 @@ export interface ServerToClientEvents {
         name: string;
         projectId: number;
     }) => void;
+    'task:created': (data: {
+        id: number;
+        taskId: number;
+        task_code: string;
+        task_number: number;
+        epic_id: number | null;
+        epic_number: number | null;
+        title: string;
+        description: string;
+        projectId: number | null;
+        project_id: number | null;
+        assigned_agent_id: number | null;
+        priority: string;
+        status: string;
+        progress: number;
+        created_at: string;
+    }) => void;
+    'task:updated': (data: {
+        taskId: number;
+        task_id: number;
+        id: number;
+        task_code: string;
+        task_number: number;
+        epic_id: number | null;
+        epic_number: number | null;
+        title: string;
+        projectId: number;
+        project_id: number;
+        project_name: string;
+        updated_at: string;
+        [key: string]: unknown;
+    }) => void;
+    'task:completed': (data: {
+        taskId: number;
+        id: number;
+        task_code: string;
+        task_number: number;
+        epic_id: number | null;
+        epic_number: number | null;
+        title: string;
+        projectId: number;
+        project_id: number;
+        project_name: string;
+        agent_name: string;
+        priority: string;
+    }) => void;
     'project:created': (data: {
         projectId: number;
         name: string;
@@ -520,6 +566,63 @@ export interface ServerToClientEvents {
         name: string;
         archived: boolean;
     }) => void;
+    agent_job_queued: (data: {
+        jobId: string;
+        taskId: number;
+        taskCode: string;
+        agentId: number;
+        agentName: string;
+        projectId: number;
+        priority: string;
+        status: 'waiting';
+        queuedAt: string;
+    }) => void;
+    agent_job_started: (data: {
+        jobId: string;
+        taskId: number;
+        taskCode: string;
+        agentId: number;
+        agentName: string;
+        projectId: number;
+        status: 'active';
+        startedAt: string;
+    }) => void;
+    agent_job_progress: (data: {
+        jobId: string;
+        taskId: number;
+        taskCode: string;
+        agentId: number;
+        projectId: number;
+        progress: number;
+        status: 'active';
+        updatedAt: string;
+    }) => void;
+    agent_job_completed: (data: {
+        jobId: string;
+        taskId: number;
+        taskCode: string;
+        agentId: number;
+        projectId: number;
+        status: 'completed';
+        progress: number;
+        result: unknown;
+        executionTimeMs: number;
+        completedAt: string;
+    }) => void;
+    agent_job_failed: (data: {
+        jobId: string;
+        taskId: number;
+        taskCode: string;
+        agentId: number;
+        projectId: number;
+        status: 'failed';
+        error: {
+            message: string;
+            stack?: string;
+        };
+        attemptsMade: number;
+        failedAt: string;
+    }) => void;
 }
 export interface ClientToServerEvents {
     authenticate: (token: string) => void;
@@ -527,6 +630,8 @@ export interface ClientToServerEvents {
     subscribe_agents: () => void;
     subscribe_alerts: () => void;
     subscribe_notifications: () => void;
+    subscribe_project: (projectId: number) => void;
+    unsubscribe_project: (projectId: number) => void;
 }
 export interface SocketData {
     userId?: number;
