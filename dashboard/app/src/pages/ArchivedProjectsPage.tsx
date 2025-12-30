@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Search,
     Archive,
     FolderKanban,
     Calendar,
@@ -10,12 +9,15 @@ import {
     Clock,
     DollarSign,
     Loader2,
-    ArrowLeft,
     Eye,
 } from 'lucide-react';
 import { useProjects, useTasks } from '@/hooks/useApi';
 import { formatDate } from '@/lib/utils';
 import type { Project, Task } from '@/types';
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatsGrid } from '@/components/common/StatsGrid';
+import { StatCard } from '@/components/common/StatCard';
+import { SearchInput } from '@/components/common/SearchInput';
 
 // Project archive statuses (completed or cancelled)
 const ARCHIVE_STATUSES = ['completed', 'cancelled'];
@@ -88,86 +90,56 @@ export function ArchivedProjectsPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="section-header">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="p-2 hover:bg-muted rounded-lg transition-colors"
-                    >
-                        <ArrowLeft className="h-5 w-5" />
-                    </button>
-                    <div>
-                        <h1 className="section-title flex items-center gap-2">
-                            <Archive className="h-6 w-6 text-primary" />
-                            Proyectos Archivados
-                        </h1>
-                        <p className="section-subtitle">
-                            {totalArchived} proyectos en archivo
-                        </p>
-                    </div>
-                </div>
-            </div>
+            <PageHeader
+                title="Proyectos Archivados"
+                subtitle={`${totalArchived} proyectos en archivo`}
+                backButton={{ to: '/projects', label: 'Volver' }}
+            />
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-4">
-                <div className="stat-card">
-                    <div className="stat-icon">
-                        <Archive className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Total Archivados</div>
-                        <div className="stat-value">{totalArchived}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon green">
-                        <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Completados</div>
-                        <div className="stat-value">{completedCount}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon red">
-                        <XCircle className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Cancelados</div>
-                        <div className="stat-value">{cancelledCount}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon orange">
-                        <DollarSign className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Budget Total</div>
-                        <div className="stat-value">
-                            ${totalBudget >= 1000 ? `${(totalBudget / 1000).toFixed(0)}K` : totalBudget}
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <StatsGrid columns={4} gap="md">
+                <StatCard
+                    title="Total Archivados"
+                    value={totalArchived}
+                    icon={Archive}
+                    variant="default"
+                />
+                <StatCard
+                    title="Completados"
+                    value={completedCount}
+                    icon={CheckCircle2}
+                    variant="success"
+                />
+                <StatCard
+                    title="Cancelados"
+                    value={cancelledCount}
+                    icon={XCircle}
+                    variant="danger"
+                />
+                <StatCard
+                    title="Budget Total"
+                    value={`$${totalBudget >= 1000 ? `${(totalBudget / 1000).toFixed(0)}K` : totalBudget}`}
+                    icon={DollarSign}
+                    variant="warning"
+                />
+            </StatsGrid>
 
             {/* Filters */}
             <div className="filters-row">
-                <div className="filter-search">
-                    <Search className="filter-search-icon" />
-                    <input
-                        type="text"
-                        placeholder="Buscar proyectos archivados..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="filter-search-input"
-                    />
-                </div>
+                <SearchInput
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Buscar proyectos archivados..."
+                    className="flex-1"
+                    ariaLabel="Search archived projects"
+                />
 
                 <div className="filter-selects">
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="filter-select"
+                        aria-label="Filter by status"
                     >
                         <option value="">Todos los estados</option>
                         <option value="completed">Completados</option>

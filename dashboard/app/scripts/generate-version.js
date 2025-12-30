@@ -1,6 +1,14 @@
 #!/usr/bin/env node
+
+/**
+ * Auto-generate version.ts with current git commit info
+ *
+ * @author ECO-Lambda | DFO Version Management
+ * @date 2025-12-29
+ */
+
 import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -8,60 +16,38 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 try {
-    // Read version from package.json
+    // Get git info
+    const commit = execSync('git rev-parse --short HEAD').toString().trim();
+    const branch = execSync('git branch --show-current').toString().trim();
+    const buildDate = new Date().toISOString();
+
+    // Read package.json for version
     const packageJson = JSON.parse(
-        readFileSync(join(__dirname, '../package.json'), 'utf-8')
+        execSync('cat package.json').toString()
     );
     const version = packageJson.version;
 
-    // Get git commit hash
-    let commitHash = 'dev';
-    try {
-        commitHash = execSync('git rev-parse --short HEAD', {
-            encoding: 'utf-8',
-            stdio: ['pipe', 'pipe', 'ignore']
-        }).trim();
-    } catch (error) {
-        console.warn('Warning: Could not get git commit hash, using "dev"');
-    }
-
-    // Get git branch
-    let branch = 'unknown';
-    try {
-        branch = execSync('git rev-parse --abbrev-ref HEAD', {
-            encoding: 'utf-8',
-            stdio: ['pipe', 'pipe', 'ignore']
-        }).trim();
-    } catch (error) {
-        console.warn('Warning: Could not get git branch');
-    }
-
-    // Get build timestamp
-    const buildDate = new Date().toISOString();
-
-    // Generate version file
+    // Generate version object
     const versionContent = `// Auto-generated file - DO NOT EDIT
 // Generated at: ${buildDate}
 
 export const VERSION = {
     version: '${version}',
-    commit: '${commitHash}',
+    commit: '${commit}',
     branch: '${branch}',
     buildDate: '${buildDate}',
-    full: 'v${version}-${commitHash}',
+    full: 'v${version}-${commit}',
 } as const;
 
 export default VERSION;
 `;
 
-    // Write version file
-    const versionPath = join(__dirname, '../src/version.ts');
+    // Write to src/version.ts
+    const versionPath = join(__dirname, '..', 'src', 'version.ts');
     writeFileSync(versionPath, versionContent, 'utf-8');
 
-    console.log(`✓ Version file generated: v${version}-${commitHash}`);
-    console.log(`  Branch: ${branch}`);
-    console.log(`  Build date: ${buildDate}`);
+    console.log(`✓ Generated version.ts: v${version}-${commit} (${branch})`);
 } catch (error) {
-    console.error('Error generating version file:', error);
+    console.error('✗ Failed to generate version.ts:', error.message);
     process.exit(1);
 }

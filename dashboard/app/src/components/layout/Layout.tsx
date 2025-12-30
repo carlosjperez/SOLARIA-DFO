@@ -6,7 +6,7 @@ import { useUIStore } from '@/store/ui';
 import { cn } from '@/lib/utils';
 
 // Pages that need full viewport (minimal padding)
-const FULL_VIEWPORT_ROUTES = ['/tasks', '/projects'];
+const FULL_VIEWPORT_ROUTES = ['/tasks'];
 
 export function Layout() {
     const sidebarOpen = useUIStore((state) => state.sidebarOpen);

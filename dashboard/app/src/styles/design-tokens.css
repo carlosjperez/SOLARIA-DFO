@@ -154,6 +154,10 @@
         --container-max-width: 1280px;
         --content-max-width: 1024px;
 
+        /* Page padding (responsive) */
+        --page-padding-x: var(--spacing-lg);    /* 24px horizontal padding */
+        --page-padding-y: var(--spacing-xl);    /* 32px vertical padding */
+
         /* ============================================
            Z-INDEX SCALE
            Capas de elevación

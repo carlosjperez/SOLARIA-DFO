@@ -33,12 +33,30 @@ export default defineConfig({
     build: {
         outDir: 'dist',
         sourcemap: true,
+        chunkSizeWarningLimit: 500, // Warn if chunks exceed 500 KB
         rollupOptions: {
             output: {
                 manualChunks: {
-                    vendor: ['react', 'react-dom', 'react-router-dom'],
-                    charts: ['recharts'],
-                    query: ['@tanstack/react-query'],
+                    // React core libraries
+                    'react-vendor': ['react', 'react-dom'],
+                    // React Router
+                    'router-vendor': ['react-router-dom'],
+                    // State management and data fetching
+                    'query-vendor': ['@tanstack/react-query'],
+                    'state-vendor': ['zustand'],
+                    // UI libraries
+                    'ui-vendor': [
+                        'lucide-react',
+                        'class-variance-authority',
+                        'clsx',
+                        'tailwind-merge',
+                    ],
+                    // Charts
+                    'charts-vendor': ['recharts'],
+                    // Utilities
+                    'utils-vendor': ['axios', 'date-fns', 'zod'],
+                    // Socket.io (large lib)
+                    'socket-vendor': ['socket.io-client'],
                 },
             },
         },

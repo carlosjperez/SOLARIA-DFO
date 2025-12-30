@@ -12,8 +12,13 @@ import {
     Clock,
     Globe,
     Shield,
-    Search,
 } from 'lucide-react';
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatsGrid } from '@/components/common/StatsGrid';
+import { StatCard } from '@/components/common/StatCard';
+import { SearchInput } from '@/components/common/SearchInput';
+import { ItemCounter } from '@/components/common/ItemCounter';
+import { FilterGroup } from '@/components/common/FilterGroup';
 
 interface VPSServer {
     id: number;
@@ -216,74 +221,58 @@ export function InfrastructurePage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="section-header">
-                <div>
-                    <h1 className="section-title">Infraestructura</h1>
-                    <p className="section-subtitle">VPS, SSH, Cloudflare y accesos de gestion</p>
-                </div>
-            </div>
+            <PageHeader
+                title="Infraestructura"
+                subtitle="VPS, SSH, Cloudflare y accesos de gestión"
+            />
 
             {/* Summary Stats */}
-            <div className="grid grid-cols-4 gap-4">
-                <div className="stat-card">
-                    <div className="stat-icon green">
-                        <Server className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">VPS Online</div>
-                        <div className="stat-value">{totalOnline}/{totalVPS}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon agents">
-                        <Network className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">NEMESIS Activos</div>
-                        <div className="stat-value">{totalNemesis}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon projects">
-                        <Cloud className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Dominios CF</div>
-                        <div className="stat-value">{totalDomains}</div>
-                    </div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-icon orange">
-                        <Key className="h-5 w-5" />
-                    </div>
-                    <div className="stat-content">
-                        <div className="stat-label">Claves SSH</div>
-                        <div className="stat-value">{sshKeys.length}</div>
-                    </div>
-                </div>
-            </div>
+            <StatsGrid columns={4} gap="md">
+                <StatCard
+                    title="VPS Online"
+                    value={`${totalOnline}/${totalVPS}`}
+                    icon={Server}
+                    variant="success"
+                />
+                <StatCard
+                    title="NEMESIS Activos"
+                    value={totalNemesis}
+                    icon={Network}
+                    variant="primary"
+                />
+                <StatCard
+                    title="Dominios CF"
+                    value={totalDomains}
+                    icon={Cloud}
+                    variant="default"
+                />
+                <StatCard
+                    title="Claves SSH"
+                    value={sshKeys.length}
+                    icon={Key}
+                    variant="warning"
+                />
+            </StatsGrid>
 
             {/* Search and Filters */}
             <div className="bg-card border border-border rounded-xl p-5">
                 <div className="flex items-center gap-4 mb-4">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre o IP (mínimo 3 caracteres)..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                        />
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                        {totalVPS + totalNemesis + totalDomains} recursos
-                    </span>
+                    <SearchInput
+                        value={search}
+                        onChange={setSearch}
+                        placeholder="Buscar por nombre o IP (mínimo 3 caracteres)..."
+                        className="flex-1"
+                        ariaLabel="Search infrastructure resources"
+                    />
+                    <ItemCounter
+                        count={totalVPS + totalNemesis + totalDomains}
+                        singularLabel="recurso"
+                        pluralLabel="recursos"
+                    />
                 </div>
 
                 {/* Type Filters */}
-                <div className="flex items-center gap-2 flex-wrap mb-3">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Tipo:</span>
+                <FilterGroup title="Tipo">
                     {(['vps', 'nemesis', 'cloudflare'] as const).map((type) => {
                         const isSelected = selectedTypes.includes(type);
                         const counts = {
@@ -306,16 +295,17 @@ export function InfrastructurePage() {
                                         ? { backgroundColor: config.color, color: '#fff' }
                                         : { backgroundColor: config.bg, color: config.color }
                                 }
+                                aria-pressed={isSelected}
+                                aria-label={`Filter by ${config.label}`}
                             >
                                 {config.label} ({counts[type]})
                             </button>
                         );
                     })}
-                </div>
+                </FilterGroup>
 
                 {/* Status Filters */}
-                <div className="flex items-center gap-2 flex-wrap mb-3">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estado:</span>
+                <FilterGroup title="Estado">
                     {(['online', 'active', 'offline', 'inactive', 'maintenance', 'pending'] as const).map((status) => {
                         const isSelected = selectedStatus.includes(status);
                         const count = [
@@ -342,16 +332,17 @@ export function InfrastructurePage() {
                                         ? { backgroundColor: config.color, color: '#fff' }
                                         : { backgroundColor: config.bg, color: config.color }
                                 }
+                                aria-pressed={isSelected}
+                                aria-label={`Filter by ${config.label}`}
                             >
                                 {config.label} ({count})
                             </button>
                         );
                     })}
-                </div>
+                </FilterGroup>
 
                 {/* Provider Filters */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Proveedor:</span>
+                <FilterGroup title="Proveedor">
                     {(['hetzner', 'hostinger'] as const).map((provider) => {
                         const isSelected = selectedProviders.includes(provider);
                         const count = vps.filter(v => v.provider.toLowerCase() === provider).length;
@@ -370,12 +361,14 @@ export function InfrastructurePage() {
                                         ? { backgroundColor: config.color, color: '#fff' }
                                         : { backgroundColor: config.bg, color: config.color }
                                 }
+                                aria-pressed={isSelected}
+                                aria-label={`Filter by ${config.label}`}
                             >
                                 {config.label} ({count})
                             </button>
                         );
                     })}
-                </div>
+                </FilterGroup>
             </div>
 
             {/* VPS Servers */}
