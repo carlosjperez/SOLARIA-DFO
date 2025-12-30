@@ -22,6 +22,7 @@ import 'dotenv/config';
 
 // Import services
 import { WebhookService } from './services/webhookService.js';
+import { handleGitHubPush, verifyGitHubSignature } from './services/githubIntegration.js';
 
 // Import local types
 import type {
@@ -313,6 +314,9 @@ class SolariaDashboardServer {
         this.app.get('/api/public/tasks/recent-completed', this.getRecentCompletedTasks.bind(this));
         this.app.get('/api/public/tasks/recent-by-project', this.getRecentTasksByProject.bind(this));
         this.app.get('/api/public/tags', this.getTaskTags.bind(this));
+
+        // GitHub Webhook (PUBLIC - no auth, signature verified)
+        this.app.post('/webhooks/github', this.handleGitHubWebhook.bind(this));
 
         // Auth middleware
         this.app.use('/api/', this.authenticateToken.bind(this));
@@ -5988,6 +5992,65 @@ class SolariaDashboardServer {
         } catch (error) {
             console.error('Create crossref error:', error);
             res.status(500).json({ error: 'Failed to create cross-reference' });
+        }
+    }
+
+    // ========================================================================
+    // GitHub Webhook Handler (Incoming)
+    // ========================================================================
+
+    /**
+     * Handle GitHub push webhook
+     * SOL-5: Auto-sync commits → DFO tasks
+     *
+     * When GitHub pushes to main branch with commits containing [DFO-XXX]:
+     * - Logs commit reference in activity logs
+     * - Auto-completes task if commit message contains "completes/closes/fixes/resolves DFO-XXX"
+     */
+    private async handleGitHubWebhook(req: Request, res: Response): Promise<void> {
+        try {
+            // Verify GitHub signature (if secret is configured)
+            const secret = process.env.GITHUB_WEBHOOK_SECRET;
+            if (secret) {
+                const signature = req.headers['x-hub-signature-256'] as string;
+                if (!signature) {
+                    console.warn('GitHub webhook: Missing signature');
+                    res.status(401).json({ error: 'Missing signature' });
+                    return;
+                }
+
+                const payload = JSON.stringify(req.body);
+                const isValid = verifyGitHubSignature(payload, signature, secret);
+                if (!isValid) {
+                    console.warn('GitHub webhook: Invalid signature');
+                    res.status(401).json({ error: 'Invalid signature' });
+                    return;
+                }
+            }
+
+            // Process the push event
+            if (!this.db) {
+                res.status(503).json({ error: 'Database not connected' });
+                return;
+            }
+
+            const result = await handleGitHubPush(req.body, this.db);
+
+            console.log(`GitHub webhook processed: ${result.status}, ${result.processed} tasks updated`);
+            if (result.errors.length > 0) {
+                console.error('GitHub webhook errors:', result.errors);
+            }
+
+            res.json({
+                success: true,
+                ...result,
+            });
+        } catch (error) {
+            console.error('GitHub webhook error:', error);
+            res.status(500).json({
+                error: 'Failed to process GitHub webhook',
+                details: error instanceof Error ? error.message : String(error),
+            });
         }
     }
 

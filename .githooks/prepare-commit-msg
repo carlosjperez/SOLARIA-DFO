@@ -1,0 +1,32 @@
+#!/bin/bash
+# Git hook: Auto-add DFO task reference to commit message
+# SOL-4: Git Hooks Auto-Reference
+#
+# Installation: Run `git config core.hooksPath .githooks`
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Skip if amending, merging, or squashing
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ] || [ "$COMMIT_SOURCE" = "commit" ]; then
+  exit 0
+fi
+
+# Extract task ID from branch name (DFO-123 or feature/DFO-123)
+BRANCH=$(git branch --show-current)
+
+if [[ $BRANCH =~ DFO-([0-9]+) ]] || [[ $BRANCH =~ feature/DFO-([0-9]+) ]]; then
+  TASK_NUMBER="${BASH_REMATCH[1]}"
+
+  # Read current message
+  ORIGINAL_MSG=$(cat "$COMMIT_MSG_FILE")
+
+  # Check if already has reference
+  if [[ ! $ORIGINAL_MSG =~ \[DFO-[0-9]+\] ]]; then
+    # Prepend task reference
+    echo "[DFO-$TASK_NUMBER] $ORIGINAL_MSG" > "$COMMIT_MSG_FILE"
+    echo "✅ Auto-added DFO task reference: [DFO-$TASK_NUMBER]" >&2
+  fi
+fi
+
+exit 0
