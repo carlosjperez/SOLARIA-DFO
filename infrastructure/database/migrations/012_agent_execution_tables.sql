@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS agent_jobs (
   CONSTRAINT fk_agent_jobs_task
     FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
   CONSTRAINT fk_agent_jobs_agent
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE,
   CONSTRAINT fk_agent_jobs_project
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
 
@@ -133,9 +133,9 @@ CREATE TABLE IF NOT EXISTS agent_mcp_configs (
 
   -- Foreign Keys
   CONSTRAINT fk_agent_mcp_configs_agent
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES ai_agents(id) ON DELETE CASCADE,
   CONSTRAINT fk_agent_mcp_configs_creator
-    FOREIGN KEY (created_by_agent_id) REFERENCES agents(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by_agent_id) REFERENCES ai_agents(id) ON DELETE SET NULL,
 
   -- Prevent duplicate server configs per agent
   CONSTRAINT uq_agent_server UNIQUE (agent_id, server_name)
