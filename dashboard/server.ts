@@ -6293,8 +6293,18 @@ class SolariaDashboardServer {
             const { taskId, agentId, metadata, context, mcpConfigs } = validation.data;
 
             // Fetch task and agent info from database
+            // Generate task_code dynamically (no code column exists)
             const [taskRows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT code, project_id FROM tasks WHERE id = ?',
+                `SELECT
+                    t.id,
+                    t.project_id,
+                    CONCAT(
+                        COALESCE(p.code, 'TSK'), '-',
+                        LPAD(COALESCE(t.task_number, t.id), 3, '0')
+                    ) as code
+                FROM tasks t
+                LEFT JOIN projects p ON t.project_id = p.id
+                WHERE t.id = ?`,
                 [taskId]
             );
 
@@ -6306,7 +6316,7 @@ class SolariaDashboardServer {
             const task = taskRows[0];
 
             const [agentRows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT name FROM agents WHERE id = ?',
+                'SELECT name FROM ai_agents WHERE id = ?',
                 [agentId]
             );
 
