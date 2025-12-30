@@ -83,6 +83,9 @@ import {
   deleteInlineDocument,
   searchDocuments,
 } from './src/endpoints/inline-documents.js';
+import { getWorkContext } from './src/endpoints/work-context.js';
+import { protocolEnforcer } from './src/utils/protocol-enforcement.js';
+import { createTaskCompletionMemory } from './src/utils/auto-memory.js';
 
 // ============================================================================
 // Tool Definitions
@@ -114,6 +117,14 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "get_current_context",
     description: "Get the current session context including which project you are isolated to",
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+  },
+  {
+    name: "get_work_context",
+    description: "IMPORTANT: Call this at the start of your work session. Returns the complete work context including: current project, active sprint (phase), active epic, and current in-progress task with subtasks. This gives you full situational awareness of what you're working on.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -1398,6 +1409,10 @@ export async function executeTool(
   apiCall: ApiCallFunction,
   context: MCPContext = {}
 ): Promise<unknown> {
+  // Protocol Enforcement - MANDATORY checks before tool execution
+  const sessionId = context.session_id || 'default';
+  protocolEnforcer.beforeToolCall(sessionId, name, args);
+
   // Determine if strict project isolation is active
   const isIsolated = Boolean(context.project_id && !context.adminMode);
   const projectId = context.project_id || (args?.project_id as number | undefined);
@@ -1477,6 +1492,9 @@ export async function executeTool(
           ? `You are working in project #${context.project_id}. All operations are isolated to this project.`
           : "No project context set. You have access to all projects. Call set_project_context to isolate to a specific project.",
       };
+
+    case "get_work_context":
+      return getWorkContext(context.project_id || null, apiCall);
 
     // Dashboard
     case "get_dashboard_overview":
@@ -1630,7 +1648,16 @@ export async function executeTool(
     case "complete_task": {
       const params = (args as unknown) as CompleteTaskParams;
       await validateTaskProject(params.task_id);
-      return apiCall(`/tasks/${params.task_id}`, {
+
+      // Get task details BEFORE completing (for auto-memory)
+      const task = await apiCall(`/tasks/${params.task_id}`) as any;
+
+      // Get subtasks to include in memory
+      const itemsResult = await apiCall(`/tasks/${params.task_id}/items`) as { items: any[] };
+      const items = itemsResult.items || [];
+
+      // Complete the task
+      const result = await apiCall(`/tasks/${params.task_id}`, {
         method: "PUT",
         body: JSON.stringify({
           status: "completed",
@@ -1638,6 +1665,28 @@ export async function executeTool(
           completion_notes: params.completion_notes,
         }),
       });
+
+      // Auto-create completion memory (SOL-3)
+      try {
+        await createTaskCompletionMemory(
+          {
+            id: task.id,
+            task_code: task.task_code,
+            title: task.title,
+            completion_notes: params.completion_notes,
+            items_total: items.length,
+            items_completed: items.filter((i: any) => i.is_completed).length,
+            project_id: task.project_id,
+            priority: task.priority,
+          },
+          apiCall
+        );
+      } catch (memoryError) {
+        // Log but don't fail task completion if memory creation fails
+        console.warn('Auto-memory creation failed:', memoryError);
+      }
+
+      return result;
     }
 
     case "delete_task": {
