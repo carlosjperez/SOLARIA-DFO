@@ -608,6 +608,9 @@ export interface ServerToClientEvents {
   epic_created: (data: { id: number; epicNumber: number; name: string; projectId: number }) => void;
   sprint_created: (data: { id: number; sprintNumber: number; name: string; projectId: number }) => void;
   // Real-time notification events (colon-style)
+  'task:created': (data: { id: number; taskId: number; task_code: string; task_number: number; epic_id: number | null; epic_number: number | null; title: string; description: string; projectId: number | null; project_id: number | null; assigned_agent_id: number | null; priority: string; status: string; progress: number; created_at: string }) => void;
+  'task:updated': (data: { taskId: number; task_id: number; id: number; task_code: string; task_number: number; epic_id: number | null; epic_number: number | null; title: string; projectId: number; project_id: number; project_name: string; updated_at: string; [key: string]: unknown }) => void;
+  'task:completed': (data: { taskId: number; id: number; task_code: string; task_number: number; epic_id: number | null; epic_number: number | null; title: string; projectId: number; project_id: number; project_name: string; agent_name: string; priority: string }) => void;
   'project:created': (data: { projectId: number; name: string; code: string; priority: string }) => void;
   'project:updated': (data: { projectId: number; name?: string; status?: string; progress?: number }) => void;
   'project:deleted': (data: { projectId: number; name: string; code: string }) => void;

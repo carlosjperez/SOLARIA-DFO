@@ -105,6 +105,37 @@ export function Header() {
         }
     };
 
+    // Render notification message with clickable task codes
+    const renderNotificationMessage = (notification: Notification) => {
+        const taskCodeRegex = /(DFO-\d{3}(?:-EPIC\d{2}|-SP\d{2})?)/g;
+        const message = notification.message;
+        const parts = message.split(taskCodeRegex);
+        const taskId = notification.data?.taskId || notification.data?.id || notification.data?.task_id;
+
+        return (
+            <div className="text-xs text-muted-foreground truncate">
+                {parts.map((part, index) => {
+                    if (part.match(taskCodeRegex) && taskId) {
+                        return (
+                            <span
+                                key={index}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowNotifications(false);
+                                    navigate(`/tasks/${taskId}`);
+                                }}
+                                className="font-mono font-semibold text-primary hover:underline cursor-pointer"
+                            >
+                                {part}
+                            </span>
+                        );
+                    }
+                    return <span key={index}>{part}</span>;
+                })}
+            </div>
+        );
+    };
+
     const totalCount = alertCount + unreadCount;
 
     return (
@@ -226,7 +257,7 @@ export function Header() {
                                                                     <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
                                                                 )}
                                                             </div>
-                                                            <div className="text-xs text-muted-foreground truncate">{notification.message}</div>
+                                                            {renderNotificationMessage(notification)}
                                                             <div className="text-[10px] text-muted-foreground mt-1">
                                                                 {formatRelativeTime(notification.timestamp.toISOString())}
                                                             </div>
