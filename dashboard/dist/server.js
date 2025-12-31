@@ -5578,7 +5578,7 @@ class SolariaDashboardServer {
      * POST /api/agent-execution/jobs/:id/cancel
      */
     async cancelAgentJob(req, res) {
-        const jobId = req.params.id;
+        const jobId = req.params.id; // Move outside try block for error handler access
         try {
             if (!this.agentExecutionService) {
                 res.status(503).json({ error: 'Agent execution service not initialized' });

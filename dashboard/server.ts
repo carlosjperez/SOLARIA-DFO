@@ -418,6 +418,14 @@ class SolariaDashboardServer {
         this.app.get('/api/agents/:id/performance', this.getAgentPerformance.bind(this));
         this.app.put('/api/agents/:id/status', this.updateAgentStatus.bind(this));
 
+        // Agent MCP Configurations
+        this.app.get('/api/agents/:id/mcp-configs', this.getAgentMcpConfigs.bind(this));
+        this.app.get('/api/agents/:id/mcp-configs/:configId', this.getAgentMcpConfig.bind(this));
+        this.app.post('/api/agents/:id/mcp-configs', this.createAgentMcpConfig.bind(this));
+        this.app.put('/api/agents/:id/mcp-configs/:configId', this.updateAgentMcpConfig.bind(this));
+        this.app.delete('/api/agents/:id/mcp-configs/:configId', this.deleteAgentMcpConfig.bind(this));
+        this.app.post('/api/agents/:id/mcp-configs/:configId/test', this.testAgentMcpConnection.bind(this));
+
         // Tasks
         this.app.get('/api/tasks', this.getTasks.bind(this));
         this.app.get('/api/tasks/recent-completed', this.getRecentCompletedTasks.bind(this));
@@ -3307,6 +3315,276 @@ class SolariaDashboardServer {
         } catch (error) {
             console.error('Error updating agent status:', error);
             res.status(500).json({ error: 'Failed to update agent status' });
+        }
+    }
+
+    // ========================================================================
+    // Agent MCP Configuration Handlers
+    // ========================================================================
+
+    private async getAgentMcpConfigs(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+
+            const [configs] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT * FROM agent_mcp_configs
+                WHERE agent_id = ?
+                ORDER BY server_name ASC
+            `, [id]);
+
+            res.json(configs);
+
+        } catch (error) {
+            console.error('Error fetching agent MCP configs:', error);
+            res.status(500).json({ error: 'Failed to fetch MCP configurations' });
+        }
+    }
+
+    private async getAgentMcpConfig(req: Request, res: Response): Promise<void> {
+        try {
+            const { id, configId } = req.params;
+
+            const [configs] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT * FROM agent_mcp_configs
+                WHERE id = ? AND agent_id = ?
+            `, [configId, id]);
+
+            if (configs.length === 0) {
+                res.status(404).json({ error: 'Configuration not found' });
+                return;
+            }
+
+            res.json(configs[0]);
+
+        } catch (error) {
+            console.error('Error fetching agent MCP config:', error);
+            res.status(500).json({ error: 'Failed to fetch MCP configuration' });
+        }
+    }
+
+    private async createAgentMcpConfig(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const {
+                server_name,
+                server_url,
+                auth_type = 'none',
+                auth_credentials,
+                transport_type = 'http',
+                config_options,
+                enabled = true
+            } = req.body;
+
+            // Validate required fields
+            if (!server_name || !server_url) {
+                res.status(400).json({ error: 'server_name and server_url are required' });
+                return;
+            }
+
+            // Check for duplicate server_name for this agent
+            const [existing] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT id FROM agent_mcp_configs
+                WHERE agent_id = ? AND server_name = ?
+            `, [id, server_name]);
+
+            if (existing.length > 0) {
+                res.status(409).json({ error: 'Configuration for this server already exists' });
+                return;
+            }
+
+            const [result] = await this.db!.execute<ResultSetHeader>(`
+                INSERT INTO agent_mcp_configs (
+                    agent_id, server_name, server_url, auth_type,
+                    auth_credentials, transport_type, config_options, enabled
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                id,
+                server_name,
+                server_url,
+                auth_type,
+                JSON.stringify(auth_credentials || {}),
+                transport_type,
+                JSON.stringify(config_options || {}),
+                enabled
+            ]);
+
+            res.status(201).json({
+                id: result.insertId,
+                message: 'MCP configuration created successfully'
+            });
+
+        } catch (error) {
+            console.error('Error creating agent MCP config:', error);
+            res.status(500).json({ error: 'Failed to create MCP configuration' });
+        }
+    }
+
+    private async updateAgentMcpConfig(req: Request, res: Response): Promise<void> {
+        try {
+            const { id, configId } = req.params;
+            const updates: string[] = [];
+            const params: unknown[] = [];
+
+            const allowedFields = [
+                'server_name', 'server_url', 'auth_type', 'auth_credentials',
+                'transport_type', 'config_options', 'enabled', 'connection_status'
+            ];
+
+            for (const field of allowedFields) {
+                if (req.body[field] !== undefined) {
+                    updates.push(`${field} = ?`);
+
+                    // JSON fields need stringification
+                    if (field === 'auth_credentials' || field === 'config_options') {
+                        params.push(JSON.stringify(req.body[field]));
+                    } else {
+                        params.push(req.body[field]);
+                    }
+                }
+            }
+
+            if (updates.length === 0) {
+                res.status(400).json({ error: 'No fields to update' });
+                return;
+            }
+
+            const query = `
+                UPDATE agent_mcp_configs
+                SET ${updates.join(', ')}, updated_at = NOW()
+                WHERE id = ? AND agent_id = ?
+            `;
+            params.push(configId, id);
+
+            const [result] = await this.db!.execute<ResultSetHeader>(query, params);
+
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Configuration not found' });
+                return;
+            }
+
+            res.json({ message: 'MCP configuration updated successfully' });
+
+        } catch (error) {
+            console.error('Error updating agent MCP config:', error);
+            res.status(500).json({ error: 'Failed to update MCP configuration' });
+        }
+    }
+
+    private async deleteAgentMcpConfig(req: Request, res: Response): Promise<void> {
+        try {
+            const { id, configId } = req.params;
+
+            const [result] = await this.db!.execute<ResultSetHeader>(`
+                DELETE FROM agent_mcp_configs
+                WHERE id = ? AND agent_id = ?
+            `, [configId, id]);
+
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Configuration not found' });
+                return;
+            }
+
+            res.json({ message: 'MCP configuration deleted successfully' });
+
+        } catch (error) {
+            console.error('Error deleting agent MCP config:', error);
+            res.status(500).json({ error: 'Failed to delete MCP configuration' });
+        }
+    }
+
+    private async testAgentMcpConnection(req: Request, res: Response): Promise<void> {
+        try {
+            const { id, configId } = req.params;
+
+            // Get config
+            const [configs] = await this.db!.execute<RowDataPacket[]>(`
+                SELECT * FROM agent_mcp_configs
+                WHERE id = ? AND agent_id = ?
+            `, [configId, id]);
+
+            if (configs.length === 0) {
+                res.status(404).json({ error: 'Configuration not found' });
+                return;
+            }
+
+            const config = configs[0];
+
+            // Import MCPClientManager dynamically
+            const { getMCPClientManager } = await import('../mcp-server/dist/src/client/mcp-client-manager.js');
+            const manager = getMCPClientManager();
+
+            // Test connection
+            try {
+                await manager.connect({
+                    name: config.server_name as string,
+                    transport: {
+                        type: config.transport_type as 'http' | 'stdio' | 'sse',
+                        url: config.server_url as string,
+                    },
+                    auth: config.auth_type === 'none'
+                        ? { type: 'none' }
+                        : {
+                            type: 'api-key' as const,
+                            apiKey: JSON.parse(config.auth_credentials as string || '{}').apiKey || '',
+                        },
+                    healthCheck: {
+                        enabled: true,
+                        interval: 60000,
+                        timeout: 5000,
+                    },
+                    retry: {
+                        maxAttempts: 1,
+                        backoffMs: 1000,
+                    },
+                });
+
+                // Get tools list
+                const tools = manager.listTools(config.server_name as string);
+
+                // Update connection status
+                await this.db!.execute(`
+                    UPDATE agent_mcp_configs
+                    SET connection_status = 'connected',
+                        last_connected_at = NOW(),
+                        last_error = NULL
+                    WHERE id = ?
+                `, [configId]);
+
+                // Disconnect test connection
+                await manager.disconnect(config.server_name as string);
+
+                res.json({
+                    success: true,
+                    message: 'Connection successful',
+                    tools_count: tools.length,
+                    tools: tools.map((t: { name: string; description?: string }) => ({
+                        name: t.name,
+                        description: t.description
+                    }))
+                });
+
+            } catch (connError) {
+                const errorMessage = connError instanceof Error ? connError.message : 'Unknown error';
+
+                // Update error status
+                await this.db!.execute(`
+                    UPDATE agent_mcp_configs
+                    SET connection_status = 'error',
+                        last_error = ?
+                    WHERE id = ?
+                `, [errorMessage, configId]);
+
+                res.status(400).json({
+                    success: false,
+                    error: 'Connection failed',
+                    details: errorMessage
+                });
+            }
+
+        } catch (error) {
+            console.error('Error testing MCP connection:', error);
+            res.status(500).json({ error: 'Failed to test connection' });
         }
     }
 
