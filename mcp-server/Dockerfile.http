@@ -9,10 +9,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# Copy compiled source from dist/
-COPY dist/handlers.js ./
-COPY dist/http-server.js ./
-COPY dist/types.js ./
+# Copy all compiled source from dist/ (including src/ subdirectory)
+COPY dist/ ./
 
 # Environment
 ENV NODE_ENV=production
