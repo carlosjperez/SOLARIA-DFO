@@ -293,7 +293,10 @@ async function processAgentJob(job) {
 // ============================================================================
 
 const workerOptions = {
-    connection: new Redis(REDIS_URL),
+    connection: new Redis(REDIS_URL, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+    }),
     concurrency: 5,
     lockDuration: 30000,
     autorun: true,
