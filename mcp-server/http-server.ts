@@ -184,9 +184,11 @@ async function authenticateRequest(req: Request): Promise<AuthResult> {
       }
     }
 
-    // Special handling for "default" token in development
-    if (token === "default" && process.env.NODE_ENV !== "production") {
-      console.log(`[AUTH] Using default development token`);
+    // Special handling for "default" token (for Claude Code CLI)
+    // Allow in development OR if explicitly enabled via ALLOW_DEFAULT_TOKEN
+    const allowDefaultToken = process.env.ALLOW_DEFAULT_TOKEN === "true" || process.env.NODE_ENV !== "production";
+    if (token === "default" && allowDefaultToken) {
+      console.log(`[AUTH] Using default token (ALLOW_DEFAULT_TOKEN=${process.env.ALLOW_DEFAULT_TOKEN}, NODE_ENV=${process.env.NODE_ENV})`);
       const apiClient = createApiClient(DASHBOARD_API, {
         user: process.env.DASHBOARD_USER || "carlosjperez",
         password: process.env.DASHBOARD_PASS || "bypass",

@@ -131,6 +131,7 @@ services:
       - DASHBOARD_PASS=bypass
       - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
       - NODE_ENV=${NODE_ENV:-production}
+      - ALLOW_DEFAULT_TOKEN=true
     depends_on:
       office:
         condition: service_healthy
