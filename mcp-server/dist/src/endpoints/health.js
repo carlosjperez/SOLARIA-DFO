@@ -11,8 +11,8 @@ import { z } from 'zod';
 import os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { ResponseBuilder } from '../utils/response-builder';
-import { db } from '../database';
+import { ResponseBuilder } from '../utils/response-builder.js';
+import { db } from '../database.js';
 const execAsync = promisify(exec);
 // ============================================================================
 // Constants

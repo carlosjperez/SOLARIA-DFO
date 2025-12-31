@@ -8,8 +8,8 @@
  * ASCII tree visualization for task dependencies
  */
 import { z } from 'zod';
-import { ResponseBuilder, CommonErrors } from '../utils/response-builder';
-import { db } from '../database';
+import { ResponseBuilder, CommonErrors } from '../utils/response-builder.js';
+import { db } from '../database.js';
 const VERSION = '2.0.0';
 // ============================================================================
 // Validation Schema

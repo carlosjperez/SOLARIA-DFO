@@ -7,6 +7,6 @@
  *
  * ASCII tree visualization for task dependencies
  */
-import { Tool } from '../types/mcp';
+import { Tool } from '../types/mcp.js';
 export declare const getDependencyTree: Tool;
 export declare const dependencyTreeTools: Tool[];

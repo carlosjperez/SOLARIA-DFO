@@ -7,7 +7,7 @@
  *
  * Comprehensive system health monitoring for database, cache, disk, memory, and CPU
  */
-import type { Tool } from '../types/mcp';
+import type { Tool } from '../types/mcp.js';
 type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
 interface HealthCheckResult {
     status: HealthStatus;

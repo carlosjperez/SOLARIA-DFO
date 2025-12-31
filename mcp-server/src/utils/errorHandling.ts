@@ -13,7 +13,7 @@ import {
     InvalidIdentifierError,
     AmbiguousIdentifierError
 } from './taskIdentifier';
-import { ErrorObject } from './response-builder';
+import { ErrorObject } from './response-builder.js'
 
 /**
  * Formats task-related errors into user-friendly ErrorObjects

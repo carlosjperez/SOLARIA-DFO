@@ -6,8 +6,8 @@
  * @task DFN-003
  */
 import { describe, it, expect, beforeEach, jest, afterEach } from '@jest/globals';
-import { getHealth } from '../endpoints/health';
-import { db } from '../database';
+import { getHealth } from '../endpoints/health.js';
+import { db } from '../database.js';
 // Mock modules
 jest.mock('../database', () => ({
     db: {

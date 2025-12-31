@@ -15,7 +15,7 @@ import {
   deleteInlineDocument,
   searchDocuments,
 } from '../endpoints/inline-documents';
-import { db } from '../database';
+import { db } from '../database.js'
 
 // Mock the database module
 jest.mock('../database', () => ({

@@ -8,9 +8,9 @@
  * task identifiers, with automatic resolution and error handling.
  */
 
-import { resolveTaskIdentifier, TaskIdentifier } from './taskIdentifier';
-import { formatTaskError } from './errorHandling';
-import { StandardErrorResponse } from './response-builder';
+import { resolveTaskIdentifier, TaskIdentifier } from './taskIdentifier.js'
+import { formatTaskError } from './errorHandling.js'
+import { StandardErrorResponse } from './response-builder.js'
 
 /**
  * Result of task validation

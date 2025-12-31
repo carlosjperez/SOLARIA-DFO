@@ -8,9 +8,9 @@
  * Aggregated statistics for tasks, velocity, completion rates, and agent workload
  */
 import { z } from 'zod';
-import { ResponseBuilder } from '../utils/response-builder';
-import { db } from '../database';
-import { formatStats } from '../utils/formatters';
+import { ResponseBuilder } from '../utils/response-builder.js';
+import { db } from '../database.js';
+import { formatStats } from '../utils/formatters.js';
 // ============================================================================
 // Constants
 // ============================================================================

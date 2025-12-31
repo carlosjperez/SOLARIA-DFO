@@ -9,9 +9,9 @@
  */
 
 import { z } from 'zod';
-import { ResponseBuilder } from '../utils/response-builder';
-import { db } from '../database';
-import { Tool } from '../types/mcp';
+import { ResponseBuilder } from '../utils/response-builder.js'
+import { db } from '../database.js'
+import { Tool } from '../types/mcp.js'
 
 // ============================================================================
 // Validation Schema

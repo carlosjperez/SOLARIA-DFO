@@ -8,8 +8,8 @@
  * Intelligently identifies tasks ready to work on (no blockers, actionable state)
  */
 import { z } from 'zod';
-import { ResponseBuilder } from '../utils/response-builder';
-import { db } from '../database';
+import { ResponseBuilder } from '../utils/response-builder.js';
+import { db } from '../database.js';
 // ============================================================================
 // Validation Schema
 // ============================================================================

@@ -8,9 +8,9 @@
  * CRUD operations for inline documents with versioning and full-text search
  */
 import { z } from 'zod';
-import { ResponseBuilder } from '../utils/response-builder';
-import { db } from '../database';
-import { formatDocument, formatDocumentList } from '../utils/formatters';
+import { ResponseBuilder } from '../utils/response-builder.js';
+import { db } from '../database.js';
+import { formatDocument, formatDocumentList } from '../utils/formatters.js';
 // ============================================================================
 // Constants
 // ============================================================================

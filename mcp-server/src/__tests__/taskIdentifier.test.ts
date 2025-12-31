@@ -21,7 +21,7 @@ jest.mock('../database', () => ({
     }
 }));
 
-import { db } from '../database';
+import { db } from '../database.js'
 
 describe('resolveTaskIdentifier', () => {
 

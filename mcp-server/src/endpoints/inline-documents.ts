@@ -9,10 +9,10 @@
  */
 
 import { z } from 'zod';
-import { ResponseBuilder } from '../utils/response-builder';
-import { db } from '../database';
-import { formatDocument, formatDocumentList } from '../utils/formatters';
-import type { Tool } from '../types/mcp';
+import { ResponseBuilder } from '../utils/response-builder.js'
+import { db } from '../database.js'
+import { formatDocument, formatDocumentList } from '../utils/formatters.js'
+import type { Tool } from '../types/mcp.js'
 
 // ============================================================================
 // Constants

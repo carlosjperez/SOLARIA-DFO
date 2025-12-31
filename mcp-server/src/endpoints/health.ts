@@ -12,9 +12,9 @@ import { z } from 'zod';
 import os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { ResponseBuilder } from '../utils/response-builder';
-import { db } from '../database';
-import type { Tool } from '../types/mcp';
+import { ResponseBuilder } from '../utils/response-builder.js'
+import { db } from '../database.js'
+import type { Tool } from '../types/mcp.js'
 
 const execAsync = promisify(exec);
 

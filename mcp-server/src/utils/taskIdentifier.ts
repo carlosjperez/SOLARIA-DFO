@@ -13,7 +13,7 @@
  * - task_code: Display format (e.g., DFO-158-EPIC15)
  */
 
-import { db } from '../database';
+import { db } from '../database.js'
 
 /**
  * Resolved task identifier with full metadata

@@ -6,8 +6,8 @@
  * @task DFN-005
  */
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { getStats } from '../endpoints/stats';
-import { db } from '../database';
+import { getStats } from '../endpoints/stats.js';
+import { db } from '../database.js';
 // Mock database
 jest.mock('../database', () => ({
     db: {

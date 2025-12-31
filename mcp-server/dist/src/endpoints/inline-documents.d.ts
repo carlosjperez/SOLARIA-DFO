@@ -7,7 +7,7 @@
  *
  * CRUD operations for inline documents with versioning and full-text search
  */
-import type { Tool } from '../types/mcp';
+import type { Tool } from '../types/mcp.js';
 /**
  * Create a new inline document
  */
@@ -32,4 +32,4 @@ export declare const deleteInlineDocument: Tool;
  * Search across all inline documents using full-text search
  */
 export declare const searchDocuments: Tool;
-export declare const inlineDocumentTools: any[];
+export declare const inlineDocumentTools: Tool[];
