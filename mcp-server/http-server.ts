@@ -184,6 +184,20 @@ async function authenticateRequest(req: Request): Promise<AuthResult> {
       }
     }
 
+    // Special handling for "default" token in development
+    if (token === "default" && process.env.NODE_ENV !== "production") {
+      console.log(`[AUTH] Using default development token`);
+      const apiClient = createApiClient(DASHBOARD_API, {
+        user: process.env.DASHBOARD_USER || "carlosjperez",
+        password: process.env.DASHBOARD_PASS || "bypass",
+      });
+
+      // Authenticate with dashboard
+      await apiClient.authenticate();
+
+      return { type: "jwt", token: "default", apiClient };
+    }
+
     // It's a JWT token - verify signature with JWT_SECRET
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
@@ -194,8 +208,8 @@ async function authenticateRequest(req: Request): Promise<AuthResult> {
         password: process.env.DASHBOARD_PASS || "bypass",
       });
 
-      // Use the verified JWT token directly instead of re-authenticating
-      apiClient.setToken(token);
+      // Authenticate with dashboard using credentials (not the incoming JWT)
+      await apiClient.authenticate();
 
       console.log(`[AUTH] JWT verified for user: ${decoded.sub || decoded.userId || 'unknown'}`);
       return { type: "jwt", token, apiClient };
