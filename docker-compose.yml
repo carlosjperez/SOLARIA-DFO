@@ -156,6 +156,7 @@ services:
     volumes:
       - ./infrastructure/nginx/nginx.unified.conf:/etc/nginx/nginx.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/dfo-v2:/usr/share/nginx/html:ro
     depends_on:
       office:
         condition: service_healthy
