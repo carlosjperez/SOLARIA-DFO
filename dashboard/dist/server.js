@@ -5578,12 +5578,12 @@ class SolariaDashboardServer {
      * POST /api/agent-execution/jobs/:id/cancel
      */
     async cancelAgentJob(req, res) {
+        const jobId = req.params.id;
         try {
             if (!this.agentExecutionService) {
                 res.status(503).json({ error: 'Agent execution service not initialized' });
                 return;
             }
-            const jobId = req.params.id;
             if (!jobId) {
                 res.status(400).json({ error: 'Job ID is required' });
                 return;
@@ -5600,7 +5600,7 @@ class SolariaDashboardServer {
             console.log(`[AgentExecution] Job cancelled successfully: ${jobId}`);
             // Log to activity log
             await this.db.execute(`INSERT INTO activity_logs (action, category, level, details)
-                 VALUES (?, 'agent_execution', 'info', ?)`, [
+                 VALUES (?, 'system', 'info', ?)`, [
                 `Agent job cancelled: ${jobId}`,
                 JSON.stringify({ jobId, cancelledAt: new Date().toISOString() })
             ]);
