@@ -29,6 +29,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const bullmq_1 = require("bullmq");
 const promise_1 = __importDefault(require("mysql2/promise"));
 const queue_js_1 = require("../config/queue.js");
+const mcp_client_manager_js_1 = require("../../mcp-server/dist/src/client/mcp-client-manager.js");
 // ============================================================================
 // Database Connection
 // ============================================================================
@@ -263,17 +264,72 @@ async function processAgentJob(job) {
         // Phase 3: MCP Server Connection (30-40%)
         // ========================================================================
         console.log(`[agentWorker] [3/5] Connecting to MCP servers...`);
+        const connectedServers = [];
+        const availableTools = new Map();
         if (mcpConfigs && mcpConfigs.length > 0) {
             console.log(`[agentWorker] Configured MCP servers: ${mcpConfigs.length}`);
-            mcpConfigs.forEach((config) => {
-                console.log(`[agentWorker]   - ${config.serverName}: ${config.enabled ? '✓ enabled' : '✗ disabled'}`);
-            });
-            // TODO (Epic 2): Implement MCP client connections
-            // - Create MCPClientManager instance
-            // - Connect to each enabled server
-            // - Verify authentication
-            // - Discover available tools
-            console.log(`[agentWorker] ⚠ MCP client not yet implemented (Epic 2 - Dual MCP Mode)`);
+            const enabledConfigs = mcpConfigs.filter(config => config.enabled);
+            console.log(`[agentWorker] Enabled servers: ${enabledConfigs.length}`);
+            if (enabledConfigs.length > 0) {
+                const manager = (0, mcp_client_manager_js_1.getMCPClientManager)();
+                for (const config of enabledConfigs) {
+                    try {
+                        console.log(`[agentWorker] Connecting to ${config.serverName}...`);
+                        // Check if already connected
+                        if (manager.isConnected(config.serverName)) {
+                            console.log(`[agentWorker]   ✓ Already connected to ${config.serverName}`);
+                        }
+                        else {
+                            // Connect to MCP server
+                            // Note: AgentMCPConfig doesn't have transportType, defaulting to 'http'
+                            const transportType = 'http';
+                            await manager.connect({
+                                name: config.serverName,
+                                transport: {
+                                    type: transportType,
+                                    url: config.serverUrl,
+                                },
+                                auth: config.authType === 'none'
+                                    ? { type: 'none' }
+                                    : config.authType === 'bearer'
+                                        ? { type: 'bearer', ...(config.authCredentials || {}) }
+                                        : { type: 'api-key', ...(config.authCredentials || {}) },
+                                healthCheck: {
+                                    enabled: true,
+                                    interval: 60000,
+                                    timeout: 10000,
+                                },
+                                retry: {
+                                    maxAttempts: 3,
+                                    backoffMs: 2000,
+                                },
+                            });
+                            console.log(`[agentWorker]   ✓ Connected to ${config.serverName}`);
+                        }
+                        // Discover available tools
+                        const tools = manager.listTools(config.serverName);
+                        availableTools.set(config.serverName, tools);
+                        connectedServers.push(config.serverName);
+                        console.log(`[agentWorker]   📋 Discovered ${tools.length} tools on ${config.serverName}`);
+                        tools.forEach((tool, i) => {
+                            if (i < 3) { // Show first 3 tools
+                                console.log(`[agentWorker]      - ${tool.name}`);
+                            }
+                        });
+                        if (tools.length > 3) {
+                            console.log(`[agentWorker]      ... and ${tools.length - 3} more`);
+                        }
+                    }
+                    catch (error) {
+                        console.error(`[agentWorker]   ✗ Failed to connect to ${config.serverName}:`, error.message);
+                        // Continue with other servers even if one fails
+                    }
+                }
+                console.log(`[agentWorker] ✓ Connected to ${connectedServers.length}/${enabledConfigs.length} servers`);
+            }
+            else {
+                console.log(`[agentWorker] No enabled MCP servers`);
+            }
         }
         else {
             console.log(`[agentWorker] No external MCP servers configured`);
@@ -283,10 +339,28 @@ async function processAgentJob(job) {
         // Phase 4: Agent Execution (40-90%)
         // ========================================================================
         console.log(`[agentWorker] [4/5] Executing agent...`);
+        // Prepare external tools summary for agent context
+        const externalToolsSummary = {};
+        let totalExternalTools = 0;
+        if (connectedServers.length > 0) {
+            console.log(`[agentWorker] External MCP tools available:`);
+            for (const serverName of connectedServers) {
+                const tools = availableTools.get(serverName) || [];
+                externalToolsSummary[serverName] = tools.map(t => t.name);
+                totalExternalTools += tools.length;
+                console.log(`[agentWorker]   ${serverName}: ${tools.length} tools`);
+                tools.slice(0, 5).forEach(tool => {
+                    console.log(`[agentWorker]      - ${tool.name}: ${tool.description || 'No description'}`);
+                });
+                if (tools.length > 5) {
+                    console.log(`[agentWorker]      ... and ${tools.length - 5} more`);
+                }
+            }
+        }
         // TODO: Implement actual agent execution
         // This is a placeholder for now. Real implementation will:
         // 1. Prepare agent prompt with context
-        // 2. Inject external MCP tools (if available)
+        // 2. Inject external MCP tools (now available in externalToolsSummary)
         // 3. Stream agent execution
         // 4. Update task_items as they complete
         // 5. Capture agent output and logs
@@ -295,15 +369,34 @@ async function processAgentJob(job) {
         output.push(`Description: ${task.description || 'No description'}`);
         output.push(`Items to complete: ${itemsPending.length}`);
         output.push('');
+        if (totalExternalTools > 0) {
+            output.push(`✓ MCP Integration Active:`);
+            output.push(`  Connected servers: ${connectedServers.join(', ')}`);
+            output.push(`  Total external tools: ${totalExternalTools}`);
+            output.push('');
+            output.push('External tools available for agent execution:');
+            for (const [serverName, toolNames] of Object.entries(externalToolsSummary)) {
+                output.push(`  ${serverName}:`);
+                toolNames.slice(0, 3).forEach(name => output.push(`    - ${name}`));
+                if (toolNames.length > 3) {
+                    output.push(`    ... and ${toolNames.length - 3} more`);
+                }
+            }
+            output.push('');
+        }
         output.push('--- Agent Execution Placeholder ---');
         output.push('Real agent execution will be implemented in future phase.');
         output.push('For now, this worker validates context and prepares execution environment.');
+        output.push('MCP client integration is ready - external tools can be injected when agent execution is implemented.');
         // Simulate progress updates
         for (let progress = 40; progress <= 90; progress += 10) {
             await job.updateProgress(progress);
             await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
         }
         console.log(`[agentWorker] ✓ Agent execution completed (placeholder)`);
+        if (totalExternalTools > 0) {
+            console.log(`[agentWorker] ℹ External tools ready for injection: ${totalExternalTools} tools from ${connectedServers.length} servers`);
+        }
         await job.updateProgress(90);
         // ========================================================================
         // Phase 5: Finalization (90-100%)
