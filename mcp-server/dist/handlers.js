@@ -12,6 +12,7 @@ import { getHealth } from './src/endpoints/health.js';
 import { getStats } from './src/endpoints/stats.js';
 import { createInlineDocument, getInlineDocument, listInlineDocuments, updateInlineDocument, deleteInlineDocument, searchDocuments, } from './src/endpoints/inline-documents.js';
 import { getWorkContext } from './src/endpoints/work-context.js';
+import { proxyExternalTool, listExternalTools } from './src/endpoints/mcp-proxy.js';
 import { queueAgentJobTool, getAgentJobStatusTool, cancelAgentJobTool, listActiveAgentJobsTool, } from './src/endpoints/agent-execution.js';
 import { protocolEnforcer } from './src/utils/protocol-enforcement.js';
 import { createTaskCompletionMemory } from './src/utils/auto-memory.js';
@@ -1292,6 +1293,30 @@ export const toolDefinitions = [
             },
         },
     },
+    {
+        name: "proxy_external_tool",
+        description: "Execute a tool on an external MCP server (Context7, Playwright, CodeRabbit, etc.). Allows agents to call tools from connected MCP servers without needing direct access. The agent must have the MCP server configured and enabled in their agent_mcp_configs.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                server_name: { type: "string", description: "MCP server name (e.g., context7, playwright, coderabbit)" },
+                tool_name: { type: "string", description: "Name of the tool to execute on the external server" },
+                parameters: { type: "object", description: "Parameters to pass to the tool (optional)" },
+            },
+            required: ["server_name", "tool_name"],
+        },
+    },
+    {
+        name: "list_external_tools",
+        description: "List available tools on a connected external MCP server. Useful for discovering what tools are available on servers like Context7, Playwright, or CodeRabbit before using proxy_external_tool.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                server_name: { type: "string", description: "MCP server name to list tools from" },
+            },
+            required: ["server_name"],
+        },
+    },
 ];
 // ============================================================================
 // Resource Definitions
@@ -2149,6 +2174,10 @@ export async function executeTool(name, args, apiCall, context = {}) {
             return cancelAgentJobTool.execute(args);
         case "list_active_agent_jobs":
             return listActiveAgentJobsTool.execute(args);
+        case "proxy_external_tool":
+            return proxyExternalTool(args);
+        case "list_external_tools":
+            return listExternalTools(args);
         default:
             throw new Error(`Unknown tool: ${name}`);
     }

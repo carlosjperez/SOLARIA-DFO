@@ -504,6 +504,9 @@ Si necesitas ejecutar DFO localmente para desarrollo:
 - Docker y Docker Compose
 - Node.js 22+
 - pnpm
+- **Redis** (para DFO 4.0+ Agent Execution Engine)
+
+> **Nota DFO 4.0:** Redis es requerido para el motor de ejecución paralela de agentes (BullMQ job queue). El `docker-compose.yml` ya incluye un servicio Redis configurado. Si ejecutas fuera de Docker, instala Redis localmente: `brew install redis` (macOS) o `apt install redis-server` (Ubuntu).
 
 ### Instalacion Local
 
@@ -514,8 +517,9 @@ cd solaria-digital-field--operations
 
 # 2. Configurar entorno
 cp .env.example .env
+# Editar .env y configurar REDIS_URL si es necesario (default: redis://redis:6379)
 
-# 3. Levantar servicios
+# 3. Levantar servicios (incluye Redis para DFO 4.0)
 docker compose up -d
 
 # 4. Verificar

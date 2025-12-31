@@ -1,0 +1,344 @@
+{
+  "info": {
+    "name": "DFO 4.0 - Agent Execution API",
+    "description": "API endpoints for BullMQ-based parallel agent execution system.\n\nTask: DFO-188 - Create API Endpoints\nDate: 2025-12-30\n\n## Authentication\nAll endpoints require JWT authentication via Bearer token.\n\n## Endpoints\n1. POST /api/agent-execution/queue - Queue a new agent job\n2. GET /api/agent-execution/jobs/:id - Get job status\n3. POST /api/agent-execution/jobs/:id/cancel - Cancel a job\n4. GET /api/agent-execution/workers - Get worker status\n\n## Setup\n1. Update {{baseUrl}} variable to your server URL\n2. Run \"Login\" request to obtain JWT token (auto-saved to {{token}})\n3. All other requests will use the token automatically",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3030",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jobId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Auto-save token to collection variable",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('token', response.token);",
+                  "    console.log('Token saved to collection variable');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"carlosjperez\",\n  \"password\": \"bypass\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Obtain JWT token for authenticated requests.\n\nCredentials:\n- Username: carlosjperez\n- Password: bypass\n\nThe token is automatically saved to the collection variable {{token}} and used in all subsequent requests."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Agent Execution",
+      "item": [
+        {
+          "name": "Queue Agent Job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Auto-save jobId for use in other requests",
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('jobId', response.data.jobId);",
+                  "    console.log('Job ID saved:', response.data.jobId);",
+                  "    ",
+                  "    // Assertions",
+                  "    pm.test('Status is 201 Created', () => {",
+                  "        pm.response.to.have.status(201);",
+                  "    });",
+                  "    ",
+                  "    pm.test('Response has job ID', () => {",
+                  "        pm.expect(response.data).to.have.property('jobId');",
+                  "    });",
+                  "    ",
+                  "    pm.test('Job status is queued', () => {",
+                  "        pm.expect(response.data.status).to.equal('queued');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"taskId\": 1,\n  \"agentId\": 11,\n  \"metadata\": {\n    \"priority\": \"high\",\n    \"estimatedHours\": 2,\n    \"retryCount\": 0\n  },\n  \"context\": {\n    \"dependencies\": [123, 456],\n    \"relatedTasks\": [789],\n    \"memoryIds\": [1, 2, 3]\n  },\n  \"mcpConfigs\": [\n    {\n      \"serverName\": \"context7\",\n      \"serverUrl\": \"https://context7.com/mcp\",\n      \"authType\": \"bearer\",\n      \"authCredentials\": {\n        \"token\": \"your-api-key\"\n      },\n      \"enabled\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-execution/queue",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent-execution", "queue"]
+            },
+            "description": "Queue a new agent execution job.\n\n**Required Fields:**\n- taskId: Task ID to execute\n- agentId: Agent ID to assign\n\n**Optional Fields:**\n- metadata: Priority, estimated hours, retry count\n- context: Dependencies, related tasks, memory IDs\n- mcpConfigs: External MCP server configurations\n\n**Response (201):**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"jobId\": \"string\",\n    \"taskId\": 1,\n    \"taskCode\": \"DFO-123\",\n    \"agentId\": 11,\n    \"agentName\": \"Claude Code\",\n    \"projectId\": 1,\n    \"status\": \"queued\",\n    \"priority\": \"high\",\n    \"queuedAt\": \"2025-12-30T10:30:00Z\"\n  }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    ",
+                  "    pm.test('Status is 200 OK', () => {",
+                  "        pm.response.to.have.status(200);",
+                  "    });",
+                  "    ",
+                  "    pm.test('Response has job status', () => {",
+                  "        pm.expect(response.data).to.have.property('status');",
+                  "    });",
+                  "    ",
+                  "    pm.test('Response has progress', () => {",
+                  "        pm.expect(response.data).to.have.property('progress');",
+                  "    });",
+                  "    ",
+                  "    console.log('Job status:', response.data.status);",
+                  "    console.log('Progress:', response.data.progress + '%');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-execution/jobs/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent-execution", "jobs", "{{jobId}}"]
+            },
+            "description": "Get the current status of a queued job.\n\n**URL Parameters:**\n- id: BullMQ job ID (saved from Queue request)\n\n**Response (200):**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"string\",\n    \"status\": \"waiting|active|completed|failed|delayed|cancelled\",\n    \"progress\": 0-100,\n    \"data\": { /* AgentJobData */ },\n    \"returnvalue\": { /* JobResult */ },\n    \"dbRecord\": {\n      \"taskId\": 1,\n      \"taskCode\": \"DFO-123\",\n      \"agentId\": 11,\n      \"projectId\": 1,\n      \"status\": \"active\",\n      \"progress\": 50,\n      \"queuedAt\": \"2025-12-30T10:30:00Z\",\n      \"startedAt\": \"2025-12-30T10:31:00Z\"\n    }\n  }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    ",
+                  "    pm.test('Status is 200 OK', () => {",
+                  "        pm.response.to.have.status(200);",
+                  "    });",
+                  "    ",
+                  "    pm.test('Job status is cancelled', () => {",
+                  "        pm.expect(response.data.status).to.equal('cancelled');",
+                  "    });",
+                  "    ",
+                  "    console.log('Job cancelled at:', response.data.cancelledAt);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-execution/jobs/{{jobId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent-execution", "jobs", "{{jobId}}", "cancel"]
+            },
+            "description": "Cancel a queued or active job.\n\n**URL Parameters:**\n- id: BullMQ job ID\n\n**Response (200):**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"jobId\": \"string\",\n    \"status\": \"cancelled\",\n    \"cancelledAt\": \"2025-12-30T10:35:00Z\"\n  },\n  \"message\": \"Job cancelled successfully\"\n}\n```\n\n**Response (404):**\nReturned if job is not found or already completed.\n```json\n{\n  \"error\": \"Job not found or cannot be cancelled\",\n  \"details\": \"Job may already be completed or does not exist\"\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Worker Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    ",
+                  "    pm.test('Status is 200 OK', () => {",
+                  "        pm.response.to.have.status(200);",
+                  "    });",
+                  "    ",
+                  "    pm.test('Response has worker config', () => {",
+                  "        pm.expect(response.data).to.have.property('workers');",
+                  "    });",
+                  "    ",
+                  "    pm.test('Response has queue metrics', () => {",
+                  "        pm.expect(response.data).to.have.property('queue');",
+                  "    });",
+                  "    ",
+                  "    console.log('Worker concurrency:', response.data.workers.concurrency);",
+                  "    console.log('Active jobs:', response.data.queue.active);",
+                  "    console.log('Success rate:', response.data.queue.successRate + '%');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-execution/workers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent-execution", "workers"]
+            },
+            "description": "Get comprehensive worker and queue status.\n\n**Response (200):**\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"workers\": {\n      \"concurrency\": 5,\n      \"lockDuration\": 30000,\n      \"queueName\": \"agent-execution\",\n      \"status\": \"active\"\n    },\n    \"queue\": {\n      \"waiting\": 3,\n      \"active\": 2,\n      \"completed\": 145,\n      \"failed\": 8,\n      \"delayed\": 0,\n      \"cancelled\": 5,\n      \"avgExecutionTimeMs\": 4523,\n      \"successRate\": 94.77\n    },\n    \"activeJobs\": [\n      {\n        \"jobId\": \"string\",\n        \"taskId\": 1,\n        \"taskCode\": \"DFO-123\",\n        \"agentId\": 11,\n        \"state\": \"active\",\n        \"progress\": 50,\n        \"startedAt\": \"2025-12-30T10:30:00Z\"\n      }\n    ],\n    \"timestamp\": \"2025-12-30T10:35:00Z\"\n  }\n}\n```"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Error Cases",
+      "item": [
+        {
+          "name": "Unauthorized - No Token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-execution/workers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent-execution", "workers"]
+            },
+            "description": "Test unauthorized access (no JWT token).\n\n**Expected Response (401):**\n```json\n{\n  \"error\": \"No token provided\"\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Request - Bad Validation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"taskId\": \"not-a-number\",\n  \"agentId\": \"invalid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-execution/queue",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent-execution", "queue"]
+            },
+            "description": "Test validation with invalid data types.\n\n**Expected Response (400):**\n```json\n{\n  \"error\": \"Validation failed\",\n  \"details\": {\n    \"taskId\": {\n      \"_errors\": [\"Expected number, received string\"]\n    },\n    \"agentId\": {\n      \"_errors\": [\"Expected number, received string\"]\n    }\n  }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Not Found - Non-existent Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"taskId\": 999999,\n  \"agentId\": 11\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-execution/queue",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent-execution", "queue"]
+            },
+            "description": "Test with non-existent task ID.\n\n**Expected Response (404):**\n```json\n{\n  \"error\": \"Task not found\"\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Not Found - Non-existent Job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/agent-execution/jobs/non-existent-job-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "agent-execution", "jobs", "non-existent-job-id"]
+            },
+            "description": "Test with non-existent job ID.\n\n**Expected Response (404):**\n```json\n{\n  \"error\": \"Job not found\"\n}\n```"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

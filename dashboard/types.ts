@@ -615,6 +615,12 @@ export interface ServerToClientEvents {
   'project:updated': (data: { projectId: number; name?: string; status?: string; progress?: number }) => void;
   'project:deleted': (data: { projectId: number; name: string; code: string }) => void;
   'project:archived': (data: { projectId: number; name: string; archived: boolean }) => void;
+  // Agent execution events
+  agent_job_queued: (data: { jobId: string; taskId: number; taskCode: string; agentId: number; agentName: string; projectId: number; priority: string; status: 'waiting'; queuedAt: string }) => void;
+  agent_job_started: (data: { jobId: string; taskId: number; taskCode: string; agentId: number; agentName: string; projectId: number; status: 'active'; startedAt: string }) => void;
+  agent_job_progress: (data: { jobId: string; taskId: number; taskCode: string; agentId: number; projectId: number; progress: number; status: 'active'; updatedAt: string }) => void;
+  agent_job_completed: (data: { jobId: string; taskId: number; taskCode: string; agentId: number; projectId: number; status: 'completed'; progress: number; result: unknown; executionTimeMs: number; completedAt: string }) => void;
+  agent_job_failed: (data: { jobId: string; taskId: number; taskCode: string; agentId: number; projectId: number; status: 'failed'; error: { message: string; stack?: string }; attemptsMade: number; failedAt: string }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -623,6 +629,8 @@ export interface ClientToServerEvents {
   subscribe_agents: () => void;
   subscribe_alerts: () => void;
   subscribe_notifications: () => void;
+  subscribe_project: (projectId: number) => void;
+  unsubscribe_project: (projectId: number) => void;
 }
 
 export interface SocketData {

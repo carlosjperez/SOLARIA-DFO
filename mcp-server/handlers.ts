@@ -84,6 +84,13 @@ import {
   searchDocuments,
 } from './src/endpoints/inline-documents.js';
 import { getWorkContext } from './src/endpoints/work-context.js';
+import { proxyExternalTool, listExternalTools } from './src/endpoints/mcp-proxy.js';
+import {
+  queueAgentJobTool,
+  getAgentJobStatusTool,
+  cancelAgentJobTool,
+  listActiveAgentJobsTool,
+} from './src/endpoints/agent-execution.js';
 import { protocolEnforcer } from './src/utils/protocol-enforcement.js';
 import { createTaskCompletionMemory } from './src/utils/auto-memory.js';
 
@@ -1301,6 +1308,113 @@ export const toolDefinitions: MCPToolDefinition[] = [
       required: ["query"],
     },
   },
+
+  // ============================================================================
+  // Agent Execution Tools (BullMQ Job Management)
+  // ============================================================================
+
+  {
+    name: "queue_agent_job",
+    description: "Queue a new agent execution job in the BullMQ system. This creates a job that will be processed by the worker pool to execute a task with a specific agent. Supports priority levels, retry configuration, and external MCP server connections.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task_id: { type: "number", description: "Task ID to execute (must exist in database)" },
+        agent_id: { type: "number", description: "Agent ID to assign (must exist in database)" },
+        metadata: {
+          type: "object",
+          properties: {
+            priority: { type: "string", enum: ["critical", "high", "medium", "low"], description: "Job priority level (default: medium)" },
+            estimatedHours: { type: "number", description: "Estimated hours for completion" },
+            retryCount: { type: "number", description: "Number of retry attempts (default: 3)" },
+          },
+        },
+        context: {
+          type: "object",
+          properties: {
+            dependencies: { type: "array", items: { type: "number" }, description: "Array of task IDs this task depends on" },
+            relatedTasks: { type: "array", items: { type: "number" }, description: "Array of related task IDs" },
+            memoryIds: { type: "array", items: { type: "number" }, description: "Array of memory IDs to load as context" },
+          },
+        },
+        mcp_configs: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              serverName: { type: "string", description: "MCP server name (e.g., 'context7', 'playwright')" },
+              serverUrl: { type: "string", description: "MCP server URL" },
+              authType: { type: "string", enum: ["bearer", "basic", "api_key", "none"], description: "Authentication type" },
+              authCredentials: { type: "object", description: "Authentication credentials" },
+              enabled: { type: "boolean", description: "Whether this MCP server is enabled" },
+            },
+          },
+          description: "External MCP server configurations to connect during execution",
+        },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+      required: ["task_id", "agent_id"],
+    },
+  },
+  {
+    name: "get_agent_job_status",
+    description: "Get the current status of a queued agent job. Returns the job state (waiting, active, completed, failed, delayed, cancelled) along with progress percentage and detailed execution information.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        job_id: { type: "string", description: "BullMQ job ID (returned from queue_agent_job)" },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+      required: ["job_id"],
+    },
+  },
+  {
+    name: "cancel_agent_job",
+    description: "Cancel a queued or active agent job. This will stop the job if it's currently running and mark it as cancelled. Jobs that have already completed or failed cannot be cancelled.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        job_id: { type: "string", description: "BullMQ job ID to cancel" },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+      required: ["job_id"],
+    },
+  },
+  {
+    name: "list_active_agent_jobs",
+    description: "List all active agent jobs currently in the queue. Shows jobs in waiting, active, or delayed states with their progress, priority, and execution details. Useful for monitoring workload and identifying bottlenecks.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Maximum number of jobs to return (default: 50)" },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+    },
+  },
+  {
+    name: "proxy_external_tool",
+    description: "Execute a tool on an external MCP server (Context7, Playwright, CodeRabbit, etc.). Allows agents to call tools from connected MCP servers without needing direct access. The agent must have the MCP server configured and enabled in their agent_mcp_configs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        server_name: { type: "string", description: "MCP server name (e.g., context7, playwright, coderabbit)" },
+        tool_name: { type: "string", description: "Name of the tool to execute on the external server" },
+        parameters: { type: "object", description: "Parameters to pass to the tool (optional)" },
+      },
+      required: ["server_name", "tool_name"],
+    },
+  },
+  {
+    name: "list_external_tools",
+    description: "List available tools on a connected external MCP server. Useful for discovering what tools are available on servers like Context7, Playwright, or CodeRabbit before using proxy_external_tool.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        server_name: { type: "string", description: "MCP server name to list tools from" },
+      },
+      required: ["server_name"],
+    },
+  },
 ];
 
 // ============================================================================
@@ -1343,18 +1457,24 @@ export function createApiClient(dashboardUrl: string, credentials: ApiCredential
   const { user, password } = credentials;
 
   async function authenticate(): Promise<{ token: string }> {
+    console.log('[DEBUG apiClient] Authenticating with dashboard:', dashboardUrl);
     const response = await fetch(`${dashboardUrl}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user, password }),
+      body: JSON.stringify({ username: user, password }),
     });
 
+    console.log('[DEBUG apiClient] Auth response status:', response.status);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.log('[DEBUG apiClient] Auth failed:', errorText);
       throw new Error("Authentication failed");
     }
 
     const data = await response.json() as { token: string };
     authToken = data.token;
+    console.log('[DEBUG apiClient] Auth successful, got token');
     return data;
   }
 
@@ -1434,7 +1554,11 @@ export async function executeTool(
       let targetProject: Project | null = null;
 
       if (params.project_id) {
-        targetProject = await apiCall(`/projects/${params.project_id}`) as Project;
+        const response = await apiCall(`/projects/${params.project_id}`) as { project?: Project } | Project;
+        console.log('[DEBUG set_project_context] API response:', JSON.stringify(response).substring(0, 200));
+        // Unwrap if API returns { project: {...} } format
+        targetProject = 'project' in response ? response.project! : response as Project;
+        console.log('[DEBUG set_project_context] targetProject:', targetProject ? { id: targetProject.id, name: targetProject.name } : null);
       } else if (params.project_name) {
         const allProjects = await apiCall("/projects") as { projects?: Project[] } | Project[];
         const projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
@@ -2239,6 +2363,28 @@ export async function executeTool(
 
     case "search_documents":
       return searchDocuments.execute(args);
+
+    // ============================================================================
+    // Agent Execution Tools (BullMQ Job Management) - DFO-189
+    // ============================================================================
+
+    case "queue_agent_job":
+      return queueAgentJobTool.execute(args);
+
+    case "get_agent_job_status":
+      return getAgentJobStatusTool.execute(args);
+
+    case "cancel_agent_job":
+      return cancelAgentJobTool.execute(args);
+
+    case "list_active_agent_jobs":
+      return listActiveAgentJobsTool.execute(args);
+
+    case "proxy_external_tool":
+      return proxyExternalTool((args as unknown) as { server_name: string; tool_name: string; parameters?: Record<string, unknown> });
+
+    case "list_external_tools":
+      return listExternalTools((args as unknown) as { server_name: string });
 
     default:
       throw new Error(`Unknown tool: ${name}`);
