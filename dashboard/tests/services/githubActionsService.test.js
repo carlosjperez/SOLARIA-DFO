@@ -9,11 +9,16 @@
  * - createPR() - Creating pull requests from tasks
  */
 
-// Mock dependencies
-jest.mock('mysql2/promise');
-jest.mock('@octokit/rest');
+// Mock dependencies BEFORE requiring them
+jest.mock('@octokit/rest', () => ({
+    Octokit: jest.fn()
+}));
 
-const mysql = require('mysql2/promise');
+jest.mock('mysql2/promise', () => ({
+    createConnection: jest.fn()
+}));
+
+// Get mocked modules
 const { Octokit } = require('@octokit/rest');
 
 // Import the service (will need to be compiled from TypeScript first)

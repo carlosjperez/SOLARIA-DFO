@@ -7,6 +7,9 @@ module.exports = {
         '\\.ts$'
     ],
     modulePathIgnorePatterns: ['/node_modules/'],
+    transformIgnorePatterns: [
+        'node_modules/(?!(@octokit)/)'
+    ],
     collectCoverageFrom: [
         'server.js',
         '!node_modules/**'
