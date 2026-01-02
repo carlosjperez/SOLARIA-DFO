@@ -12,10 +12,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebhookService = void 0;
 const crypto_1 = __importDefault(require("crypto"));
 class WebhookService {
-    db;
-    deliveryQueue = [];
-    isProcessing = false;
     constructor(db) {
+        this.deliveryQueue = [];
+        this.isProcessing = false;
         this.db = db;
     }
     /**
@@ -333,4 +332,3 @@ class WebhookService {
 }
 exports.WebhookService = WebhookService;
 exports.default = WebhookService;
-//# sourceMappingURL=webhookService.js.map

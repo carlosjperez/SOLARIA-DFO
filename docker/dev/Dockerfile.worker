@@ -1,0 +1,48 @@
+# SOLARIA Worker - Development Dockerfile
+# Background jobs + embeddings with hot-reload
+
+FROM node:22-bookworm-slim
+
+WORKDIR /app
+
+# Install dependencies for Transformers.js ONNX runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    build-essential \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create models directory for caching
+RUN mkdir -p /app/models /app/.cache
+
+# Set cache directories for Hugging Face models
+ENV HF_HOME=/app/.cache/huggingface \
+    TRANSFORMERS_CACHE=/app/.cache/huggingface \
+    XDG_CACHE_HOME=/app/.cache
+
+# Install ALL dependencies (including devDependencies for nodemon)
+COPY workers/package*.json ./
+RUN npm install
+
+# NOTE: Source code mounted as volume for hot-reload
+# No COPY of source code here
+
+# Development environment variables
+ENV NODE_ENV=development \
+    REDIS_URL=redis://redis:6379 \
+    DB_HOST=office \
+    DB_PORT=3306 \
+    DB_USER=solaria_user \
+    DB_PASSWORD=solaria2024 \
+    DB_NAME=solaria_construction \
+    EMBEDDING_HTTP_PORT=3032
+
+# Expose embedding HTTP server port
+EXPOSE 3032
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -q --spider http://localhost:3032/health || exit 1
+
+# Run with nodemon for hot-reload
+CMD ["npx", "nodemon", "start.js"]

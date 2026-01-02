@@ -4,7 +4,6 @@ import { ViewSelector, type ViewSelectorProps } from './ViewSelector';
 import { SortBar, type SortBarProps } from './SortBar';
 import { FilterBar, type FilterBarProps } from './FilterBar';
 import { cn } from '@/lib/utils';
-import type { ReactNode } from 'react';
 
 /**
  * SearchAndFilterBar Props Interface

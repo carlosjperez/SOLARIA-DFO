@@ -40,3 +40,37 @@ export declare function handleGitHubPush(payload: GitHubPushPayload, db: Connect
  * Ensures webhook requests are authentic
  */
 export declare function verifyGitHubSignature(payload: string, signature: string, secret: string): boolean;
+export interface GitHubWorkflowRunPayload {
+    action: 'queued' | 'in_progress' | 'completed' | 'requested';
+    workflow_run: {
+        id: number;
+        name: string;
+        head_branch: string;
+        head_sha: string;
+        run_number: number;
+        event: string;
+        status: string;
+        conclusion: string | null;
+        workflow_id: number;
+        html_url: string;
+        created_at: string;
+        updated_at: string;
+        run_started_at: string | null;
+    };
+    repository: {
+        name: string;
+        full_name: string;
+    };
+    sender: {
+        login: string;
+    };
+}
+/**
+ * Process GitHub Actions workflow_run webhook
+ * Updates github_workflow_runs table and emits Socket.IO events
+ */
+export declare function handleWorkflowRunEvent(payload: GitHubWorkflowRunPayload, db: Connection, io?: any): Promise<{
+    status: string;
+    updated: boolean;
+    error?: string;
+}>;

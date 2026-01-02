@@ -33,3 +33,9 @@ export * from './office-clients.js';
 
 // Permissions (RBAC)
 export * from './permissions.js';
+
+// Agent Execution (BullMQ jobs, MCP configs)
+export * from './agent-execution.js';
+
+// GitHub Workflows (workflows, runs, task links)
+export * from './github-workflows.js';

@@ -1,74 +1,54 @@
 /**
  * MCP Proxy Tools
+ * DFO-196 | Epic 20 Sprint 2.2: Agent Integration
  *
- * @author ECO-Lambda | DFO 4.0 Epic 2 Sprint 2.2
- * @date 2025-12-31
- * @task DFO-2007
+ * @author ECO-Omega | DFO 4.0
+ * @date 2026-01-01 (updated)
+ * @task DFO-196
  *
- * Proxy tools to execute tools on external MCP servers
- * Allows agents to call tools from Context7, Playwright, CodeRabbit, etc.
+ * Proxy tools for executing commands on external MCP servers.
+ * Enables DFO to act as MCP client and forward tool calls to Context7, Playwright, CodeRabbit, etc.
  */
-import { z } from 'zod';
-declare const ProxyExternalToolSchema: z.ZodObject<{
-    server_name: z.ZodString;
-    tool_name: z.ZodString;
-    parameters: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
-}, "strip", z.ZodTypeAny, {
-    server_name: string;
-    tool_name: string;
-    parameters?: Record<string, unknown> | undefined;
-}, {
-    server_name: string;
-    tool_name: string;
-    parameters?: Record<string, unknown> | undefined;
-}>;
-declare const ListExternalToolsSchema: z.ZodObject<{
-    server_name: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    server_name: string;
-}, {
-    server_name: string;
-}>;
-/**
- * Proxy a tool call to an external MCP server
- *
- * This allows agents to execute tools on external MCP servers like Context7,
- * Playwright, CodeRabbit, etc. without needing direct access.
- */
-export declare function proxyExternalTool(params: z.infer<typeof ProxyExternalToolSchema>): Promise<string>;
-/**
- * List available tools on an external MCP server
- *
- * Useful for discovering what tools are available on a connected MCP server.
- */
-export declare function listExternalTools(params: z.infer<typeof ListExternalToolsSchema>): Promise<string>;
-export declare const mcpProxyTools: ({
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+export declare const proxyExternalTool: Tool;
+export declare const listExternalTools: Tool;
+export declare const mcpProxyTools: {
+    inputSchema: {
+        [x: string]: unknown;
+        type: "object";
+        properties?: {
+            [x: string]: object;
+        } | undefined;
+        required?: string[] | undefined;
+    };
     name: string;
-    description: string;
-    inputSchema: z.ZodObject<{
-        server_name: z.ZodString;
-        tool_name: z.ZodString;
-        parameters: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodUnknown>>;
-    }, "strip", z.ZodTypeAny, {
-        server_name: string;
-        tool_name: string;
-        parameters?: Record<string, unknown> | undefined;
-    }, {
-        server_name: string;
-        tool_name: string;
-        parameters?: Record<string, unknown> | undefined;
-    }>;
-    handler: typeof proxyExternalTool;
-} | {
-    name: string;
-    description: string;
-    inputSchema: z.ZodObject<{
-        server_name: z.ZodString;
-    }, "strip", z.ZodTypeAny, {
-        server_name: string;
-    }, {
-        server_name: string;
-    }>;
-    handler: typeof listExternalTools;
-})[];
-export {};
+    description?: string | undefined;
+    outputSchema?: {
+        [x: string]: unknown;
+        type: "object";
+        properties?: {
+            [x: string]: object;
+        } | undefined;
+        required?: string[] | undefined;
+    } | undefined;
+    annotations?: {
+        title?: string | undefined;
+        readOnlyHint?: boolean | undefined;
+        destructiveHint?: boolean | undefined;
+        idempotentHint?: boolean | undefined;
+        openWorldHint?: boolean | undefined;
+    } | undefined;
+    execution?: {
+        taskSupport?: "optional" | "required" | "forbidden" | undefined;
+    } | undefined;
+    _meta?: {
+        [x: string]: unknown;
+    } | undefined;
+    icons?: {
+        src: string;
+        mimeType?: string | undefined;
+        sizes?: string[] | undefined;
+        theme?: "light" | "dark" | undefined;
+    }[] | undefined;
+    title?: string | undefined;
+}[];

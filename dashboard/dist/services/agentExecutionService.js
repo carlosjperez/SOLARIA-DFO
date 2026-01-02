@@ -21,11 +21,6 @@ const queue_js_1 = require("../config/queue.js");
  * Provides methods for queueing, monitoring, and controlling agent tasks.
  */
 class AgentExecutionService {
-    db;
-    queue;
-    queueEvents;
-    redisConnection;
-    io;
     /**
      * Initialize the AgentExecutionService
      * @param db - MySQL database connection
@@ -624,4 +619,3 @@ class AgentExecutionService {
 }
 exports.AgentExecutionService = AgentExecutionService;
 exports.default = AgentExecutionService;
-//# sourceMappingURL=agentExecutionService.js.map

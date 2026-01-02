@@ -114,10 +114,16 @@ export const Interactive: Story = {
     );
   },
   args: {
+    searchValue: '',
+    onSearchChange: fn(),
     searchPlaceholder: 'Search projects...',
     itemCount: 24,
     itemSingularLabel: 'project',
     itemPluralLabel: 'projects',
+    viewValue: 'grid',
+    onViewChange: fn(),
+    sortValue: { field: 'name', direction: 'asc' },
+    onSortChange: fn(),
     sortOptions: [
       { value: 'name', label: 'Name' },
       { value: 'status', label: 'Status' },

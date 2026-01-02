@@ -81,7 +81,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             tableName: "projects";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "office" | "dfo";
+            data: "dfo" | "office";
             driverParam: string;
             notNull: false;
             hasDefault: true;

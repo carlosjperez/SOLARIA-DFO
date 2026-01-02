@@ -155,4 +155,3 @@ exports.projectsRelations = (0, drizzle_orm_1.relations)(exports.projects, ({ on
     requests: many(exports.projectRequests),
     metrics: many(exports.projectMetrics),
 }));
-//# sourceMappingURL=projects.js.map

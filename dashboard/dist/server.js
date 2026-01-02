@@ -4,6 +4,39 @@
  * TypeScript migration - Servidor para supervision humana de proyectos gestionados por agentes IA
  * @version 3.0.0-ts
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -25,6 +58,7 @@ const zod_1 = require("zod");
 // Import services
 const webhookService_js_1 = require("./services/webhookService.js");
 const agentExecutionService_js_1 = __importDefault(require("./services/agentExecutionService.js"));
+const githubActionsService_js_1 = require("./services/githubActionsService.js");
 const githubIntegration_js_1 = require("./services/githubIntegration.js");
 // ============================================================================
 // Validation Schemas
@@ -49,26 +83,79 @@ const QueueAgentJobSchema = zod_1.z.object({
         serverName: zod_1.z.string(),
         serverUrl: zod_1.z.string().url(),
         authType: zod_1.z.enum(['bearer', 'basic', 'none']),
-        authCredentials: zod_1.z.record(zod_1.z.unknown()).optional(),
+        authCredentials: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional(),
         enabled: zod_1.z.boolean()
     })).optional()
+});
+/**
+ * Zod Schema for Agent MCP Config Creation
+ */
+const CreateAgentMcpConfigSchema = zod_1.z.object({
+    server_name: zod_1.z.string().min(1, 'Server name is required').max(255, 'Server name too long'),
+    server_url: zod_1.z.string().url('Invalid server URL').max(2048, 'URL too long'),
+    auth_type: zod_1.z.enum(['none', 'bearer', 'basic', 'api-key']).default('none'),
+    auth_credentials: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional(),
+    transport_type: zod_1.z.enum(['http', 'stdio', 'sse']).default('http'),
+    config_options: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional(),
+    enabled: zod_1.z.boolean().default(true)
+});
+/**
+ * Zod Schema for Agent MCP Config Update
+ */
+const UpdateAgentMcpConfigSchema = zod_1.z.object({
+    server_name: zod_1.z.string().min(1).max(255).optional(),
+    server_url: zod_1.z.string().url().max(2048).optional(),
+    auth_type: zod_1.z.enum(['none', 'bearer', 'basic', 'api-key']).optional(),
+    auth_credentials: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional(),
+    transport_type: zod_1.z.enum(['http', 'stdio', 'sse']).optional(),
+    config_options: zod_1.z.record(zod_1.z.string(), zod_1.z.unknown()).optional(),
+    enabled: zod_1.z.boolean().optional(),
+    connection_status: zod_1.z.enum(['disconnected', 'connected', 'error']).optional()
+}).refine((data) => Object.keys(data).length > 0, { message: 'At least one field must be provided for update' });
+/**
+ * Zod schema for GitHub Actions workflow trigger
+ */
+const TriggerWorkflowSchema = zod_1.z.object({
+    owner: zod_1.z.string().min(1, 'Owner is required'),
+    repo: zod_1.z.string().min(1, 'Repository is required'),
+    workflowId: zod_1.z.string().min(1, 'Workflow ID is required'),
+    ref: zod_1.z.string().min(1, 'Ref (branch/tag) is required'),
+    inputs: zod_1.z.record(zod_1.z.string(), zod_1.z.union([zod_1.z.string(), zod_1.z.number(), zod_1.z.boolean()])).optional(),
+    projectId: zod_1.z.number().int().positive('Project ID must be a positive integer'),
+    taskId: zod_1.z.number().int().positive().optional()
+});
+/**
+ * Zod schema for GitHub issue creation
+ */
+const CreateIssueSchema = zod_1.z.object({
+    owner: zod_1.z.string().min(1, 'Owner is required'),
+    repo: zod_1.z.string().min(1, 'Repository is required'),
+    title: zod_1.z.string().min(1, 'Title is required'),
+    body: zod_1.z.string().min(1, 'Body is required'),
+    labels: zod_1.z.array(zod_1.z.string()).optional(),
+    assignees: zod_1.z.array(zod_1.z.string()).optional(),
+    taskId: zod_1.z.number().int().positive('Task ID must be a positive integer'),
+    projectId: zod_1.z.number().int().positive('Project ID must be a positive integer')
+});
+/**
+ * Zod schema for GitHub PR creation
+ */
+const CreatePRSchema = zod_1.z.object({
+    owner: zod_1.z.string().min(1, 'Owner is required'),
+    repo: zod_1.z.string().min(1, 'Repository is required'),
+    title: zod_1.z.string().min(1, 'Title is required'),
+    body: zod_1.z.string().min(1, 'Body is required'),
+    head: zod_1.z.string().min(1, 'Head branch is required'),
+    base: zod_1.z.string().min(1, 'Base branch is required'),
+    labels: zod_1.z.array(zod_1.z.string()).optional(),
+    assignees: zod_1.z.array(zod_1.z.string()).optional(),
+    taskId: zod_1.z.number().int().positive('Task ID must be a positive integer'),
+    projectId: zod_1.z.number().int().positive('Project ID must be a positive integer')
 });
 // ============================================================================
 // Server Class
 // ============================================================================
 class SolariaDashboardServer {
-    app;
-    server;
-    io;
-    port;
-    db;
-    redis;
-    connectedClients;
-    repoPath;
-    _dbHealthInterval;
-    workerUrl;
-    webhookService;
-    agentExecutionService;
     constructor() {
         this.app = (0, express_1.default)();
         this.server = http_1.default.createServer(this.app);
@@ -83,6 +170,7 @@ class SolariaDashboardServer {
         this.workerUrl = process.env.WORKER_URL || 'http://worker:3032';
         this.webhookService = null;
         this.agentExecutionService = null;
+        this.githubActionsService = null;
         // Trust proxy for rate limiting behind nginx
         this.app.set('trust proxy', true);
         this.repoPath = process.env.REPO_PATH || path_1.default.resolve(__dirname, '..', '..');
@@ -137,9 +225,26 @@ class SolariaDashboardServer {
                 // Initialize webhook service
                 this.webhookService = new webhookService_js_1.WebhookService(this.db);
                 console.log('WebhookService initialized');
-                // Initialize agent execution service
-                this.agentExecutionService = new agentExecutionService_js_1.default(this.db, this.io);
-                console.log('AgentExecutionService initialized');
+                // Initialize agent execution service (with Redis resilience)
+                try {
+                    this.agentExecutionService = new agentExecutionService_js_1.default(this.db, this.io);
+                    console.log('AgentExecutionService initialized successfully');
+                }
+                catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    console.error('Failed to initialize AgentExecutionService:', errorMessage);
+                    console.warn('Agent execution features will be unavailable until Redis is accessible');
+                    this.agentExecutionService = null;
+                }
+                // Initialize GitHub Actions service
+                const githubToken = process.env.GITHUB_TOKEN;
+                if (githubToken) {
+                    this.githubActionsService = new githubActionsService_js_1.GitHubActionsService({ token: githubToken }, this.db);
+                    console.log('GitHubActionsService initialized');
+                }
+                else {
+                    console.warn('GITHUB_TOKEN not found - GitHubActionsService will not be available');
+                }
                 return;
             }
             catch (error) {
@@ -285,8 +390,9 @@ class SolariaDashboardServer {
         this.app.get('/api/public/tasks/recent-completed', this.getRecentCompletedTasks.bind(this));
         this.app.get('/api/public/tasks/recent-by-project', this.getRecentTasksByProject.bind(this));
         this.app.get('/api/public/tags', this.getTaskTags.bind(this));
-        // GitHub Webhook (PUBLIC - no auth, signature verified)
+        // GitHub Webhooks (PUBLIC - no auth, signature verified)
         this.app.post('/webhooks/github', this.handleGitHubWebhook.bind(this));
+        this.app.post('/webhooks/github/workflow', this.handleGitHubActionsWebhook.bind(this));
         // Auth middleware
         this.app.use('/api/', this.authenticateToken.bind(this));
         // Dashboard
@@ -339,6 +445,13 @@ class SolariaDashboardServer {
         this.app.get('/api/agents/:id', this.getAgent.bind(this));
         this.app.get('/api/agents/:id/performance', this.getAgentPerformance.bind(this));
         this.app.put('/api/agents/:id/status', this.updateAgentStatus.bind(this));
+        // Agent MCP Configurations
+        this.app.get('/api/agents/:id/mcp-configs', this.getAgentMcpConfigs.bind(this));
+        this.app.get('/api/agents/:id/mcp-configs/:configId', this.getAgentMcpConfig.bind(this));
+        this.app.post('/api/agents/:id/mcp-configs', this.createAgentMcpConfig.bind(this));
+        this.app.put('/api/agents/:id/mcp-configs/:configId', this.updateAgentMcpConfig.bind(this));
+        this.app.delete('/api/agents/:id/mcp-configs/:configId', this.deleteAgentMcpConfig.bind(this));
+        this.app.post('/api/agents/:id/mcp-configs/:configId/test', this.testAgentMcpConnection.bind(this));
         // Tasks
         this.app.get('/api/tasks', this.getTasks.bind(this));
         this.app.get('/api/tasks/recent-completed', this.getRecentCompletedTasks.bind(this));
@@ -413,6 +526,13 @@ class SolariaDashboardServer {
         this.app.post('/api/webhooks/:id/test', this.testWebhook.bind(this));
         this.app.put('/api/webhooks/:id', this.updateWebhook.bind(this));
         this.app.delete('/api/webhooks/:id', this.deleteWebhook.bind(this));
+        // ========================================================================
+        // GitHub Actions API - Workflow Triggers & Issue/PR Management (JWT Protected)
+        // ========================================================================
+        this.app.post('/api/github/trigger-workflow', this.authenticateToken.bind(this), this.triggerWorkflow.bind(this));
+        this.app.get('/api/github/workflow-status/:run_id', this.authenticateToken.bind(this), this.getWorkflowStatus.bind(this));
+        this.app.post('/api/github/create-issue', this.authenticateToken.bind(this), this.createIssue.bind(this));
+        this.app.post('/api/github/create-pr', this.authenticateToken.bind(this), this.createPR.bind(this));
         // ========================================================================
         // Agent Execution API - BullMQ Job Management (JWT Protected)
         // ========================================================================
@@ -680,12 +800,17 @@ class SolariaDashboardServer {
     // ========================================================================
     async healthCheck(_req, res) {
         try {
+            // Check database
             if (this.db) {
                 await this.db.execute('SELECT 1');
             }
+            // Check Redis (via AgentExecutionService)
+            const redisStatus = this.agentExecutionService ? 'connected' : 'disconnected';
             res.json({
                 status: 'healthy',
                 database: this.db ? 'connected' : 'disconnected',
+                redis: redisStatus,
+                agentExecution: this.agentExecutionService ? 'available' : 'unavailable',
                 timestamp: new Date().toISOString(),
                 uptime: process.uptime()
             });
@@ -694,6 +819,7 @@ class SolariaDashboardServer {
             res.status(503).json({
                 status: 'unhealthy',
                 database: 'error',
+                redis: 'unknown',
                 timestamp: new Date().toISOString()
             });
         }
@@ -2811,6 +2937,234 @@ class SolariaDashboardServer {
         }
     }
     // ========================================================================
+    // Agent MCP Configuration Handlers
+    // ========================================================================
+    async getAgentMcpConfigs(req, res) {
+        try {
+            const { id } = req.params;
+            const [configs] = await this.db.execute(`
+                SELECT * FROM agent_mcp_configs
+                WHERE agent_id = ?
+                ORDER BY server_name ASC
+            `, [id]);
+            res.json(configs);
+        }
+        catch (error) {
+            console.error('Error fetching agent MCP configs:', error);
+            res.status(500).json({ error: 'Failed to fetch MCP configurations' });
+        }
+    }
+    async getAgentMcpConfig(req, res) {
+        try {
+            const { id, configId } = req.params;
+            const [configs] = await this.db.execute(`
+                SELECT * FROM agent_mcp_configs
+                WHERE id = ? AND agent_id = ?
+            `, [configId, id]);
+            if (configs.length === 0) {
+                res.status(404).json({ error: 'Configuration not found' });
+                return;
+            }
+            res.json(configs[0]);
+        }
+        catch (error) {
+            console.error('Error fetching agent MCP config:', error);
+            res.status(500).json({ error: 'Failed to fetch MCP configuration' });
+        }
+    }
+    async createAgentMcpConfig(req, res) {
+        try {
+            const { id } = req.params;
+            // Validate request body with Zod
+            const validation = CreateAgentMcpConfigSchema.safeParse(req.body);
+            if (!validation.success) {
+                res.status(400).json({
+                    error: 'Validation failed',
+                    details: validation.error.format()
+                });
+                return;
+            }
+            const { server_name, server_url, auth_type, auth_credentials, transport_type, config_options, enabled } = validation.data;
+            // Check for duplicate server_name for this agent
+            const [existing] = await this.db.execute(`
+                SELECT id FROM agent_mcp_configs
+                WHERE agent_id = ? AND server_name = ?
+            `, [id, server_name]);
+            if (existing.length > 0) {
+                res.status(409).json({ error: 'Configuration for this server already exists' });
+                return;
+            }
+            const [result] = await this.db.execute(`
+                INSERT INTO agent_mcp_configs (
+                    agent_id, server_name, server_url, auth_type,
+                    auth_credentials, transport_type, config_options, enabled
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                id,
+                server_name,
+                server_url,
+                auth_type,
+                JSON.stringify(auth_credentials || {}),
+                transport_type,
+                JSON.stringify(config_options || {}),
+                enabled
+            ]);
+            res.status(201).json({
+                id: result.insertId,
+                message: 'MCP configuration created successfully'
+            });
+        }
+        catch (error) {
+            console.error('Error creating agent MCP config:', error);
+            res.status(500).json({ error: 'Failed to create MCP configuration' });
+        }
+    }
+    async updateAgentMcpConfig(req, res) {
+        try {
+            const { id, configId } = req.params;
+            // Validate request body with Zod
+            const validation = UpdateAgentMcpConfigSchema.safeParse(req.body);
+            if (!validation.success) {
+                res.status(400).json({
+                    error: 'Validation failed',
+                    details: validation.error.format()
+                });
+                return;
+            }
+            const validatedData = validation.data;
+            const updates = [];
+            const params = [];
+            for (const [field, value] of Object.entries(validatedData)) {
+                updates.push(`${field} = ?`);
+                // JSON fields need stringification
+                if (field === 'auth_credentials' || field === 'config_options') {
+                    params.push(JSON.stringify(value));
+                }
+                else {
+                    params.push(value);
+                }
+            }
+            const query = `
+                UPDATE agent_mcp_configs
+                SET ${updates.join(', ')}, updated_at = NOW()
+                WHERE id = ? AND agent_id = ?
+            `;
+            params.push(configId, id);
+            const [result] = await this.db.execute(query, params);
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Configuration not found' });
+                return;
+            }
+            res.json({ message: 'MCP configuration updated successfully' });
+        }
+        catch (error) {
+            console.error('Error updating agent MCP config:', error);
+            res.status(500).json({ error: 'Failed to update MCP configuration' });
+        }
+    }
+    async deleteAgentMcpConfig(req, res) {
+        try {
+            const { id, configId } = req.params;
+            const [result] = await this.db.execute(`
+                DELETE FROM agent_mcp_configs
+                WHERE id = ? AND agent_id = ?
+            `, [configId, id]);
+            if (result.affectedRows === 0) {
+                res.status(404).json({ error: 'Configuration not found' });
+                return;
+            }
+            res.json({ message: 'MCP configuration deleted successfully' });
+        }
+        catch (error) {
+            console.error('Error deleting agent MCP config:', error);
+            res.status(500).json({ error: 'Failed to delete MCP configuration' });
+        }
+    }
+    async testAgentMcpConnection(req, res) {
+        try {
+            const { id, configId } = req.params;
+            // Get config
+            const [configs] = await this.db.execute(`
+                SELECT * FROM agent_mcp_configs
+                WHERE id = ? AND agent_id = ?
+            `, [configId, id]);
+            if (configs.length === 0) {
+                res.status(404).json({ error: 'Configuration not found' });
+                return;
+            }
+            const config = configs[0];
+            // Import MCPClientManager dynamically
+            const { getMCPClientManager } = await Promise.resolve().then(() => __importStar(require('../mcp-server/dist/src/client/mcp-client-manager.js')));
+            const manager = getMCPClientManager();
+            // Test connection
+            try {
+                await manager.connect({
+                    name: config.server_name,
+                    transport: {
+                        type: config.transport_type,
+                        url: config.server_url,
+                    },
+                    auth: config.auth_type === 'none'
+                        ? { type: 'none' }
+                        : {
+                            type: 'api-key',
+                            apiKey: JSON.parse(config.auth_credentials || '{}').apiKey || '',
+                        },
+                    healthCheck: {
+                        enabled: true,
+                        interval: 60000,
+                        timeout: 5000,
+                    },
+                    retry: {
+                        maxAttempts: 1,
+                        backoffMs: 1000,
+                    },
+                });
+                // Get tools list
+                const tools = manager.listTools(config.server_name);
+                // Update connection status
+                await this.db.execute(`
+                    UPDATE agent_mcp_configs
+                    SET connection_status = 'connected',
+                        last_connected_at = NOW(),
+                        last_error = NULL
+                    WHERE id = ?
+                `, [configId]);
+                // Disconnect test connection
+                await manager.disconnect(config.server_name);
+                res.json({
+                    success: true,
+                    message: 'Connection successful',
+                    tools_count: tools.length,
+                    tools: tools.map((t) => ({
+                        name: t.name,
+                        description: t.description
+                    }))
+                });
+            }
+            catch (connError) {
+                const errorMessage = connError instanceof Error ? connError.message : 'Unknown error';
+                // Update error status
+                await this.db.execute(`
+                    UPDATE agent_mcp_configs
+                    SET connection_status = 'error',
+                        last_error = ?
+                    WHERE id = ?
+                `, [errorMessage, configId]);
+                res.status(400).json({
+                    success: false,
+                    error: 'Connection failed',
+                    details: errorMessage
+                });
+            }
+        }
+        catch (error) {
+            console.error('Error testing MCP connection:', error);
+            res.status(500).json({ error: 'Failed to test connection' });
+        }
+    }
+    // ========================================================================
     // Task Handlers
     // ========================================================================
     /**
@@ -3599,21 +3953,13 @@ class SolariaDashboardServer {
     async getBusinesses(req, res) {
         try {
             const { status, limit = 50, offset = 0 } = req.query;
-            let query = `
-                SELECT
-                    b.*,
-                    COUNT(DISTINCT p.id) as project_count,
-                    SUM(CASE WHEN p.status = 'active' THEN 1 ELSE 0 END) as active_projects
-                FROM businesses b
-                LEFT JOIN projects p ON p.business_id = b.id
-                WHERE 1=1
-            `;
+            let query = 'SELECT b.* FROM businesses b WHERE 1=1';
             const params = [];
             if (status) {
                 query += ' AND b.status = ?';
                 params.push(String(status));
             }
-            query += ' GROUP BY b.id ORDER BY b.name ASC LIMIT ? OFFSET ?';
+            query += ' ORDER BY b.name ASC LIMIT ? OFFSET ?';
             params.push(Number(limit), Number(offset));
             const [businesses] = await this.db.execute(query, params);
             // Get total count
@@ -3644,28 +3990,28 @@ class SolariaDashboardServer {
                 return;
             }
             const business = businesses[0];
-            // Get associated projects
+            // Get associated projects (using client field)
             const [projects] = await this.db.execute(`
                 SELECT
                     id, name, code, status, description,
-                    start_date, end_date, progress,
-                    budget_allocated, budget_spent
+                    start_date, deadline, completion_percentage,
+                    budget, actual_cost
                 FROM projects
-                WHERE business_id = ?
+                WHERE client = ?
                 ORDER BY created_at DESC
-            `, [id]);
+            `, [business.name]);
             // Get financial summary
             const [financials] = await this.db.execute(`
                 SELECT
-                    SUM(budget_allocated) as total_budget,
-                    SUM(budget_spent) as total_spent,
+                    SUM(budget) as total_budget,
+                    SUM(actual_cost) as total_spent,
                     COUNT(*) as total_projects,
-                    AVG(progress) as avg_progress
+                    AVG(completion_percentage) as avg_progress
                 FROM projects
-                WHERE business_id = ?
-            `, [id]);
+                WHERE client = ?
+            `, [business.name]);
             res.json({
-                ...business,
+                business,
                 projects,
                 financials: financials[0] || {}
             });
@@ -4221,8 +4567,8 @@ class SolariaDashboardServer {
     async getDocumentsList(_req, res) {
         try {
             const repoPath = process.env.REPO_PATH || '/repo';
-            const fs = await import('fs');
-            const path = await import('path');
+            const fs = await Promise.resolve().then(() => __importStar(require('fs')));
+            const path = await Promise.resolve().then(() => __importStar(require('path')));
             const docPatterns = [
                 { pattern: /\.md$/i, type: 'markdown', icon: 'fa-file-lines' },
                 { pattern: /\.txt$/i, type: 'text', icon: 'fa-file-alt' },
@@ -5305,6 +5651,66 @@ class SolariaDashboardServer {
             });
         }
     }
+    /**
+     * Handle GitHub Actions workflow_run webhook
+     * DFO-201-EPIC21: Receive workflow status updates
+     *
+     * Events handled:
+     * - workflow_run.queued
+     * - workflow_run.in_progress
+     * - workflow_run.completed
+     */
+    async handleGitHubActionsWebhook(req, res) {
+        try {
+            // Verify GitHub signature (if secret is configured)
+            const secret = process.env.GITHUB_WEBHOOK_SECRET;
+            if (secret) {
+                const signature = req.headers['x-hub-signature-256'];
+                if (!signature) {
+                    console.warn('GitHub Actions webhook: Missing signature');
+                    res.status(401).json({ error: 'Missing signature' });
+                    return;
+                }
+                const payload = JSON.stringify(req.body);
+                const isValid = (0, githubIntegration_js_1.verifyGitHubSignature)(payload, signature, secret);
+                if (!isValid) {
+                    console.warn('GitHub Actions webhook: Invalid signature');
+                    res.status(401).json({ error: 'Invalid signature' });
+                    return;
+                }
+            }
+            // Validate event type
+            const event = req.headers['x-github-event'];
+            if (event !== 'workflow_run') {
+                console.warn(`GitHub Actions webhook: Unsupported event '${event}'`);
+                res.status(400).json({
+                    error: 'Unsupported event',
+                    details: `Expected 'workflow_run', got '${event}'`,
+                });
+                return;
+            }
+            // Process workflow run event
+            const payload = req.body;
+            const result = await (0, githubIntegration_js_1.handleWorkflowRunEvent)(payload, this.db, this.io);
+            console.log(`GitHub Actions webhook processed: ${result.status}` +
+                (result.updated ? `, workflow run updated` : ''));
+            if (result.error) {
+                console.warn('GitHub Actions webhook warning:', result.error);
+            }
+            res.json({
+                success: result.updated,
+                status: result.status,
+                error: result.error,
+            });
+        }
+        catch (error) {
+            console.error('GitHub Actions webhook error:', error);
+            res.status(500).json({
+                error: 'Failed to process GitHub Actions webhook',
+                details: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
     // ========================================================================
     // Webhooks Handlers (n8n Integration)
     // ========================================================================
@@ -5691,6 +6097,369 @@ class SolariaDashboardServer {
             res.status(500).json({
                 error: 'Failed to retrieve worker status',
                 details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+            });
+        }
+    }
+    // ========================================================================
+    // GitHub Actions API Handlers
+    // ========================================================================
+    /**
+     * Trigger a GitHub Actions workflow
+     * POST /api/github/trigger-workflow
+     */
+    async triggerWorkflow(req, res) {
+        try {
+            if (!this.githubActionsService) {
+                res.status(503).json({
+                    success: false,
+                    error: {
+                        code: 'SERVICE_NOT_INITIALIZED',
+                        message: 'GitHub Actions service not initialized',
+                        suggestion: 'Ensure GITHUB_TOKEN environment variable is set'
+                    }
+                });
+                return;
+            }
+            // Validate request body with Zod
+            const validation = TriggerWorkflowSchema.safeParse(req.body);
+            if (!validation.success) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'VALIDATION_ERROR',
+                        message: 'Validation failed',
+                        details: validation.error.format()
+                    }
+                });
+                return;
+            }
+            const { owner, repo, workflowId, ref, inputs, projectId, taskId } = validation.data;
+            // Trigger the workflow
+            const result = await this.githubActionsService.triggerWorkflow({
+                owner,
+                repo,
+                workflowId,
+                ref,
+                inputs,
+                projectId,
+                taskId
+            });
+            if (!result.success) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'WORKFLOW_TRIGGER_FAILED',
+                        message: result.error || 'Failed to trigger workflow',
+                        details: { owner, repo, workflowId, ref }
+                    }
+                });
+                return;
+            }
+            console.log(`[GitHub] Workflow triggered successfully: ${owner}/${repo}/${workflowId} | Ref: ${ref} | Run ID: ${result.githubRunId}`);
+            // Log to activity log
+            await this.db.execute(`INSERT INTO activity_logs (action, category, level, project_id, details)
+                 VALUES (?, 'github', 'info', ?, ?)`, [
+                `GitHub workflow triggered: ${owner}/${repo}/${workflowId}`,
+                projectId,
+                JSON.stringify({
+                    workflowId: result.workflowId,
+                    githubRunId: result.githubRunId,
+                    ref,
+                    taskId
+                })
+            ]);
+            res.status(201).json({
+                success: true,
+                data: {
+                    workflowId: result.workflowId,
+                    runId: result.runId,
+                    githubRunId: result.githubRunId,
+                    owner,
+                    repo,
+                    ref,
+                    triggeredAt: new Date().toISOString()
+                },
+                message: 'Workflow triggered successfully'
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            console.error('[GitHub] Trigger workflow error:', {
+                error: errorMessage,
+                stack: errorStack
+            });
+            res.status(500).json({
+                success: false,
+                error: {
+                    code: 'INTERNAL_ERROR',
+                    message: 'Failed to trigger workflow',
+                    details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+                }
+            });
+        }
+    }
+    /**
+     * Get GitHub Actions workflow run status
+     * GET /api/github/workflow-status/:run_id
+     */
+    async getWorkflowStatus(req, res) {
+        try {
+            if (!this.githubActionsService) {
+                res.status(503).json({
+                    success: false,
+                    error: {
+                        code: 'SERVICE_NOT_INITIALIZED',
+                        message: 'GitHub Actions service not initialized'
+                    }
+                });
+                return;
+            }
+            const runId = parseInt(req.params.run_id, 10);
+            if (isNaN(runId)) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_RUN_ID',
+                        message: 'Run ID must be a valid integer'
+                    }
+                });
+                return;
+            }
+            // Get workflow run from database to get owner/repo/github_run_id
+            const [runRows] = await this.db.execute(`SELECT wr.github_run_id, w.owner, w.repo
+                 FROM github_workflow_runs wr
+                 JOIN github_workflows w ON wr.workflow_id = w.id
+                 WHERE wr.id = ?`, [runId]);
+            if (!runRows || runRows.length === 0) {
+                res.status(404).json({
+                    success: false,
+                    error: {
+                        code: 'RUN_NOT_FOUND',
+                        message: 'Workflow run not found'
+                    }
+                });
+                return;
+            }
+            const run = runRows[0];
+            // Fetch status from GitHub
+            const status = await this.githubActionsService.getRunStatus(run.owner, run.repo, run.github_run_id);
+            console.log(`[GitHub] Workflow status retrieved: Run ${runId} | Status: ${status.status} | Conclusion: ${status.conclusion || 'N/A'}`);
+            res.json({
+                success: true,
+                data: {
+                    runId,
+                    githubRunId: status.id,
+                    status: status.status,
+                    conclusion: status.conclusion,
+                    runNumber: status.runNumber,
+                    htmlUrl: status.htmlUrl,
+                    startedAt: status.startedAt,
+                    completedAt: status.completedAt,
+                    durationSeconds: status.durationSeconds
+                }
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[GitHub] Get workflow status error:', errorMessage);
+            res.status(500).json({
+                success: false,
+                error: {
+                    code: 'INTERNAL_ERROR',
+                    message: 'Failed to retrieve workflow status',
+                    details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+                }
+            });
+        }
+    }
+    /**
+     * Create a GitHub issue from a DFO task
+     * POST /api/github/create-issue
+     */
+    async createIssue(req, res) {
+        try {
+            if (!this.githubActionsService) {
+                res.status(503).json({
+                    success: false,
+                    error: {
+                        code: 'SERVICE_NOT_INITIALIZED',
+                        message: 'GitHub Actions service not initialized'
+                    }
+                });
+                return;
+            }
+            // Validate request body with Zod
+            const validation = CreateIssueSchema.safeParse(req.body);
+            if (!validation.success) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'VALIDATION_ERROR',
+                        message: 'Validation failed',
+                        details: validation.error.format()
+                    }
+                });
+                return;
+            }
+            const { owner, repo, title, body, labels, assignees, taskId, projectId } = validation.data;
+            // Create the issue
+            const result = await this.githubActionsService.createIssue({
+                owner,
+                repo,
+                title,
+                body,
+                labels,
+                assignees,
+                taskId,
+                projectId
+            });
+            if (!result.success) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'ISSUE_CREATE_FAILED',
+                        message: result.error || 'Failed to create issue',
+                        details: { owner, repo, taskId }
+                    }
+                });
+                return;
+            }
+            console.log(`[GitHub] Issue created successfully: ${owner}/${repo}#${result.issueNumber} | Task: ${taskId}`);
+            // Log to activity log
+            await this.db.execute(`INSERT INTO activity_logs (action, category, level, project_id, details)
+                 VALUES (?, 'github', 'info', ?, ?)`, [
+                `GitHub issue created: ${owner}/${repo}#${result.issueNumber}`,
+                projectId,
+                JSON.stringify({
+                    issueNumber: result.issueNumber,
+                    issueUrl: result.issueUrl,
+                    taskId,
+                    taskLinkId: result.taskLinkId
+                })
+            ]);
+            res.status(201).json({
+                success: true,
+                data: {
+                    issueNumber: result.issueNumber,
+                    issueUrl: result.issueUrl,
+                    taskLinkId: result.taskLinkId,
+                    taskId,
+                    owner,
+                    repo,
+                    createdAt: new Date().toISOString()
+                },
+                message: 'Issue created successfully'
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[GitHub] Create issue error:', errorMessage);
+            res.status(500).json({
+                success: false,
+                error: {
+                    code: 'INTERNAL_ERROR',
+                    message: 'Failed to create issue',
+                    details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+                }
+            });
+        }
+    }
+    /**
+     * Create a GitHub pull request from a DFO task
+     * POST /api/github/create-pr
+     */
+    async createPR(req, res) {
+        try {
+            if (!this.githubActionsService) {
+                res.status(503).json({
+                    success: false,
+                    error: {
+                        code: 'SERVICE_NOT_INITIALIZED',
+                        message: 'GitHub Actions service not initialized'
+                    }
+                });
+                return;
+            }
+            // Validate request body with Zod
+            const validation = CreatePRSchema.safeParse(req.body);
+            if (!validation.success) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'VALIDATION_ERROR',
+                        message: 'Validation failed',
+                        details: validation.error.format()
+                    }
+                });
+                return;
+            }
+            const { owner, repo, title, body, head, base, labels, assignees, taskId, projectId } = validation.data;
+            // Create the PR
+            const result = await this.githubActionsService.createPR({
+                owner,
+                repo,
+                title,
+                body,
+                head,
+                base,
+                labels,
+                assignees,
+                taskId,
+                projectId
+            });
+            if (!result.success) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'PR_CREATE_FAILED',
+                        message: result.error || 'Failed to create pull request',
+                        details: { owner, repo, head, base, taskId }
+                    }
+                });
+                return;
+            }
+            console.log(`[GitHub] PR created successfully: ${owner}/${repo}#${result.prNumber} | Task: ${taskId}`);
+            // Log to activity log
+            await this.db.execute(`INSERT INTO activity_logs (action, category, level, project_id, details)
+                 VALUES (?, 'github', 'info', ?, ?)`, [
+                `GitHub PR created: ${owner}/${repo}#${result.prNumber}`,
+                projectId,
+                JSON.stringify({
+                    prNumber: result.prNumber,
+                    prUrl: result.prUrl,
+                    head,
+                    base,
+                    taskId,
+                    taskLinkId: result.taskLinkId
+                })
+            ]);
+            res.status(201).json({
+                success: true,
+                data: {
+                    prNumber: result.prNumber,
+                    prUrl: result.prUrl,
+                    taskLinkId: result.taskLinkId,
+                    taskId,
+                    owner,
+                    repo,
+                    head,
+                    base,
+                    createdAt: new Date().toISOString()
+                },
+                message: 'Pull request created successfully'
+            });
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[GitHub] Create PR error:', errorMessage);
+            res.status(500).json({
+                success: false,
+                error: {
+                    code: 'INTERNAL_ERROR',
+                    message: 'Failed to create pull request',
+                    details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+                }
             });
         }
     }
@@ -6220,4 +6989,3 @@ class SolariaDashboardServer {
 const server = new SolariaDashboardServer();
 server.start();
 exports.default = SolariaDashboardServer;
-//# sourceMappingURL=server.js.map

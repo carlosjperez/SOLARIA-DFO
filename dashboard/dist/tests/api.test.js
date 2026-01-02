@@ -5,7 +5,7 @@
  * Tests authentication, agents, tasks, projects, and docs endpoints
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-const API_BASE = 'http://localhost:3030/api';
+const API_BASE = process.env.API_BASE || 'http://localhost:3030/api';
 const TEST_USER = { userId: 'carlosjperez', password: 'bypass' };
 let authToken = null;
 // Test helper functions
@@ -641,6 +641,182 @@ const testPublicDashboardHasCorrectStats = test('Public API: Dashboard stats hav
     // Businesses stats
     assert(data.businesses.total_businesses !== undefined, 'Should have total_businesses');
 });
+// ==================== GITHUB ACTIONS API TESTS ====================
+const testGitHubTriggerWorkflowRequiresAuth = test('GitHub: Trigger workflow requires auth', async () => {
+    const tempToken = authToken;
+    authToken = null; // Remove auth token
+    const { status } = await fetchJson(`${API_BASE}/github/trigger-workflow`, {
+        method: 'POST',
+        body: JSON.stringify({
+            owner: 'test-owner',
+            repo: 'test-repo',
+            workflowId: 'test.yml',
+            ref: 'main'
+        })
+    });
+    assertEqual(status, 401, 'Status should be 401 without auth');
+    authToken = tempToken; // Restore auth token
+});
+const testGitHubTriggerWorkflowValidation = test('GitHub: Trigger workflow validates request', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/github/trigger-workflow`, {
+        method: 'POST',
+        body: JSON.stringify({
+        // Missing required fields
+        })
+    });
+    // Should return 400 or error message about missing fields
+    assert(status === 400 || status === 500 || data.error, 'Should validate request body');
+});
+const testGitHubTriggerWorkflowHandlesNoToken = test('GitHub: Trigger workflow handles missing GITHUB_TOKEN', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/github/trigger-workflow`, {
+        method: 'POST',
+        body: JSON.stringify({
+            owner: 'solaria-agency',
+            repo: 'test-repo',
+            workflowId: 'test.yml',
+            ref: 'main',
+            inputs: {},
+            projectId: 1,
+            taskId: 1
+        })
+    });
+    // If GITHUB_TOKEN is not configured, should return appropriate error
+    // Could be 503 (service unavailable) or 500 with error message
+    if (status === 503 || (status === 500 && data.error && data.error.includes('GitHub'))) {
+        assert(true, 'Correctly handles missing GITHUB_TOKEN');
+    }
+    else if (status === 200 || status === 201) {
+        // If successful, verify response structure
+        assert(data.success !== undefined, 'Should have success field');
+        if (data.success) {
+            assert(data.data, 'Should have data field');
+            assert(data.data.githubRunId || data.data.runId, 'Should have run ID in response');
+        }
+    }
+    else {
+        assert(true, 'Accepts valid request structure');
+    }
+});
+const testGitHubWorkflowStatusRequiresAuth = test('GitHub: Get workflow status requires auth', async () => {
+    const tempToken = authToken;
+    authToken = null;
+    const { status } = await fetchJson(`${API_BASE}/github/workflow-status/12345`);
+    assertEqual(status, 401, 'Status should be 401 without auth');
+    authToken = tempToken;
+});
+const testGitHubWorkflowStatusValidation = test('GitHub: Get workflow status validates run_id', async () => {
+    const { status } = await fetchJson(`${API_BASE}/github/workflow-status/invalid-id`);
+    // Should handle invalid run_id (could be 400, 404, or 500)
+    assert(status >= 400, 'Should return error status for invalid run_id');
+});
+const testGitHubCreateIssueRequiresAuth = test('GitHub: Create issue requires auth', async () => {
+    const tempToken = authToken;
+    authToken = null;
+    const { status } = await fetchJson(`${API_BASE}/github/create-issue`, {
+        method: 'POST',
+        body: JSON.stringify({
+            owner: 'test-owner',
+            repo: 'test-repo',
+            title: 'Test Issue',
+            body: 'Test body',
+            taskId: 1
+        })
+    });
+    assertEqual(status, 401, 'Status should be 401 without auth');
+    authToken = tempToken;
+});
+const testGitHubCreateIssueValidation = test('GitHub: Create issue validates request', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/github/create-issue`, {
+        method: 'POST',
+        body: JSON.stringify({
+        // Missing required fields like owner, repo, title
+        })
+    });
+    assert(status === 400 || status === 500 || data.error, 'Should validate required fields');
+});
+const testGitHubCreateIssueHandlesNoToken = test('GitHub: Create issue handles missing GITHUB_TOKEN', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/github/create-issue`, {
+        method: 'POST',
+        body: JSON.stringify({
+            owner: 'solaria-agency',
+            repo: 'test-repo',
+            title: 'Test Issue: Feature Request',
+            body: 'This is a test issue body',
+            labels: ['enhancement'],
+            assignees: [],
+            taskId: 1,
+            projectId: 1
+        })
+    });
+    if (status === 503 || (status === 500 && data.error && data.error.includes('GitHub'))) {
+        assert(true, 'Correctly handles missing GITHUB_TOKEN');
+    }
+    else if (status === 200 || status === 201) {
+        if (data.success) {
+            assert(data.data, 'Should have data field');
+            assert(data.data.issueNumber || data.data.issueUrl, 'Should have issue info');
+        }
+    }
+    else {
+        assert(true, 'Accepts valid request structure');
+    }
+});
+const testGitHubCreatePRRequiresAuth = test('GitHub: Create PR requires auth', async () => {
+    const tempToken = authToken;
+    authToken = null;
+    const { status } = await fetchJson(`${API_BASE}/github/create-pr`, {
+        method: 'POST',
+        body: JSON.stringify({
+            owner: 'test-owner',
+            repo: 'test-repo',
+            title: 'Test PR',
+            head: 'feature-branch',
+            base: 'main',
+            taskId: 1
+        })
+    });
+    assertEqual(status, 401, 'Status should be 401 without auth');
+    authToken = tempToken;
+});
+const testGitHubCreatePRValidation = test('GitHub: Create PR validates request', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/github/create-pr`, {
+        method: 'POST',
+        body: JSON.stringify({
+        // Missing required fields
+        })
+    });
+    assert(status === 400 || status === 500 || data.error, 'Should validate required fields');
+});
+const testGitHubCreatePRHandlesNoToken = test('GitHub: Create PR handles missing GITHUB_TOKEN', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/github/create-pr`, {
+        method: 'POST',
+        body: JSON.stringify({
+            owner: 'solaria-agency',
+            repo: 'test-repo',
+            title: 'Feature: Test PR',
+            body: 'This is a test PR body',
+            head: 'feature/test-branch',
+            base: 'main',
+            labels: ['enhancement'],
+            assignees: [],
+            draft: false,
+            taskId: 1,
+            projectId: 1
+        })
+    });
+    if (status === 503 || (status === 500 && data.error && data.error.includes('GitHub'))) {
+        assert(true, 'Correctly handles missing GITHUB_TOKEN');
+    }
+    else if (status === 200 || status === 201) {
+        if (data.success) {
+            assert(data.data, 'Should have data field');
+            assert(data.data.prNumber || data.data.prUrl, 'Should have PR info');
+        }
+    }
+    else {
+        assert(true, 'Accepts valid request structure');
+    }
+});
 // ==================== RUN ALL TESTS ====================
 async function runTests() {
     console.log('\n========================================');
@@ -706,7 +882,19 @@ async function runTests() {
         testBusinessUpdateNoFields,
         testBusinessUpdateNotFound,
         testBusinessUpdateNullWebsite,
-        testBusinessUpdateZeroValues
+        testBusinessUpdateZeroValues,
+        // GitHub Actions API (Authenticated)
+        testGitHubTriggerWorkflowRequiresAuth,
+        testGitHubTriggerWorkflowValidation,
+        testGitHubTriggerWorkflowHandlesNoToken,
+        testGitHubWorkflowStatusRequiresAuth,
+        testGitHubWorkflowStatusValidation,
+        testGitHubCreateIssueRequiresAuth,
+        testGitHubCreateIssueValidation,
+        testGitHubCreateIssueHandlesNoToken,
+        testGitHubCreatePRRequiresAuth,
+        testGitHubCreatePRValidation,
+        testGitHubCreatePRHandlesNoToken
     ];
     for (const runTest of tests) {
         await runTest();

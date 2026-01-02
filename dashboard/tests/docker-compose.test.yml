@@ -1,0 +1,106 @@
+# SOLARIA DFO - Containerized Integration Tests
+# Runs API integration tests against isolated test environment
+
+version: '3.8'
+
+services:
+  # Test database (ephemeral)
+  test-db:
+    image: mariadb:11.4
+    container_name: dfo-test-db
+    environment:
+      MYSQL_ROOT_PASSWORD: test_root_pass
+      MYSQL_DATABASE: solaria_test
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_pass
+    tmpfs:
+      - /var/lib/mysql  # In-memory database for speed
+    volumes:
+      - ../../infrastructure/database/mysql-init-test.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ../../infrastructure/database/test-data-fixes.sql:/docker-entrypoint-initdb.d/02-fixes.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Test Redis (ephemeral)
+  test-redis:
+    image: redis:7-alpine
+    container_name: dfo-test-redis
+    tmpfs:
+      - /data  # In-memory cache
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 3
+    networks:
+      - test-network
+
+  # Dashboard server (test mode)
+  test-server:
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile.test
+    container_name: dfo-test-server
+    environment:
+      - NODE_ENV=test
+      - DB_HOST=test-db
+      - DB_PORT=3306
+      - DB_USER=test_user
+      - DB_PASSWORD=test_pass
+      - DB_NAME=solaria_test
+      - REDIS_URL=redis://test-redis:6379
+      - JWT_SECRET=test_jwt_secret_32_chars_minimum
+      - PORT=3030
+      - ALLOW_DEFAULT_TOKEN=true
+    ports:
+      - "13030:3030"  # Expose on non-standard port to avoid conflicts
+    depends_on:
+      test-db:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3030/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - ../server.ts:/app/server.ts:ro
+      - ../services:/app/services:ro
+      - ../db:/app/db:ro
+      - ../config:/app/config:ro
+      - ../workers:/app/workers:ro
+    networks:
+      - test-network
+
+  # Test runner (runs integration tests)
+  test-runner:
+    build:
+      context: ..
+      dockerfile: tests/Dockerfile.test-runner
+    container_name: dfo-test-runner
+    environment:
+      - API_BASE=http://test-server:3030/api
+      - TEST_TIMEOUT=30000
+    depends_on:
+      test-server:
+        condition: service_healthy
+    volumes:
+      - .:/tests:ro
+      - ./results:/results  # Output test results here
+    command: node /tests/api.test.js
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  test-results:

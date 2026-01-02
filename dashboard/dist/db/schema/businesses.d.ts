@@ -79,7 +79,7 @@ export declare const businesses: import("drizzle-orm/mysql-core").MySqlTableWith
             tableName: "businesses";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "active" | "planning" | "inactive" | "paused";
+            data: "planning" | "active" | "inactive" | "paused";
             driverParam: string;
             notNull: false;
             hasDefault: true;

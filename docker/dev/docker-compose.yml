@@ -1,0 +1,179 @@
+# SOLARIA Digital Field Operations - Development Environment
+# Version: 4.0.0 - Professional Dev/Prod Separation
+#
+# Features:
+# - Hot-reload enabled (tsx watch, nodemon)
+# - All dependencies installed (including devDependencies)
+# - Source code mounted as volumes for instant changes
+# - NODE_ENV=development
+# - Verbose logging
+
+services:
+  # ============================================================================
+  # OFFICE: Dashboard + MariaDB (Development with hot-reload)
+  # ============================================================================
+  office:
+    container_name: solaria-dfo-office-dev
+    build:
+      context: ../..
+      dockerfile: docker/dev/Dockerfile.office
+    ports:
+      - "4030:3030"       # Dashboard HTTP
+      - "44060:3306"      # MariaDB (external access)
+    environment:
+      # Database credentials (simple for dev)
+      - DB_PASSWORD=solaria2024
+      - MYSQL_ROOT_PASSWORD=SolariaRoot2024
+      - DB_NAME=solaria_construction
+      - DB_USER=solaria_user
+      # Application
+      - JWT_SECRET=solaria_jwt_secret_dev_not_for_production
+      - PORT=3030
+      - NODE_ENV=development
+      # Redis for caching
+      - REDIS_URL=redis://redis:6379
+      # Project ingestion
+      - REPO_PATH=/repo
+      - CI_MODE=false
+    volumes:
+      # HOT-RELOAD: Mount source code as volume
+      - ../../dashboard:/app:delegated
+      # Preserve node_modules installed in container (don't overwrite with host)
+      - office_node_modules:/app/node_modules
+      - office_mysql_data:/var/lib/mysql
+      - ../../logs:/app/logs
+      # Mount repo for ingestion (optional)
+      - ${REPO_PATH:-/tmp}:/repo:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3030/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # REDIS: Cache and Queue
+  # ============================================================================
+  redis:
+    container_name: solaria-dfo-redis-dev
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # WORKER: Background Jobs + Embeddings (Development with hot-reload)
+  # ============================================================================
+  worker:
+    container_name: solaria-dfo-worker-dev
+    build:
+      context: ../..
+      dockerfile: docker/dev/Dockerfile.worker
+    ports:
+      - "4032:3032"       # Embedding HTTP API
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DASHBOARD_URL=http://office:3030
+      - DB_HOST=office
+      - DB_PORT=3306
+      - DB_USER=solaria_user
+      - DB_PASSWORD=solaria2024
+      - DB_NAME=solaria_construction
+      - EMBEDDING_HTTP_PORT=3032
+      - NODE_ENV=development
+    volumes:
+      # HOT-RELOAD: Mount source code as volume
+      - ../../workers:/app:delegated
+      # Preserve node_modules installed in container
+      - worker_node_modules:/app/node_modules
+      - worker_models:/app/models
+      - worker_cache:/app/.cache
+    depends_on:
+      office:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3032/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # MCP: Model Context Protocol HTTP Server (Development with hot-reload)
+  # ============================================================================
+  mcp:
+    container_name: solaria-dfo-mcp-dev
+    build:
+      context: ../..
+      dockerfile: docker/dev/Dockerfile.mcp
+    ports:
+      - "4031:3031"
+    environment:
+      - MCP_PORT=3031
+      - DASHBOARD_API_URL=http://office:3030/api
+      - DASHBOARD_USER=carlosjperez
+      - DASHBOARD_PASS=bypass
+      - JWT_SECRET=solaria_jwt_secret_dev_not_for_production
+      - NODE_ENV=development
+      - ALLOW_DEFAULT_TOKEN=true
+    volumes:
+      # HOT-RELOAD: Mount source code as volume
+      - ../../mcp-server:/app:delegated
+      # Preserve node_modules installed in container
+      - mcp_node_modules:/app/node_modules
+    depends_on:
+      office:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3031/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - solaria-network
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+volumes:
+  office_node_modules:
+    driver: local
+  mcp_node_modules:
+    driver: local
+  worker_node_modules:
+    driver: local
+  office_mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  worker_models:
+    driver: local
+  worker_cache:
+    driver: local
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+networks:
+  solaria-network:
+    driver: bridge

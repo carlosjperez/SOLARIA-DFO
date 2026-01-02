@@ -66,6 +66,183 @@ async function connectToDatabase() {
     }
     throw new Error('Database connection failed');
 }
+/**
+ * Load enabled MCP server configurations for a specific agent
+ *
+ * Queries agent_mcp_configs table to retrieve all active external MCP server
+ * configurations that this agent should connect to. Only returns enabled configs.
+ *
+ * @param agentId - Agent ID to load configurations for
+ * @returns Array of MCP configuration objects
+ *
+ * @example
+ * const configs = await loadAgentMCPConfigs(11);
+ * // Returns: [{ server_name: 'context7', server_url: 'https://...', ... }]
+ */
+async function loadAgentMCPConfigs(agentId) {
+    const startTime = Date.now();
+    try {
+        console.log(`[agentWorker] Loading MCP configs for agent ${agentId}...`);
+        const [rows] = await db.execute(`SELECT
+                id,
+                agent_id,
+                server_name,
+                server_url,
+                auth_type,
+                auth_credentials,
+                enabled,
+                transport_type,
+                config_options,
+                last_connected_at,
+                connection_status,
+                last_error,
+                created_at,
+                updated_at
+             FROM agent_mcp_configs
+             WHERE agent_id = ? AND enabled = 1
+             ORDER BY server_name ASC`, [agentId]);
+        const configs = rows;
+        const queryTime = Date.now() - startTime;
+        console.log(`[agentWorker] ✓ Loaded ${configs.length} enabled MCP config(s) in ${queryTime}ms`);
+        if (configs.length === 0) {
+            console.log(`[agentWorker] ℹ No enabled MCP configs found for agent ${agentId} - agent will use local tools only`);
+        }
+        return configs;
+    }
+    catch (error) {
+        const queryTime = Date.now() - startTime;
+        console.error(`[agentWorker] ✗ Failed to load MCP configs for agent ${agentId} after ${queryTime}ms`);
+        console.error(`[agentWorker]   Error: ${error.message}`);
+        if (error.code) {
+            console.error(`[agentWorker]   Code: ${error.code}`);
+        }
+        if (error.stack) {
+            console.error(`[agentWorker]   Stack: ${error.stack.split('\n').slice(0, 3).join('\n')}`);
+        }
+        // Fail-safe: Return empty array - agent can still execute with local tools only
+        console.warn(`[agentWorker] ⚠ Continuing with local tools only (external MCP servers unavailable)`);
+        return [];
+    }
+}
+/**
+ * Connect to external MCP servers and discover available tools
+ *
+ * Establishes connections to all configured external MCP servers and performs
+ * tool discovery. Uses connection pooling (reuses existing connections) and
+ * implements fail-soft error handling (failures on individual servers don't
+ * block execution).
+ *
+ * @param configs - Array of MCP configurations to connect to
+ * @returns Object containing connected server names and discovered tools map
+ *
+ * @example
+ * const { connectedServers, availableTools } = await connectExternalServers(configs);
+ * // connectedServers: ['context7', 'playwright']
+ * // availableTools: Map { 'context7' => [...tools], 'playwright' => [...tools] }
+ */
+async function connectExternalServers(configs) {
+    const connectedServers = [];
+    const availableTools = new Map();
+    if (configs.length === 0) {
+        console.log('[agentWorker] No MCP configs provided, skipping external server connections');
+        return { connectedServers, availableTools };
+    }
+    console.log(`[agentWorker] Connecting to ${configs.length} external MCP server(s)...`);
+    const manager = (0, mcp_client_manager_js_1.getMCPClientManager)();
+    const connectionStartTime = Date.now();
+    for (const config of configs) {
+        try {
+            console.log(`[agentWorker]   → ${config.server_name}...`);
+            // Check if already connected (connection pooling)
+            if (manager.isConnected(config.server_name)) {
+                console.log(`[agentWorker]     ✓ Already connected (reusing connection)`);
+            }
+            else {
+                // Parse auth config
+                let authConfig = { type: 'none' };
+                if (config.auth_type !== 'none' && config.auth_credentials) {
+                    if (config.auth_type === 'bearer') {
+                        authConfig = {
+                            type: 'bearer',
+                            token: config.auth_credentials.token || '',
+                        };
+                    }
+                    else if (config.auth_type === 'api_key') {
+                        authConfig = {
+                            type: 'api-key',
+                            key: config.auth_credentials.key || '',
+                            header: config.auth_credentials.header || 'X-API-Key',
+                        };
+                    }
+                    else if (config.auth_type === 'basic') {
+                        authConfig = {
+                            type: 'basic',
+                            username: config.auth_credentials.username || '',
+                            password: config.auth_credentials.password || '',
+                        };
+                    }
+                }
+                // Connect to MCP server
+                await manager.connect({
+                    name: config.server_name,
+                    transport: {
+                        type: config.transport_type,
+                        url: config.server_url,
+                    },
+                    auth: authConfig,
+                    healthCheck: {
+                        enabled: true,
+                        interval: 60000,
+                        timeout: 10000,
+                    },
+                    retry: {
+                        maxAttempts: 3,
+                        backoffMs: 2000,
+                    },
+                });
+                console.log(`[agentWorker]     ✓ Connected successfully`);
+            }
+            // Discover available tools
+            const tools = await manager.listTools(config.server_name);
+            availableTools.set(config.server_name, tools);
+            connectedServers.push(config.server_name);
+            console.log(`[agentWorker]     📋 Discovered ${tools.length} tool(s)`);
+        }
+        catch (error) {
+            console.error(`[agentWorker]     ✗ Connection failed: ${error.message}`);
+            // Enhanced error logging
+            if (error.code) {
+                console.error(`[agentWorker]       Code: ${error.code}`);
+            }
+            console.error(`[agentWorker]       URL: ${config.server_url}`);
+            console.error(`[agentWorker]       Transport: ${config.transport_type}`);
+            console.error(`[agentWorker]       Auth: ${config.auth_type}`);
+            if (error.stack) {
+                console.error(`[agentWorker]       Stack: ${error.stack.split('\n').slice(0, 2).join('\n')}`);
+            }
+            // Continue with other servers (fail-soft approach - don't throw)
+        }
+    }
+    const connectionTime = Date.now() - connectionStartTime;
+    const totalTools = Array.from(availableTools.values()).reduce((sum, tools) => sum + tools.length, 0);
+    const successRate = configs.length > 0 ? Math.round((connectedServers.length / configs.length) * 100) : 0;
+    const avgToolsPerServer = connectedServers.length > 0 ? Math.round(totalTools / connectedServers.length) : 0;
+    // Summary logging with metrics
+    console.log(`[agentWorker] ✓ MCP Connection Summary: ${connectedServers.length}/${configs.length} servers (${successRate}% success), ${totalTools} tools discovered, ${connectionTime}ms`);
+    if (connectedServers.length > 0) {
+        console.log(`[agentWorker]   Average: ${avgToolsPerServer} tools/server`);
+    }
+    // Critical: All servers failed
+    if (configs.length > 0 && connectedServers.length === 0) {
+        console.error(`[agentWorker] ✗ CRITICAL: All ${configs.length} MCP server(s) failed to connect - agent will have NO external tools`);
+    }
+    // Warning: Some servers failed
+    else if (connectedServers.length < configs.length) {
+        const failedCount = configs.length - connectedServers.length;
+        console.warn(`[agentWorker] ⚠ ${failedCount} MCP server(s) failed to connect (${successRate}% success rate)`);
+    }
+    return { connectedServers, availableTools };
+}
 // ============================================================================
 // Context Loading
 // ============================================================================
@@ -207,6 +384,8 @@ async function loadTaskContext(jobData) {
 async function processAgentJob(job) {
     const startTime = Date.now();
     const { taskId, taskCode, agentId, agentName, projectId, mcpConfigs, metadata } = job.data;
+    // Declare connectedServers outside try block for cleanup access in finally
+    let connectedServers = [];
     console.log(`[agentWorker] =========================================`);
     console.log(`[agentWorker] Processing job ${job.id}`);
     console.log(`[agentWorker] Task: ${taskCode} - Agent: ${agentName}`);
@@ -264,138 +443,155 @@ async function processAgentJob(job) {
         // Phase 3: MCP Server Connection (30-40%)
         // ========================================================================
         console.log(`[agentWorker] [3/5] Connecting to MCP servers...`);
-        const connectedServers = [];
-        const availableTools = new Map();
-        if (mcpConfigs && mcpConfigs.length > 0) {
-            console.log(`[agentWorker] Configured MCP servers: ${mcpConfigs.length}`);
-            const enabledConfigs = mcpConfigs.filter(config => config.enabled);
-            console.log(`[agentWorker] Enabled servers: ${enabledConfigs.length}`);
-            if (enabledConfigs.length > 0) {
-                const manager = (0, mcp_client_manager_js_1.getMCPClientManager)();
-                for (const config of enabledConfigs) {
-                    try {
-                        console.log(`[agentWorker] Connecting to ${config.serverName}...`);
-                        // Check if already connected
-                        if (manager.isConnected(config.serverName)) {
-                            console.log(`[agentWorker]   ✓ Already connected to ${config.serverName}`);
-                        }
-                        else {
-                            // Connect to MCP server
-                            // Note: AgentMCPConfig doesn't have transportType, defaulting to 'http'
-                            const transportType = 'http';
-                            await manager.connect({
-                                name: config.serverName,
-                                transport: {
-                                    type: transportType,
-                                    url: config.serverUrl,
-                                },
-                                auth: config.authType === 'none'
-                                    ? { type: 'none' }
-                                    : config.authType === 'bearer'
-                                        ? { type: 'bearer', ...(config.authCredentials || {}) }
-                                        : { type: 'api-key', ...(config.authCredentials || {}) },
-                                healthCheck: {
-                                    enabled: true,
-                                    interval: 60000,
-                                    timeout: 10000,
-                                },
-                                retry: {
-                                    maxAttempts: 3,
-                                    backoffMs: 2000,
-                                },
-                            });
-                            console.log(`[agentWorker]   ✓ Connected to ${config.serverName}`);
-                        }
-                        // Discover available tools
-                        const tools = manager.listTools(config.serverName);
-                        availableTools.set(config.serverName, tools);
-                        connectedServers.push(config.serverName);
-                        console.log(`[agentWorker]   📋 Discovered ${tools.length} tools on ${config.serverName}`);
-                        tools.forEach((tool, i) => {
-                            if (i < 3) { // Show first 3 tools
-                                console.log(`[agentWorker]      - ${tool.name}`);
-                            }
-                        });
-                        if (tools.length > 3) {
-                            console.log(`[agentWorker]      ... and ${tools.length - 3} more`);
-                        }
-                    }
-                    catch (error) {
-                        console.error(`[agentWorker]   ✗ Failed to connect to ${config.serverName}:`, error.message);
-                        // Continue with other servers even if one fails
-                    }
-                }
-                console.log(`[agentWorker] ✓ Connected to ${connectedServers.length}/${enabledConfigs.length} servers`);
-            }
-            else {
-                console.log(`[agentWorker] No enabled MCP servers`);
-            }
-        }
-        else {
-            console.log(`[agentWorker] No external MCP servers configured`);
-        }
+        // Load MCP configs from database (DFO-197: DB-driven config)
+        const mcpConfigs = await loadAgentMCPConfigs(job.data.agentId);
+        // Connect to external servers and discover tools (DFO-197: Refactored)
+        const connectionResult = await connectExternalServers(mcpConfigs);
+        connectedServers = connectionResult.connectedServers; // Update outer scope variable for cleanup in finally
+        const availableTools = connectionResult.availableTools;
         await job.updateProgress(40);
         // ========================================================================
         // Phase 4: Agent Execution (40-90%)
         // ========================================================================
         console.log(`[agentWorker] [4/5] Executing agent...`);
-        // Prepare external tools summary for agent context
-        const externalToolsSummary = {};
-        let totalExternalTools = 0;
-        if (connectedServers.length > 0) {
-            console.log(`[agentWorker] External MCP tools available:`);
-            for (const serverName of connectedServers) {
-                const tools = availableTools.get(serverName) || [];
-                externalToolsSummary[serverName] = tools.map(t => t.name);
-                totalExternalTools += tools.length;
-                console.log(`[agentWorker]   ${serverName}: ${tools.length} tools`);
-                tools.slice(0, 5).forEach(tool => {
+        const externalToolsSummary = {
+            servers: Array.from(availableTools.entries()).map(([serverName, tools]) => ({
+                name: serverName,
+                connected: true,
+                tools_count: tools.length,
+                tools: tools.map((tool) => ({
+                    name: tool.name,
+                    description: tool.description,
+                    usage: `Use proxy_external_tool with server_name="${serverName}", tool_name="${tool.name}"`,
+                })),
+            })),
+            total_servers: connectedServers.length,
+            total_tools: Array.from(availableTools.values()).reduce((sum, tools) => sum + tools.length, 0),
+        };
+        if (externalToolsSummary.total_tools > 0) {
+            console.log(`[agentWorker] ✓ External tools summary generated:`);
+            console.log(`[agentWorker]   Servers: ${externalToolsSummary.total_servers}`);
+            console.log(`[agentWorker]   Total tools: ${externalToolsSummary.total_tools}`);
+            externalToolsSummary.servers.forEach((server) => {
+                console.log(`[agentWorker]   ${server.name}: ${server.tools_count} tools`);
+                server.tools.slice(0, 3).forEach((tool) => {
                     console.log(`[agentWorker]      - ${tool.name}: ${tool.description || 'No description'}`);
                 });
-                if (tools.length > 5) {
-                    console.log(`[agentWorker]      ... and ${tools.length - 5} more`);
+                if (server.tools.length > 3) {
+                    console.log(`[agentWorker]      ... and ${server.tools.length - 3} more`);
                 }
-            }
+            });
         }
-        // TODO: Implement actual agent execution
-        // This is a placeholder for now. Real implementation will:
-        // 1. Prepare agent prompt with context
-        // 2. Inject external MCP tools (now available in externalToolsSummary)
-        // 3. Stream agent execution
-        // 4. Update task_items as they complete
-        // 5. Capture agent output and logs
+        // ========================================================================
+        // DFO-197: Build Agent Execution Context with External Tools
+        // ========================================================================
+        const agentContext = {
+            task: {
+                id: task.id,
+                title: task.title,
+                description: task.description,
+                priority: task.priority,
+                status: task.status,
+            },
+            project: {
+                id: context.project_id,
+                name: context.project_name,
+            },
+            items_pending: itemsPending.map((item) => ({
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                estimated_minutes: item.estimated_minutes,
+            })),
+            dependencies: context.dependencies,
+            related_tasks: context.related_tasks,
+            memories: context.memories,
+            external_tools: externalToolsSummary,
+        };
+        // ========================================================================
+        // Agent Prompt with External Tools Injection (DFO-197)
+        // ========================================================================
+        const agentPrompt = `
+You are SOLARIA Agent ${job.data.agentId} executing task #${taskId}.
+
+## Task Details
+**Title:** ${task.title}
+**Description:** ${task.description || 'No description provided'}
+**Priority:** ${task.priority}
+**Status:** ${task.status}
+
+## Pending Subtasks (${itemsPending.length})
+${itemsPending
+            .map((item, index) => `
+${index + 1}. ${item.title}
+   ${item.description ? `Description: ${item.description}` : ''}
+   ${item.estimated_minutes ? `Estimated: ${item.estimated_minutes} minutes` : ''}
+`)
+            .join('\n')}
+
+${externalToolsSummary.total_tools > 0
+            ? `
+## External MCP Tools Available (${externalToolsSummary.total_tools} tools from ${externalToolsSummary.total_servers} servers)
+
+You have access to external tools from the following MCP servers:
+
+${externalToolsSummary.servers
+                .map((server) => `
+### ${server.name} (${server.tools_count} tools)
+${server.tools
+                .map((tool) => `- **${tool.name}**: ${tool.description || 'No description'}
+  Usage: ${tool.usage}
+  Example:
+  \`\`\`
+  proxy_external_tool({
+    server_name: "${server.name}",
+    tool_name: "${tool.name}",
+    params: { /* tool-specific parameters */ },
+    format: "human"
+  })
+  \`\`\`
+`)
+                .join('\n')}
+`)
+                .join('\n')}
+
+## How to Use External Tools
+Call the DFO tool "proxy_external_tool" with:
+- **server_name**: The server name (e.g., "context7", "playwright", "coderabbit")
+- **tool_name**: The specific tool name from the list above
+- **params**: Parameters for that tool (see tool documentation)
+- **format**: "json" or "human" (human recommended for readability)
+
+These external tools extend your capabilities beyond DFO's built-in tools.
+`
+            : '## No External Tools Available\nYou are working with DFO built-in tools only.'}
+
+## Your Mission
+Execute the pending subtasks listed above. Use external tools when they can help accomplish the work more efficiently.
+
+Report progress as you complete each subtask.
+`.trim();
+        // ========================================================================
+        // Agent Execution (Placeholder - Real implementation pending)
+        // ========================================================================
         const output = [];
-        output.push(`Task: ${task.title}`);
-        output.push(`Description: ${task.description || 'No description'}`);
-        output.push(`Items to complete: ${itemsPending.length}`);
+        output.push(`✓ Agent context prepared with ${externalToolsSummary.total_tools} external tools`);
         output.push('');
-        if (totalExternalTools > 0) {
-            output.push(`✓ MCP Integration Active:`);
-            output.push(`  Connected servers: ${connectedServers.join(', ')}`);
-            output.push(`  Total external tools: ${totalExternalTools}`);
-            output.push('');
-            output.push('External tools available for agent execution:');
-            for (const [serverName, toolNames] of Object.entries(externalToolsSummary)) {
-                output.push(`  ${serverName}:`);
-                toolNames.slice(0, 3).forEach(name => output.push(`    - ${name}`));
-                if (toolNames.length > 3) {
-                    output.push(`    ... and ${toolNames.length - 3} more`);
-                }
-            }
-            output.push('');
-        }
         output.push('--- Agent Execution Placeholder ---');
         output.push('Real agent execution will be implemented in future phase.');
-        output.push('For now, this worker validates context and prepares execution environment.');
-        output.push('MCP client integration is ready - external tools can be injected when agent execution is implemented.');
+        output.push('Context is fully prepared with external tools injection.');
+        output.push('');
+        output.push('Agent Prompt Preview (first 500 chars):');
+        output.push(agentPrompt.substring(0, 500) + '...');
         // Simulate progress updates
         for (let progress = 40; progress <= 90; progress += 10) {
             await job.updateProgress(progress);
-            await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
+            await new Promise((resolve) => setTimeout(resolve, 100));
         }
-        console.log(`[agentWorker] ✓ Agent execution completed (placeholder)`);
-        if (totalExternalTools > 0) {
-            console.log(`[agentWorker] ℹ External tools ready for injection: ${totalExternalTools} tools from ${connectedServers.length} servers`);
+        console.log(`[agentWorker] ✓ Agent context built with external tools`);
+        console.log(`[agentWorker] ℹ Agent prompt length: ${agentPrompt.length} characters`);
+        if (externalToolsSummary.total_tools > 0) {
+            console.log(`[agentWorker] ℹ External tools injected: ${externalToolsSummary.total_tools} from ${externalToolsSummary.total_servers} servers`);
         }
         await job.updateProgress(90);
         // ========================================================================
@@ -467,6 +663,39 @@ async function processAgentJob(job) {
             taskStatus: 'blocked',
         };
         return result;
+    }
+    finally {
+        // ========================================================================
+        // DFO-197: Cleanup MCP Connections (MANDATORY)
+        // ========================================================================
+        console.log('[agentWorker] Cleaning up MCP connections...');
+        // Check if connectedServers was defined (may be undefined if job failed early)
+        if (typeof connectedServers !== 'undefined' && connectedServers.length > 0) {
+            const manager = (0, mcp_client_manager_js_1.getMCPClientManager)();
+            let disconnectedCount = 0;
+            let errorCount = 0;
+            for (const serverName of connectedServers) {
+                try {
+                    console.log(`[agentWorker]   → Disconnecting ${serverName}...`);
+                    await manager.disconnect(serverName);
+                    disconnectedCount++;
+                    console.log(`[agentWorker]     ✓ Disconnected`);
+                }
+                catch (error) {
+                    errorCount++;
+                    console.warn(`[agentWorker]     ⚠ Failed to disconnect ${serverName}: ${error.message}`);
+                    // Best-effort: continue with other servers (don't throw)
+                }
+            }
+            const successRate = Math.round((disconnectedCount / connectedServers.length) * 100);
+            console.log(`[agentWorker] ✓ Cleanup complete: ${disconnectedCount}/${connectedServers.length} servers disconnected (${successRate}% success rate)`);
+            if (errorCount > 0) {
+                console.warn(`[agentWorker] ⚠ ${errorCount} disconnect error(s) occurred (non-fatal)`);
+            }
+        }
+        else {
+            console.log('[agentWorker] No MCP connections to clean up');
+        }
     }
 }
 // ============================================================================

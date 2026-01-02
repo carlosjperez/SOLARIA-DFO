@@ -80,6 +80,10 @@ export const Interactive: Story = {
       </div>
     );
   },
+  args: {
+    value: 'grid',
+    onChange: fn(),
+  },
 };
 
 /**
@@ -134,6 +138,10 @@ export const InContext: Story = {
         </div>
       </div>
     );
+  },
+  args: {
+    value: 'grid',
+    onChange: fn(),
   },
   parameters: {
     layout: 'padded',
@@ -201,4 +209,8 @@ export const BothStates: Story = {
       </div>
     </div>
   ),
+  args: {
+    value: 'grid',
+    onChange: fn(),
+  },
 };

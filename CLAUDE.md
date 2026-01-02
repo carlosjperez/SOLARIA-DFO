@@ -1,7 +1,7 @@
 # SOLARIA Digital Field Operations - Manual de Operación
 
-**Versión:** 3.5.1
-**Última actualización:** 2025-12-27
+**Versión:** 4.0.0
+**Última actualización:** 2026-01-01
 
 ---
 
@@ -40,7 +40,7 @@ SOLARIA DFO es una **Oficina Digital de Construcción en Campo** centralizada qu
 
 ---
 
-## Arquitectura v3.5 (Centralizada Multi-Servicio)
+## Arquitectura v4.0 (Centralizada Multi-Servicio + Dev/Prod Separation)
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -377,6 +377,142 @@ Editar `~/.claude/claude_code_config.json`:
 - `get_agent_tasks` - Tareas asignadas a agente
 - `update_agent_status` - Cambiar estado (active/busy/inactive)
 
+#### Agent Execution (DFO 4.0 - Parallel Execution Engine)
+**Status:** ⚠️ Code Complete - Requiere Dashboard API
+
+**Nota Importante:** Las herramientas están implementadas pero requieren Dashboard API para funcionar en producción. Ver DFO-189-TESTING-RESULTS.md para detalles.
+
+- `queue_agent_job` - ⏳ **Cola tarea para ejecución automática por agente**
+  - Queue job en BullMQ con prioridad, retry y MCP configs
+  - Params: `task_id`, `agent_id`, `metadata` (priority, estimatedHours), `context` (dependencies, relatedTasks, memoryIds), `mcp_configs` (external MCP servers)
+  - Returns: job_id, status, queued timestamp
+  - **Requiere:** Dashboard API endpoint `POST /api/agent-execution/queue`
+
+- `get_agent_job_status` - 📊 **Estado de job en ejecución**
+  - Obtiene estado actual, progreso, intentos, errores
+  - Params: `job_id`, `format` (json|human)
+  - Returns: status (waiting|active|completed|failed|cancelled), progress %, timestamps, last_error
+  - **Requiere:** Dashboard API endpoint `GET /api/agent-execution/jobs/:id`
+
+- `cancel_agent_job` - 🚫 **Cancelar job en espera o activo**
+  - Cancela job y notifica worker si está en ejecución
+  - Params: `job_id`, `format` (json|human)
+  - Returns: confirmation, previous status, cancelled timestamp
+  - **Requiere:** Dashboard API endpoint `POST /api/agent-execution/jobs/:id/cancel`
+
+- `list_active_agent_jobs` - 📋 **Listar todos los jobs activos**
+  - Lista jobs con filtros por proyecto, status, agente
+  - Params: `project_id` (optional), `format` (json|human)
+  - Returns: jobs array, status counts, queue metrics
+  - **Requiere:** Dashboard API endpoint `GET /api/agent-execution/jobs`
+
+**Arquitectura:** Las herramientas usan Dashboard API (no DB directa) para:
+- Separación de concerns (MCP server standalone)
+- Autenticación/autorización centralizada
+- Integración con BullMQ worker pool
+- Ver: `/mcp-server/src/endpoints/agent-execution.ts`
+
+**Roadmap:**
+- ✅ DFO-189: MCP Tools implementadas (4 hours) - COMPLETADO
+- ⏳ DFO-190: Dashboard API endpoints (6 hours) - PENDIENTE
+- ⏳ DFO-191: Refactor MCP tools para usar API (2 hours) - PENDIENTE
+- ⏳ DFO-1005: BullMQ Worker implementation (10 hours) - PENDIENTE
+
+#### GitHub Actions Integration (DFO-3003)
+**Status:** ✅ Complete - Ready for Production
+
+Herramientas para automatizar workflows de GitHub Actions desde DFO. Integra ejecución de workflows, tracking de estado, y auto-creación de issues/PRs vinculados a tareas.
+
+- `github_trigger_workflow` - 🚀 **Disparar workflow de GitHub Actions desde tarea DFO**
+  - Ejecuta workflow mediante GitHub API con workflow_dispatch event
+  - Crea registro de ejecución y vincula con tarea DFO
+  - Soporta inputs personalizados y refs (branch/tag/sha)
+  - Params: `owner`, `repo`, `workflow_id`, `ref` (default: 'main'), `inputs` (optional), `project_id`, `task_id` (optional), `format` (json|human)
+  - Returns: workflow_name, run_number, github_run_id, status, run_url
+  - **Ejemplo:**
+    ```javascript
+    github_trigger_workflow({
+      owner: "solaria-agency",
+      repo: "dfo",
+      workflow_id: "deploy.yml",
+      ref: "main",
+      project_id: 99,
+      task_id: 545,
+      inputs: { environment: "production" }
+    })
+    ```
+
+- `github_get_workflow_status` - 📊 **Consultar estado de workflow run**
+  - Obtiene estado actual desde GitHub API
+  - Actualiza registros DFO con último status
+  - Incluye duración, conclusión, y URL del run
+  - Params: `owner`, `repo`, `github_run_id`, `format` (json|human)
+  - Returns: status (queued|in_progress|completed), conclusion (success|failure|cancelled|skipped), run_number, duration_seconds, started_at, completed_at, html_url
+  - **Ejemplo:**
+    ```javascript
+    github_get_workflow_status({
+      owner: "solaria-agency",
+      repo: "dfo",
+      github_run_id: 123456789
+    })
+    ```
+
+- `github_create_issue_from_task` - 🐛 **Auto-crear GitHub issue desde tarea DFO**
+  - Crea issue con título y descripción de la tarea
+  - Incluye metadata DFO (task code, project) en body
+  - Vincula issue con tarea para tracking bidireccional
+  - Soporta labels y assignees
+  - Params: `task_id`, `owner`, `repo`, `labels` (optional), `assignees` (optional), `format` (json|human)
+  - Returns: task_code, issue_number, issue_url, linked
+  - **Ejemplo:**
+    ```javascript
+    github_create_issue_from_task({
+      task_id: 545,
+      owner: "solaria-agency",
+      repo: "dfo",
+      labels: ["bug", "priority-high"],
+      assignees: ["carlosjperez"]
+    })
+    ```
+
+- `github_create_pr_from_task` - 🔀 **Auto-crear Pull Request desde tarea DFO**
+  - Crea PR con título y descripción de la tarea
+  - Genera checklist template en PR body
+  - Vincula PR con tarea para tracking
+  - Soporta draft PRs, labels, y assignees
+  - Params: `task_id`, `owner`, `repo`, `head_branch`, `base_branch` (default: 'main'), `labels` (optional), `assignees` (optional), `draft` (default: false), `format` (json|human)
+  - Returns: task_code, pr_number, pr_url, draft, linked
+  - **Ejemplo:**
+    ```javascript
+    github_create_pr_from_task({
+      task_id: 545,
+      owner: "solaria-agency",
+      repo: "dfo",
+      head_branch: "feature/github-actions",
+      base_branch: "main",
+      labels: ["enhancement"],
+      draft: true
+    })
+    ```
+
+**Configuración:**
+- Requiere `GITHUB_TOKEN` en variables de entorno
+- Token debe tener permisos: `repo`, `workflow`, `actions:read`, `actions:write`
+- Opcionalmente `GITHUB_API_URL` para GitHub Enterprise (default: https://api.github.com)
+
+**Implementación:**
+- Archivo: `/mcp-server/src/endpoints/github-actions.ts` (521 líneas)
+- Service: `/dashboard/services/githubActionsService.ts`
+- Tests: `/mcp-server/src/__tests__/github-actions.test.ts` (15 tests, 100% pass)
+- Handlers: Registrado en `/mcp-server/handlers.ts` (líneas 1446-1516)
+
+**Status DFO-3003:**
+- ✅ Implementar GitHubActionsService (8 hours) - COMPLETADO
+- ✅ MCP Tools para GitHub Actions (4 hours) - COMPLETADO
+- ✅ Registrar tools en handlers.ts (15 min) - COMPLETADO
+- ✅ Tests unitarios (45 min) - COMPLETADO (15 tests passing)
+- ✅ Documentación y verificación end-to-end (30 min) - EN PROCESO
+
 #### Dashboard
 - `get_dashboard_overview` - KPIs ejecutivos
 - `get_dashboard_alerts` - Alertas activas
@@ -466,26 +602,58 @@ memory_create({
 
 ## Desarrollo Local
 
+**⚠️ IMPORTANTE:** El proyecto usa separación profesional dev/prod desde v4.0.0
+
+### Opción 1: Desarrollo con Hot-Reload (RECOMENDADO)
+
 ```bash
 # 1. Clonar repositorio
 git clone https://github.com/carlosjperez/SOLARIA-DFO.git
 cd SOLARIA-DFO
 
-# 2. Configurar credenciales
+# 2. Configurar credenciales para desarrollo
 cp .env.example .env
-# Editar .env (NUNCA usar caracteres especiales en passwords)
+# Editar .env:
+#   - NODE_ENV=development
+#   - JWT_SECRET=solaria_jwt_secret_dev_not_for_production
+#   - ALLOW_DEFAULT_TOKEN=true
 
-# 3. Levantar servicios
+# 3. Levantar servicios con hot-reload
+cd docker/dev
 docker compose up -d
 
 # 4. Verificar estado
 curl http://localhost:3030/api/health
+curl http://localhost:3031/health      # MCP server
+curl http://localhost:3032/health      # Worker
 
-# 5. Acceder al dashboard
+# 5. Ver logs en tiempo real (hot-reload activo)
+docker compose logs -f
+
+# 6. Acceder al dashboard
 open http://localhost:3030
 # Usuario: carlosjperez
 # Password: bypass
 ```
+
+**Características desarrollo:**
+- ✅ Hot-reload instantáneo (tsx watch, nodemon)
+- ✅ Código montado como volumen (cambios sin rebuild)
+- ✅ Todas las dependencias instaladas (incluidas dev)
+- ✅ Logs verbose
+- ✅ NODE_ENV=development
+
+**Documentación completa:** Ver `docker/README.md`
+
+### Opción 2: Producción Local (Testing)
+
+```bash
+cd docker/prod
+docker compose build --no-cache
+docker compose up -d
+```
+
+**Diferencias dev vs prod:** Ver tabla en `docker/README.md`
 
 ---
 
@@ -567,6 +735,167 @@ GET /api/csuite/ceo           - Vista CEO
 GET /api/csuite/cto           - Vista CTO
 GET /api/csuite/coo           - Vista COO
 GET /api/csuite/cfo           - Vista CFO
+```
+
+### Agent Execution (BullMQ)
+```
+POST   /api/agent-execution/queue          - Encolar job de agente
+GET    /api/agent-execution/jobs/:id       - Estado de job
+POST   /api/agent-execution/jobs/:id/cancel - Cancelar job
+GET    /api/agent-execution/workers        - Estado de workers
+```
+
+**Autenticación:** JWT Bearer token requerido
+
+**POST /api/agent-execution/queue** - Encolar tarea para ejecución de agente
+
+Request:
+```json
+{
+  "taskId": 547,
+  "agentId": 11,
+  "metadata": {
+    "priority": "critical" | "high" | "medium" | "low",
+    "estimatedHours": 2,
+    "retryCount": 0
+  },
+  "context": {
+    "dependencies": [123, 456],
+    "relatedTasks": [789],
+    "memoryIds": [1, 2, 3]
+  },
+  "mcpConfigs": [
+    {
+      "serverName": "context7",
+      "serverUrl": "https://mcp.context7.dev",
+      "authType": "bearer",
+      "authCredentials": { "token": "xxx" },
+      "enabled": true
+    }
+  ]
+}
+```
+
+Response (201 Created):
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "12345",
+    "taskId": 547,
+    "taskCode": "DFO-205",
+    "agentId": 11,
+    "agentName": "Claude Code",
+    "projectId": 1,
+    "status": "queued",
+    "priority": "high",
+    "queuedAt": "2026-01-01T10:30:00Z"
+  },
+  "message": "Job queued successfully"
+}
+```
+
+**GET /api/agent-execution/jobs/:id** - Obtener estado de job
+
+Response (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "12345",
+    "taskId": 547,
+    "taskCode": "DFO-205",
+    "agentId": 11,
+    "status": "active" | "waiting" | "completed" | "failed" | "cancelled",
+    "progress": 45,
+    "result": null,
+    "error": null,
+    "startedAt": "2026-01-01T10:30:15Z",
+    "completedAt": null
+  }
+}
+```
+
+**POST /api/agent-execution/jobs/:id/cancel** - Cancelar job en progreso
+
+Response (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "12345",
+    "status": "cancelled",
+    "cancelledAt": "2026-01-01T10:35:00Z"
+  },
+  "message": "Job cancelled successfully"
+}
+```
+
+**GET /api/agent-execution/workers** - Estado de workers BullMQ
+
+Response (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "workers": [
+      {
+        "name": "agent-execution-worker-1",
+        "status": "active",
+        "currentJob": "12345",
+        "processedJobs": 127
+      }
+    ],
+    "queue": {
+      "waiting": 3,
+      "active": 1,
+      "completed": 124,
+      "failed": 2
+    }
+  }
+}
+```
+
+**Errores comunes:**
+
+| Status | Error | Causa |
+|--------|-------|-------|
+| 400 | Validation failed | Payload inválido (Zod) |
+| 401 | Invalid or expired token | JWT expirado o inválido |
+| 404 | Job not found | Job ID no existe |
+| 503 | Agent execution service not initialized | BullMQ/Redis no disponible |
+| 500 | Failed to queue job | Error de conexión Redis/BullMQ |
+
+**Requisitos de infraestructura:**
+- ✅ Dashboard API implementado (server.ts)
+- ✅ AgentExecutionService implementado
+- ⚠️ Redis debe estar configurado en producción
+- ⚠️ BullMQ worker debe estar desplegado (DFO-1005)
+
+**Estado actual (2026-01-01):**
+- API endpoints: ✅ Funcionales
+- Autenticación JWT: ✅ Funcionando
+- Validación Zod: ✅ Funcionando
+- BullMQ queue: ⚠️ Requiere Redis en producción
+- Worker deployment: ❌ Pendiente (DFO-1005)
+
+**Testing:**
+```bash
+# Obtener token
+TOKEN=$(curl -s -X POST https://dfo.solaria.agency/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"carlosjperez","password":"bypass"}' | jq -r '.token')
+
+# Encolar job
+curl -X POST https://dfo.solaria.agency/api/agent-execution/queue \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "taskId": 547,
+    "agentId": 11,
+    "metadata": {"priority": "high", "estimatedHours": 2},
+    "context": {"dependencies": [], "relatedTasks": [], "memoryIds": []}
+  }'
 ```
 
 ---

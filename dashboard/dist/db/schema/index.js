@@ -39,4 +39,8 @@ __exportStar(require("./businesses.js"), exports);
 __exportStar(require("./office-clients.js"), exports);
 // Permissions (RBAC)
 __exportStar(require("./permissions.js"), exports);
+// Agent Execution (BullMQ jobs, MCP configs)
+__exportStar(require("./agent-execution.js"), exports);
+// GitHub Workflows (workflows, runs, task links)
+__exportStar(require("./github-workflows.js"), exports);
 //# sourceMappingURL=index.js.map

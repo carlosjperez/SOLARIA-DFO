@@ -29,4 +29,3 @@ exports.users = (0, mysql_core_1.mysqlTable)('users', {
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
     updatedAt: (0, mysql_core_1.timestamp)('updated_at').defaultNow().onUpdateNow(),
 });
-//# sourceMappingURL=users.js.map

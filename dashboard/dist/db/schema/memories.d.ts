@@ -543,7 +543,7 @@ export declare const memoryEvents: import("drizzle-orm/mysql-core").MySqlTableWi
             tableName: "memory_events";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "deleted" | "created" | "updated" | "accessed" | "shared";
+            data: "created" | "updated" | "deleted" | "accessed" | "shared";
             driverParam: string;
             notNull: true;
             hasDefault: false;

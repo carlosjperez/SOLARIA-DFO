@@ -100,7 +100,7 @@ export declare const officeClients: import("drizzle-orm/mysql-core").MySqlTableW
             tableName: "office_clients";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "active" | "inactive" | "lead" | "churned" | "prospect";
+            data: "active" | "inactive" | "lead" | "prospect" | "churned";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -726,7 +726,7 @@ export declare const officePayments: import("drizzle-orm/mysql-core").MySqlTable
             tableName: "office_payments";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "other" | "milestone" | "deposit" | "final" | "recurring";
+            data: "other" | "deposit" | "milestone" | "final" | "recurring";
             driverParam: string;
             notNull: false;
             hasDefault: true;

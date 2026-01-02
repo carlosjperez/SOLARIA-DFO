@@ -83,7 +83,7 @@ export declare const webhooks: import("drizzle-orm/mysql-core").MySqlTableWithCo
             tableName: "webhooks";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "all" | "project.created" | "project.updated" | "project.status_changed" | "project.completed" | "task.created" | "task.completed" | "task.updated" | "task.status_changed" | "task.assigned" | "task.deleted" | "agent.status_changed" | "agent.task_assigned" | "memory.created" | "memory.updated" | "alert.created" | "alert.resolved";
+            data: "task.created" | "task.updated" | "task.completed" | "task.deleted" | "task.status_changed" | "task.assigned" | "project.created" | "project.updated" | "project.status_changed" | "project.completed" | "agent.status_changed" | "agent.task_assigned" | "memory.created" | "memory.updated" | "alert.created" | "alert.resolved" | "all";
             driverParam: string;
             notNull: true;
             hasDefault: false;

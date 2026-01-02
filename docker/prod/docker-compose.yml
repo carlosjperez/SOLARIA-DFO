@@ -1,0 +1,191 @@
+# SOLARIA Digital Field Operations - Production Environment
+# Version: 4.0.0 - Professional Dev/Prod Separation
+#
+# Features:
+# - Multi-stage builds (optimized images)
+# - Production dependencies only
+# - Compiled/built code (no source)
+# - NODE_ENV=production
+# - restart: unless-stopped
+# - No code volumes (security)
+
+services:
+  # ============================================================================
+  # OFFICE: Dashboard + MariaDB (Production optimized)
+  # ============================================================================
+  office:
+    container_name: solaria-dfo-office
+    build:
+      context: ../..
+      dockerfile: docker/prod/Dockerfile.office
+    ports:
+      - "3030:3030"       # Dashboard HTTP
+      - "33060:3306"      # MariaDB (external access)
+    environment:
+      # Database credentials (use secrets in production!)
+      - DB_PASSWORD=${DB_PASSWORD:-solaria2024}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-SolariaRoot2024}
+      - DB_NAME=${DB_NAME:-solaria_construction}
+      - DB_USER=${DB_USER:-solaria_user}
+      # Application
+      - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
+      - PORT=3030
+      - NODE_ENV=production
+      # Redis for caching
+      - REDIS_URL=redis://redis:6379
+      # Project ingestion
+      - REPO_PATH=/repo
+      - CI_MODE=${CI_MODE:-false}
+    volumes:
+      # Data persistence only, NO source code
+      - office_mysql_data:/var/lib/mysql
+      - ./logs:/app/logs
+      - ${REPO_PATH:-/tmp}:/repo:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3030/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # REDIS: Cache and Queue
+  # ============================================================================
+  redis:
+    container_name: solaria-dfo-redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # WORKER: Background Jobs + Embeddings (Production optimized)
+  # ============================================================================
+  worker:
+    container_name: solaria-dfo-worker
+    build:
+      context: ../..
+      dockerfile: docker/prod/Dockerfile.worker
+    ports:
+      - "3032:3032"       # Embedding HTTP API
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DASHBOARD_URL=http://office:3030
+      - DB_HOST=office
+      - DB_PORT=3306
+      - DB_USER=${DB_USER:-solaria_user}
+      - DB_PASSWORD=${DB_PASSWORD:-solaria2024}
+      - DB_NAME=${DB_NAME:-solaria_construction}
+      - EMBEDDING_HTTP_PORT=3032
+      - NODE_ENV=production
+    volumes:
+      # Data persistence only, NO source code
+      - worker_models:/app/models
+      - worker_cache:/app/.cache
+    depends_on:
+      office:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3032/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # MCP: Model Context Protocol HTTP Server (Production optimized)
+  # ============================================================================
+  mcp:
+    container_name: solaria-dfo-mcp
+    build:
+      context: ../..
+      dockerfile: docker/prod/Dockerfile.mcp
+    ports:
+      - "3031:3031"
+    environment:
+      - MCP_PORT=3031
+      - DASHBOARD_API_URL=http://office:3030/api
+      - DASHBOARD_USER=${DASHBOARD_USER:-carlosjperez}
+      - DASHBOARD_PASS=${DASHBOARD_PASS:-bypass}
+      - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
+      - NODE_ENV=production
+      - ALLOW_DEFAULT_TOKEN=${ALLOW_DEFAULT_TOKEN:-true}
+    # NO volumes - compiled code baked into image
+    depends_on:
+      office:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3031/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - solaria-network
+
+  # ============================================================================
+  # NGINX: Reverse Proxy (Optional - for SSL in production)
+  # ============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: solaria-dfo-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../../infrastructure/nginx/nginx.unified.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/dfo-v2:/usr/share/nginx/html:ro
+    depends_on:
+      office:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - with-proxy
+    networks:
+      - solaria-network
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+volumes:
+  office_mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  worker_models:
+    driver: local
+  worker_cache:
+    driver: local
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+networks:
+  solaria-network:
+    driver: bridge

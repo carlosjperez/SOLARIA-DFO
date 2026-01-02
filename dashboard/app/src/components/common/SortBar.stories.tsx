@@ -94,6 +94,8 @@ export const Interactive: Story = {
     );
   },
   args: {
+    value: { field: 'name', direction: 'asc' },
+    onChange: fn(),
     options: defaultOptions,
   },
 };
@@ -223,6 +225,8 @@ export const InContext: Story = {
     );
   },
   args: {
+    value: { field: 'name', direction: 'asc' },
+    onChange: fn(),
     options: defaultOptions,
   },
   parameters: {
@@ -254,6 +258,11 @@ export const BothDirections: Story = {
       </div>
     </div>
   ),
+  args: {
+    value: { field: 'name', direction: 'asc' },
+    onChange: fn(),
+    options: defaultOptions,
+  },
 };
 
 /**

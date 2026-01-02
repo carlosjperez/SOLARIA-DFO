@@ -140,7 +140,7 @@ export declare const agentJobs: import("drizzle-orm/mysql-core").MySqlTableWithC
             tableName: "agent_jobs";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "completed" | "failed" | "active" | "waiting" | "delayed" | "cancelled";
+            data: "completed" | "cancelled" | "active" | "failed" | "waiting" | "delayed";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -556,7 +556,7 @@ export declare const agentMcpConfigs: import("drizzle-orm/mysql-core").MySqlTabl
             tableName: "agent_mcp_configs";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "bearer" | "basic" | "none" | "api_key";
+            data: "bearer" | "basic" | "api_key" | "none";
             driverParam: string;
             notNull: false;
             hasDefault: true;

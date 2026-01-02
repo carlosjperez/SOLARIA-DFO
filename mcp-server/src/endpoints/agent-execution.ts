@@ -14,6 +14,7 @@ import { ResponseBuilder, CommonErrors } from '../utils/response-builder.js'
 import { db } from '../database.js'
 import { Tool } from '../types/mcp.js'
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { getDFOApiClient } from '../utils/dfo-api-client.js';
 
 const VERSION = '4.0.0';
 
@@ -235,94 +236,24 @@ function formatActiveJobs(jobs: JobStatus[]): string {
  */
 async function queueAgentJob(args: z.infer<typeof QueueAgentJobInputSchema>) {
     const builder = new ResponseBuilder({ version: VERSION });
+    const apiClient = getDFOApiClient();
 
     try {
-        // Fetch task information
-        const [taskRows] = (await db.execute(
-            'SELECT id, code, project_id FROM tasks WHERE id = ?',
-            [args.task_id]
-        )) as unknown as [RowDataPacket[], any];
-
-        if (!taskRows || taskRows.length === 0) {
-            return builder.error(CommonErrors.notFound('Task', args.task_id));
-        }
-
-        const task = taskRows[0];
-
-        // Fetch agent information
-        const [agentRows] = (await db.execute('SELECT id, name FROM agents WHERE id = ?', [
-            args.agent_id,
-        ])) as unknown as [RowDataPacket[], any];
-
-        if (!agentRows || agentRows.length === 0) {
-            return builder.error(CommonErrors.notFound('Agent', args.agent_id));
-        }
-
-        const agent = agentRows[0];
-
-        // Prepare job data
-        const jobData: AgentJobData = {
+        // Call Dashboard API to queue the job
+        const apiResponse = await apiClient.queueJob({
             taskId: args.task_id,
-            taskCode: task.code,
             agentId: args.agent_id,
-            agentName: agent.name,
-            projectId: task.project_id,
-            mcpConfigs: args.mcp_configs as any,
+            metadata: args.metadata,
             context: args.context,
-            metadata: args.metadata as any,
-        };
+            mcpConfigs: args.mcp_configs as any,
+        });
 
-        // Call the Express API endpoint to queue the job
-        // Note: In production, this would make an HTTP request to the dashboard API
-        // For now, we'll create the job record directly
-        const priority =
-            args.metadata?.priority === 'critical'
-                ? 1
-                : args.metadata?.priority === 'high'
-                  ? 2
-                  : args.metadata?.priority === 'medium'
-                    ? 3
-                    : 4;
+        // Handle API errors
+        if (!apiResponse.success) {
+            return builder.error(apiResponse.error!);
+        }
 
-        // Insert job record
-        const [result] = (await db.execute(
-            `INSERT INTO agent_jobs (
-                bullmq_job_id, task_id, task_code, agent_id, project_id,
-                status, progress, job_data, priority, queued_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-            [
-                `mcp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                args.task_id,
-                task.code,
-                args.agent_id,
-                task.project_id,
-                'waiting',
-                0,
-                JSON.stringify(jobData),
-                priority,
-            ]
-        )) as unknown as [ResultSetHeader, any];
-
-        const jobId = result.insertId;
-
-        // Get the created job
-        const [jobRows] = (await db.execute(
-            'SELECT * FROM agent_jobs WHERE id = ?',
-            [jobId]
-        )) as unknown as [RowDataPacket[], any];
-        const createdJob = jobRows[0];
-
-        const response = {
-            jobId: createdJob.bullmq_job_id,
-            taskId: args.task_id,
-            taskCode: task.code,
-            agentId: args.agent_id,
-            agentName: agent.name,
-            projectId: task.project_id,
-            status: 'queued',
-            priority: args.metadata?.priority || 'medium',
-            queuedAt: createdJob.queued_at,
-        };
+        const response = apiResponse.data!;
 
         if (args.format === 'human') {
             return builder.success(response, {
@@ -340,7 +271,12 @@ async function queueAgentJob(args: z.infer<typeof QueueAgentJobInputSchema>) {
 
         return builder.success(response);
     } catch (error: any) {
-        return builder.error(CommonErrors.databaseError(error));
+        return builder.error({
+            code: 'API_REQUEST_FAILED',
+            message: 'Failed to queue job via Dashboard API',
+            details: { originalError: error.message },
+            suggestion: 'Check that Dashboard API is running and accessible at DFO_API_URL',
+        });
     }
 }
 
@@ -349,41 +285,18 @@ async function queueAgentJob(args: z.infer<typeof QueueAgentJobInputSchema>) {
  */
 async function getJobStatus(args: z.infer<typeof GetJobStatusInputSchema>) {
     const builder = new ResponseBuilder({ version: VERSION });
+    const apiClient = getDFOApiClient();
 
     try {
-        const [rows] = (await db.execute(
-            `SELECT
-                aj.*,
-                t.code as task_code,
-                a.name as agent_name
-            FROM agent_jobs aj
-            JOIN tasks t ON aj.task_id = t.id
-            JOIN agents a ON aj.agent_id = a.id
-            WHERE aj.bullmq_job_id = ?`,
-            [args.job_id]
-        )) as unknown as [RowDataPacket[], any];
+        // Call Dashboard API to get job status
+        const apiResponse = await apiClient.getJobStatus(args.job_id);
 
-        if (!rows || rows.length === 0) {
-            return builder.error(CommonErrors.notFound('Job', args.job_id));
+        // Handle API errors
+        if (!apiResponse.success) {
+            return builder.error(apiResponse.error!);
         }
 
-        const job = rows[0];
-
-        const jobStatus: JobStatus = {
-            jobId: job.bullmq_job_id,
-            taskId: job.task_id,
-            taskCode: job.task_code,
-            agentId: job.agent_id,
-            agentName: job.agent_name,
-            status: job.status,
-            progress: job.progress || 0,
-            queuedAt: job.queued_at,
-            startedAt: job.started_at,
-            completedAt: job.completed_at,
-            attemptsMade: job.attempts_made || 0,
-            maxAttempts: job.max_attempts || 3,
-            lastError: job.last_error,
-        };
+        const jobStatus = apiResponse.data!;
 
         if (args.format === 'human') {
             return builder.success(jobStatus, {
@@ -394,7 +307,12 @@ async function getJobStatus(args: z.infer<typeof GetJobStatusInputSchema>) {
 
         return builder.success(jobStatus);
     } catch (error: any) {
-        return builder.error(CommonErrors.databaseError(error));
+        return builder.error({
+            code: 'API_REQUEST_FAILED',
+            message: 'Failed to get job status via Dashboard API',
+            details: { originalError: error.message },
+            suggestion: 'Check that Dashboard API is running and accessible at DFO_API_URL',
+        });
     }
 }
 
@@ -403,52 +321,25 @@ async function getJobStatus(args: z.infer<typeof GetJobStatusInputSchema>) {
  */
 async function cancelJob(args: z.infer<typeof CancelJobInputSchema>) {
     const builder = new ResponseBuilder({ version: VERSION });
+    const apiClient = getDFOApiClient();
 
     try {
-        // Check if job exists and is cancellable
-        const [rows] = (await db.execute(
-            'SELECT status, task_code FROM agent_jobs WHERE bullmq_job_id = ?',
-            [args.job_id]
-        )) as unknown as [RowDataPacket[], any];
+        // Call Dashboard API to cancel the job
+        const apiResponse = await apiClient.cancelJob(args.job_id);
 
-        if (!rows || rows.length === 0) {
-            return builder.error(CommonErrors.notFound('Job', args.job_id));
+        // Handle API errors
+        if (!apiResponse.success) {
+            return builder.error(apiResponse.error!);
         }
 
-        const job = rows[0];
-
-        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
-            return builder.error({
-                code: 'CANNOT_CANCEL_JOB',
-                message: `Job ${args.job_id} cannot be cancelled (status: ${job.status})`,
-                details: {
-                    jobId: args.job_id,
-                    currentStatus: job.status,
-                    reason: 'Job is already in a terminal state',
-                },
-                suggestion: 'Jobs can only be cancelled when they are waiting, active, or delayed.',
-            });
-        }
-
-        // Update job status to cancelled
-        await db.execute(
-            'UPDATE agent_jobs SET status = ?, completed_at = NOW() WHERE bullmq_job_id = ?',
-            ['cancelled', args.job_id]
-        );
-
-        const response = {
-            jobId: args.job_id,
-            taskCode: job.task_code,
-            status: 'cancelled',
-            cancelledAt: new Date().toISOString(),
-        };
+        const response = apiResponse.data!;
 
         if (args.format === 'human') {
             return builder.success(response, {
                 format: 'human',
                 formatted: `🚫 Job cancelled successfully\n\n` +
                     `Job ID: ${response.jobId}\n` +
-                    `Task: ${response.taskCode}\n` +
+                    `Status: ${response.status}\n` +
                     `Cancelled: ${new Date(response.cancelledAt).toLocaleString()}\n\n` +
                     `The job has been removed from the execution queue.`
             });
@@ -456,7 +347,12 @@ async function cancelJob(args: z.infer<typeof CancelJobInputSchema>) {
 
         return builder.success(response);
     } catch (error: any) {
-        return builder.error(CommonErrors.databaseError(error));
+        return builder.error({
+            code: 'API_REQUEST_FAILED',
+            message: 'Failed to cancel job via Dashboard API',
+            details: { originalError: error.message },
+            suggestion: 'Check that Dashboard API is running and accessible at DFO_API_URL',
+        });
     }
 }
 

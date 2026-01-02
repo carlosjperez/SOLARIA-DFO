@@ -13,3 +13,5 @@ export * from './memories.js';
 export * from './businesses.js';
 export * from './office-clients.js';
 export * from './permissions.js';
+export * from './agent-execution.js';
+export * from './github-workflows.js';

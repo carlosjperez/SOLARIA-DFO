@@ -119,4 +119,3 @@ function taskPriorityToJobPriority(taskPriority) {
     };
     return map[taskPriority] || exports.JobPriority.MEDIUM;
 }
-//# sourceMappingURL=queue.js.map

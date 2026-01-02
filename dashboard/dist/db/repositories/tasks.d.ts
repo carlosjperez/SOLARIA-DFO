@@ -20,7 +20,7 @@ export declare function findAllTasks(filters?: {
     agentId: number | null;
     assignedAgentId: number | null;
     assignedBy: number | null;
-    status: "completed" | "cancelled" | "pending" | "in_progress" | "review" | "blocked" | null;
+    status: "completed" | "in_progress" | "pending" | "review" | "blocked" | "cancelled" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     estimatedHours: string | null;
     actualHours: string | null;
@@ -42,7 +42,7 @@ export declare function findTaskById(id: number): Promise<{
     agentId: number | null;
     assignedAgentId: number | null;
     assignedBy: number | null;
-    status: "completed" | "cancelled" | "pending" | "in_progress" | "review" | "blocked" | null;
+    status: "completed" | "in_progress" | "pending" | "review" | "blocked" | "cancelled" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     estimatedHours: string | null;
     actualHours: string | null;
@@ -66,7 +66,7 @@ export declare function updateTask(id: number, data: Partial<NewTask>): Promise<
     agentId: number | null;
     assignedAgentId: number | null;
     assignedBy: number | null;
-    status: "completed" | "cancelled" | "pending" | "in_progress" | "review" | "blocked" | null;
+    status: "completed" | "in_progress" | "pending" | "review" | "blocked" | "cancelled" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     estimatedHours: string | null;
     actualHours: string | null;
@@ -88,7 +88,7 @@ export declare function completeTask(id: number, notes?: string): Promise<{
     agentId: number | null;
     assignedAgentId: number | null;
     assignedBy: number | null;
-    status: "completed" | "cancelled" | "pending" | "in_progress" | "review" | "blocked" | null;
+    status: "completed" | "in_progress" | "pending" | "review" | "blocked" | "cancelled" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     estimatedHours: string | null;
     actualHours: string | null;

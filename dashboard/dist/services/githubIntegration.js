@@ -41,6 +41,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleGitHubPush = handleGitHubPush;
 exports.verifyGitHubSignature = verifyGitHubSignature;
+exports.handleWorkflowRunEvent = handleWorkflowRunEvent;
 const crypto = __importStar(require("crypto"));
 /**
  * Process GitHub push webhook
@@ -162,4 +163,101 @@ function verifyGitHubSignature(payload, signature, secret) {
     const digest = 'sha256=' + hmac.update(payload).digest('hex');
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
 }
-//# sourceMappingURL=githubIntegration.js.map
+/**
+ * Process GitHub Actions workflow_run webhook
+ * Updates github_workflow_runs table and emits Socket.IO events
+ */
+async function handleWorkflowRunEvent(payload, db, io) {
+    try {
+        const { action, workflow_run, repository } = payload;
+        // Only process relevant actions
+        if (!['queued', 'in_progress', 'completed'].includes(action)) {
+            return {
+                status: 'skipped',
+                updated: false,
+                error: `Action '${action}' not handled`,
+            };
+        }
+        // Find the workflow run in our database by github_run_id
+        const [runs] = await db.query('SELECT * FROM github_workflow_runs WHERE github_run_id = ? LIMIT 1', [workflow_run.id]);
+        if (runs.length === 0) {
+            return {
+                status: 'not_found',
+                updated: false,
+                error: `Workflow run ${workflow_run.id} not found in DFO`,
+            };
+        }
+        const run = runs[0];
+        // Calculate duration if completed
+        let durationSeconds = null;
+        if (action === 'completed' && workflow_run.run_started_at) {
+            const startTime = new Date(workflow_run.run_started_at).getTime();
+            const endTime = new Date(workflow_run.updated_at).getTime();
+            durationSeconds = Math.floor((endTime - startTime) / 1000);
+        }
+        // Update workflow run status
+        await db.query(`UPDATE github_workflow_runs
+       SET status = ?,
+           conclusion = ?,
+           started_at = ?,
+           completed_at = ?,
+           duration_seconds = ?,
+           updated_at = NOW()
+       WHERE id = ?`, [
+            workflow_run.status,
+            workflow_run.conclusion || null,
+            workflow_run.run_started_at || null,
+            action === 'completed' ? workflow_run.updated_at : null,
+            durationSeconds,
+            run.id,
+        ]);
+        // Log activity
+        await db.query(`INSERT INTO activity_logs
+       (project_id, category, action, level, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`, [
+            run.project_id,
+            'github_workflow',
+            `Workflow run #${workflow_run.run_number} ${action}`,
+            action === 'completed' && workflow_run.conclusion === 'failure' ? 'error' : 'info',
+            JSON.stringify({
+                github_run_id: workflow_run.id,
+                run_number: workflow_run.run_number,
+                workflow_name: workflow_run.name,
+                repository: repository.full_name,
+                status: workflow_run.status,
+                conclusion: workflow_run.conclusion,
+                branch: workflow_run.head_branch,
+                commit_sha: workflow_run.head_sha,
+                html_url: workflow_run.html_url,
+            }),
+        ]);
+        // Emit Socket.IO event if io instance provided
+        if (io) {
+            io.emit('github_workflow_update', {
+                workflow_run_id: run.id,
+                github_run_id: workflow_run.id,
+                run_number: workflow_run.run_number,
+                workflow_name: workflow_run.name,
+                status: workflow_run.status,
+                conclusion: workflow_run.conclusion,
+                action,
+                project_id: run.project_id,
+                task_id: run.task_id,
+                html_url: workflow_run.html_url,
+            });
+        }
+        return {
+            status: 'processed',
+            updated: true,
+        };
+    }
+    catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        console.error('Error processing workflow run event:', error);
+        return {
+            status: 'error',
+            updated: false,
+            error: errMsg,
+        };
+    }
+}

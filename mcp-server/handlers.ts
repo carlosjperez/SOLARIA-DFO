@@ -93,6 +93,12 @@ import {
 } from './src/endpoints/agent-execution.js';
 import { protocolEnforcer } from './src/utils/protocol-enforcement.js';
 import { createTaskCompletionMemory } from './src/utils/auto-memory.js';
+import {
+  githubTriggerWorkflowTool,
+  githubGetWorkflowStatusTool,
+  githubCreateIssueTool,
+  githubCreatePRTool,
+} from './src/endpoints/github-actions.js';
 
 // ============================================================================
 // Tool Definitions
@@ -1393,26 +1399,122 @@ export const toolDefinitions: MCPToolDefinition[] = [
   },
   {
     name: "proxy_external_tool",
-    description: "Execute a tool on an external MCP server (Context7, Playwright, CodeRabbit, etc.). Allows agents to call tools from connected MCP servers without needing direct access. The agent must have the MCP server configured and enabled in their agent_mcp_configs.",
+    description: "Execute a tool on an external MCP server. This tool allows DFO to forward tool calls to external MCP servers like Context7 (documentation), Playwright (browser automation), or CodeRabbit (code reviews). The external server must be configured and connected in the agent's MCP configuration.",
     inputSchema: {
       type: "object",
       properties: {
-        server_name: { type: "string", description: "MCP server name (e.g., context7, playwright, coderabbit)" },
-        tool_name: { type: "string", description: "Name of the tool to execute on the external server" },
-        parameters: { type: "object", description: "Parameters to pass to the tool (optional)" },
+        server_name: {
+          type: "string",
+          description: "Name of the external MCP server (e.g., 'context7', 'playwright', 'coderabbit')"
+        },
+        tool_name: {
+          type: "string",
+          description: "Name of the tool to execute on the external server"
+        },
+        params: {
+          type: "object",
+          description: "Parameters to pass to the external tool"
+        },
+        format: {
+          type: "string",
+          enum: ["json", "human"],
+          description: "Output format (default: json)"
+        },
       },
       required: ["server_name", "tool_name"],
     },
   },
   {
     name: "list_external_tools",
-    description: "List available tools on a connected external MCP server. Useful for discovering what tools are available on servers like Context7, Playwright, or CodeRabbit before using proxy_external_tool.",
+    description: "List available tools from external MCP servers. Discovers all tools available on connected external MCP servers. Useful for understanding what capabilities are available, verifying server connections, and finding the correct tool name for proxy_external_tool. If server_name is provided, only lists tools from that server. Otherwise, lists all tools from all connected servers.",
     inputSchema: {
       type: "object",
       properties: {
-        server_name: { type: "string", description: "MCP server name to list tools from" },
+        server_name: {
+          type: "string",
+          description: "Optional server name to filter tools. If omitted, lists tools from all connected servers."
+        },
+        format: {
+          type: "string",
+          enum: ["json", "human"],
+          description: "Output format (default: json)"
+        },
       },
-      required: ["server_name"],
+    },
+  },
+
+  // ============================================================================
+  // GitHub Actions Integration Tools (SLR-011 - DFO-206 Pattern)
+  // ============================================================================
+
+  {
+    name: "github_trigger_workflow",
+    description: "Trigger a GitHub Actions workflow in a repository. Useful for automated deployments, testing, or custom CI/CD pipelines triggered from DFO tasks.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        owner: { type: "string", description: "Repository owner (username or organization)" },
+        repo: { type: "string", description: "Repository name" },
+        workflow_id: { type: "string", description: "Workflow ID or filename (e.g., 'deploy.yml')" },
+        ref: { type: "string", description: "Git ref (branch/tag) to run workflow on" },
+        inputs: { type: "object", description: "Workflow inputs as key-value pairs (optional)" },
+        project_id: { type: "number", description: "Project ID (required)" },
+        task_id: { type: "number", description: "Task ID to link the workflow run to (optional)" },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+      required: ["owner", "repo", "workflow_id", "ref", "project_id"],
+    },
+  },
+  {
+    name: "github_get_workflow_status",
+    description: "Get the current status of a GitHub Actions workflow run. Returns execution state, conclusion, duration, and logs URL. Use the run_id returned from github_trigger_workflow.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        run_id: { type: "number", description: "DFO workflow run ID (from github_trigger_workflow response)" },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+      required: ["run_id"],
+    },
+  },
+  {
+    name: "github_create_issue",
+    description: "Create a GitHub issue from a DFO task. Automatically links the issue to the task for tracking. Useful for bug reports, feature requests, or technical debt documentation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        owner: { type: "string", description: "Repository owner (username or organization)" },
+        repo: { type: "string", description: "Repository name" },
+        title: { type: "string", description: "Issue title" },
+        body: { type: "string", description: "Issue body (markdown supported)" },
+        labels: { type: "array", items: { type: "string" }, description: "Labels to apply (optional)" },
+        assignees: { type: "array", items: { type: "string" }, description: "GitHub usernames to assign (optional)" },
+        task_id: { type: "number", description: "DFO task ID to link" },
+        project_id: { type: "number", description: "DFO project ID" },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+      required: ["owner", "repo", "title", "body", "task_id", "project_id"],
+    },
+  },
+  {
+    name: "github_create_pr",
+    description: "Create a GitHub pull request from a DFO task. Automatically links the PR to the task for tracking. Useful for code review workflows and deployment automation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        owner: { type: "string", description: "Repository owner (username or organization)" },
+        repo: { type: "string", description: "Repository name" },
+        title: { type: "string", description: "PR title" },
+        body: { type: "string", description: "PR body (markdown supported)" },
+        head: { type: "string", description: "Head branch (source of changes)" },
+        base: { type: "string", description: "Base branch (target for merge)" },
+        labels: { type: "array", items: { type: "string" }, description: "Labels to apply (optional)" },
+        assignees: { type: "array", items: { type: "string" }, description: "GitHub usernames to assign (optional)" },
+        task_id: { type: "number", description: "DFO task ID to link" },
+        project_id: { type: "number", description: "DFO project ID" },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+      required: ["owner", "repo", "title", "body", "head", "base", "task_id", "project_id"],
     },
   },
 ];
@@ -2379,6 +2481,22 @@ export async function executeTool(
 
     case "list_active_agent_jobs":
       return listActiveAgentJobsTool.execute(args);
+
+    // ============================================================================
+    // GitHub Actions Integration Tools (SLR-011 - DFO-206 Pattern)
+    // ============================================================================
+
+    case "github_trigger_workflow":
+      return githubTriggerWorkflowTool.execute(args);
+
+    case "github_get_workflow_status":
+      return githubGetWorkflowStatusTool.execute(args);
+
+    case "github_create_issue":
+      return githubCreateIssueTool.execute(args);
+
+    case "github_create_pr":
+      return githubCreatePRTool.execute(args);
 
     case "proxy_external_tool":
       return proxyExternalTool((args as unknown) as { server_name: string; tool_name: string; parameters?: Record<string, unknown> });

@@ -62,4 +62,3 @@ exports.sprintsRelations = (0, drizzle_orm_1.relations)(exports.sprints, ({ one,
     epics: many(epics_js_1.epics),
     tasks: many(tasks_js_1.tasks), // Direct task assignments (standalone tasks)
 }));
-//# sourceMappingURL=sprints.js.map

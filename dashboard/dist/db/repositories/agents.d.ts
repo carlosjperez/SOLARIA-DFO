@@ -6,7 +6,7 @@ export declare function findAllAgents(): Promise<{
     id: number;
     name: string;
     role: "project_manager" | "architect" | "developer" | "tester" | "analyst" | "designer" | "devops" | "technical_writer" | "security_auditor" | "deployment_specialist";
-    status: "error" | "active" | "busy" | "inactive" | "maintenance" | null;
+    status: "error" | "active" | "inactive" | "maintenance" | "busy" | null;
     capabilities: unknown;
     configuration: unknown;
     lastActivity: Date | null;
@@ -16,7 +16,7 @@ export declare function findAgentById(id: number): Promise<{
     id: number;
     name: string;
     role: "project_manager" | "architect" | "developer" | "tester" | "analyst" | "designer" | "devops" | "technical_writer" | "security_auditor" | "deployment_specialist";
-    status: "error" | "active" | "busy" | "inactive" | "maintenance" | null;
+    status: "error" | "active" | "inactive" | "maintenance" | "busy" | null;
     capabilities: unknown;
     configuration: unknown;
     lastActivity: Date | null;
@@ -27,7 +27,7 @@ export declare function updateAgentStatus(id: number, status: 'active' | 'busy' 
     id: number;
     name: string;
     role: "project_manager" | "architect" | "developer" | "tester" | "analyst" | "designer" | "devops" | "technical_writer" | "security_auditor" | "deployment_specialist";
-    status: "error" | "active" | "busy" | "inactive" | "maintenance" | null;
+    status: "error" | "active" | "inactive" | "maintenance" | "busy" | null;
     capabilities: unknown;
     configuration: unknown;
     lastActivity: Date | null;
@@ -38,7 +38,7 @@ export declare function getActiveAgents(): Promise<{
     id: number;
     name: string;
     role: "project_manager" | "architect" | "developer" | "tester" | "analyst" | "designer" | "devops" | "technical_writer" | "security_auditor" | "deployment_specialist";
-    status: "error" | "active" | "busy" | "inactive" | "maintenance" | null;
+    status: "error" | "active" | "inactive" | "maintenance" | "busy" | null;
     capabilities: unknown;
     configuration: unknown;
     lastActivity: Date | null;
@@ -48,7 +48,7 @@ export declare function getBusyAgents(): Promise<{
     id: number;
     name: string;
     role: "project_manager" | "architect" | "developer" | "tester" | "analyst" | "designer" | "devops" | "technical_writer" | "security_auditor" | "deployment_specialist";
-    status: "error" | "active" | "busy" | "inactive" | "maintenance" | null;
+    status: "error" | "active" | "inactive" | "maintenance" | "busy" | null;
     capabilities: unknown;
     configuration: unknown;
     lastActivity: Date | null;

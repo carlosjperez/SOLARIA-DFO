@@ -1,0 +1,49 @@
+# SOLARIA MCP HTTP Server - Production Dockerfile (Multi-Stage)
+# Optimized build with TypeScript compilation
+
+# ============================================================================
+# STAGE 1: Builder - Compile TypeScript
+# ============================================================================
+FROM node:22-alpine AS builder
+
+WORKDIR /build
+
+# Copy package files
+COPY mcp-server/package*.json ./
+
+# Install ALL dependencies (needed for TypeScript compilation)
+RUN npm ci
+
+# Copy source code
+COPY mcp-server/. .
+
+# Build TypeScript (outputs to dist/)
+RUN npm run build
+
+# ============================================================================
+# STAGE 2: Runner - Minimal production image
+# ============================================================================
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install production dependencies
+COPY mcp-server/package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+# Copy compiled code from builder stage
+COPY --from=builder /build/dist ./dist
+
+# Production environment
+ENV NODE_ENV=production
+ENV MCP_PORT=3031
+
+# Expose port
+EXPOSE 3031
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3031/health || exit 1
+
+# Start server with compiled code
+CMD ["node", "dist/http-server.js"]

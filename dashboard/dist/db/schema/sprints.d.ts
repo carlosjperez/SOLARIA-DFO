@@ -100,7 +100,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             tableName: "sprints";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "active" | "completed" | "cancelled" | "planned";
+            data: "completed" | "cancelled" | "planned" | "active";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -202,7 +202,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             tableName: "sprints";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "planning" | "development" | "testing" | "deployment" | "maintenance" | "custom";
+            data: "custom" | "planning" | "development" | "testing" | "deployment" | "maintenance";
             driverParam: string;
             notNull: false;
             hasDefault: true;

@@ -11,7 +11,7 @@ export declare function findAllProjects(limit?: number): Promise<{
     officeOrigin: "office" | "dfo" | null;
     officeVisible: number | null;
     description: string | null;
-    status: "planning" | "development" | "testing" | "deployment" | "completed" | "on_hold" | "cancelled" | null;
+    status: "completed" | "planning" | "development" | "testing" | "deployment" | "on_hold" | "cancelled" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     budget: string | null;
     actualCost: string | null;
@@ -37,7 +37,7 @@ export declare function findProjectById(id: number): Promise<{
     officeOrigin: "office" | "dfo" | null;
     officeVisible: number | null;
     description: string | null;
-    status: "planning" | "development" | "testing" | "deployment" | "completed" | "on_hold" | "cancelled" | null;
+    status: "completed" | "planning" | "development" | "testing" | "deployment" | "on_hold" | "cancelled" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     budget: string | null;
     actualCost: string | null;
@@ -63,7 +63,7 @@ export declare function findProjectByCode(code: string): Promise<{
     officeOrigin: "office" | "dfo" | null;
     officeVisible: number | null;
     description: string | null;
-    status: "planning" | "development" | "testing" | "deployment" | "completed" | "on_hold" | "cancelled" | null;
+    status: "completed" | "planning" | "development" | "testing" | "deployment" | "on_hold" | "cancelled" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     budget: string | null;
     actualCost: string | null;
@@ -91,7 +91,7 @@ export declare function updateProject(id: number, data: Partial<NewProject>): Pr
     officeOrigin: "office" | "dfo" | null;
     officeVisible: number | null;
     description: string | null;
-    status: "planning" | "development" | "testing" | "deployment" | "completed" | "on_hold" | "cancelled" | null;
+    status: "completed" | "planning" | "development" | "testing" | "deployment" | "on_hold" | "cancelled" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     budget: string | null;
     actualCost: string | null;
@@ -148,7 +148,7 @@ export declare function findProjectDocuments(projectId: number): Promise<{
     id: number;
     projectId: number;
     name: string;
-    type: "spec" | "contract" | "manual" | "design" | "report" | "other" | null;
+    type: "other" | "manual" | "spec" | "contract" | "design" | "report" | null;
     url: string;
     description: string | null;
     fileSize: number | null;
@@ -161,7 +161,7 @@ export declare function findProjectRequests(projectId: number): Promise<{
     id: number;
     projectId: number;
     text: string;
-    status: "completed" | "pending" | "approved" | "in_review" | "in_progress" | "rejected" | null;
+    status: "completed" | "in_progress" | "pending" | "in_review" | "approved" | "rejected" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     requestedBy: string | null;
     assignedTo: number | null;
@@ -175,7 +175,7 @@ export declare function updateProjectRequest(id: number, data: Partial<typeof pr
     id: number;
     projectId: number;
     text: string;
-    status: "completed" | "pending" | "approved" | "in_review" | "in_progress" | "rejected" | null;
+    status: "completed" | "in_progress" | "pending" | "in_review" | "approved" | "rejected" | null;
     priority: "critical" | "high" | "medium" | "low" | null;
     requestedBy: string | null;
     assignedTo: number | null;

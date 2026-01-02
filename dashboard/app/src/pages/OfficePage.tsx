@@ -14,8 +14,7 @@ import { cn } from '@/lib/utils';
 import { StandardPageLayout } from '@/components/layouts/StandardPageLayout';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatsGrid } from '@/components/common/StatsGrid';
-import { StatCard } from '@/components/common/StatCard';
-import type { StatConfig } from '@/components/common/StatCard';
+import { StatCard, type StatCardProps } from '@/components/common/StatCard';
 import { SearchAndFilterBar } from '@/components/common/SearchAndFilterBar';
 import { ContentGrid } from '@/components/common/ContentGrid';
 import { ContentGroup } from '@/components/common/ContentGroup';
@@ -37,28 +36,28 @@ import { ContentGroup } from '@/components/common/ContentGroup';
 type ViewMode = 'grid' | 'list';
 
 // Datos de ejemplo - Stats
-const EXAMPLE_STATS: StatConfig[] = [
+const EXAMPLE_STATS: StatCardProps[] = [
     {
         icon: Briefcase,
-        label: 'Total Items',
+        title: 'Total Items',
         value: '127',
         variant: 'default',
     },
     {
         icon: Target,
-        label: 'En Progreso',
+        title: 'En Progreso',
         value: '45',
         variant: 'warning',
     },
     {
         icon: Users,
-        label: 'Asignados',
+        title: 'Asignados',
         value: '12',
         variant: 'primary',
     },
     {
         icon: TrendingUp,
-        label: 'Completados',
+        title: 'Completados',
         value: '82',
         variant: 'success',
     },
@@ -291,8 +290,8 @@ export function OfficePage() {
             <StatsGrid>
                 {EXAMPLE_STATS.map((stat) => (
                     <StatCard
-                        key={stat.label}
-                        title={stat.label}
+                        key={stat.title}
+                        title={stat.title}
                         value={stat.value}
                         icon={stat.icon}
                         variant={stat.variant}

@@ -344,7 +344,7 @@ export declare const activityLogs: import("drizzle-orm/mysql-core").MySqlTableWi
             tableName: "activity_logs";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "development" | "testing" | "deployment" | "system" | "management" | "security";
+            data: "development" | "testing" | "deployment" | "management" | "security" | "system";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -361,7 +361,7 @@ export declare const activityLogs: import("drizzle-orm/mysql-core").MySqlTableWi
             tableName: "activity_logs";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "error" | "critical" | "warning" | "info" | "debug";
+            data: "critical" | "error" | "debug" | "info" | "warning";
             driverParam: string;
             notNull: false;
             hasDefault: true;

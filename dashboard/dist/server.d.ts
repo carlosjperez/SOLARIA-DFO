@@ -17,6 +17,7 @@ declare class SolariaDashboardServer {
     private workerUrl;
     private webhookService;
     private agentExecutionService;
+    private githubActionsService;
     constructor();
     private initializeMiddleware;
     private initializeDatabase;
@@ -110,6 +111,12 @@ declare class SolariaDashboardServer {
     private getAgent;
     private getAgentPerformance;
     private updateAgentStatus;
+    private getAgentMcpConfigs;
+    private getAgentMcpConfig;
+    private createAgentMcpConfig;
+    private updateAgentMcpConfig;
+    private deleteAgentMcpConfig;
+    private testAgentMcpConnection;
     /**
      * Helper: Recalculate task progress based on completed items
      * Also auto-completes task when all items are done
@@ -181,6 +188,16 @@ declare class SolariaDashboardServer {
      * - Auto-completes task if commit message contains "completes/closes/fixes/resolves DFO-XXX"
      */
     private handleGitHubWebhook;
+    /**
+     * Handle GitHub Actions workflow_run webhook
+     * DFO-201-EPIC21: Receive workflow status updates
+     *
+     * Events handled:
+     * - workflow_run.queued
+     * - workflow_run.in_progress
+     * - workflow_run.completed
+     */
+    private handleGitHubActionsWebhook;
     private getWebhooks;
     private getWebhook;
     private getWebhookDeliveries;
@@ -207,6 +224,26 @@ declare class SolariaDashboardServer {
      * GET /api/agent-execution/workers
      */
     private getWorkerStatus;
+    /**
+     * Trigger a GitHub Actions workflow
+     * POST /api/github/trigger-workflow
+     */
+    private triggerWorkflow;
+    /**
+     * Get GitHub Actions workflow run status
+     * GET /api/github/workflow-status/:run_id
+     */
+    private getWorkflowStatus;
+    /**
+     * Create a GitHub issue from a DFO task
+     * POST /api/github/create-issue
+     */
+    private createIssue;
+    /**
+     * Create a GitHub pull request from a DFO task
+     * POST /api/github/create-pr
+     */
+    private createPR;
     private testWebhook;
     /**
      * Dispatch webhook event (internal use)

@@ -1,176 +1,308 @@
 /**
  * MCP Proxy Tools
+ * DFO-196 | Epic 20 Sprint 2.2: Agent Integration
  *
- * @author ECO-Lambda | DFO 4.0 Epic 2 Sprint 2.2
- * @date 2025-12-31
- * @task DFO-2007
+ * @author ECO-Omega | DFO 4.0
+ * @date 2026-01-01 (updated)
+ * @task DFO-196
  *
- * Proxy tools to execute tools on external MCP servers
- * Allows agents to call tools from Context7, Playwright, CodeRabbit, etc.
+ * Proxy tools for executing commands on external MCP servers.
+ * Enables DFO to act as MCP client and forward tool calls to Context7, Playwright, CodeRabbit, etc.
  */
 
 import { z } from 'zod';
+import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { getMCPClientManager } from '../client/mcp-client-manager.js';
 import { ResponseBuilder, CommonErrors } from '../utils/response-builder.js';
 
-// ============================================================================
-// Validation Schemas
-// ============================================================================
-
-const ProxyExternalToolSchema = z.object({
-    server_name: z.string().min(1).describe('MCP server name (e.g., context7, playwright)'),
-    tool_name: z.string().min(1).describe('Tool to execute on the external server'),
-    parameters: z.record(z.unknown()).optional().describe('Parameters to pass to the tool'),
-});
-
-const ListExternalToolsSchema = z.object({
-    server_name: z.string().min(1).describe('MCP server name to list tools from'),
-});
+const VERSION = '4.0.0';
 
 // ============================================================================
-// Tool Implementations
+// Zod Validation Schemas
 // ============================================================================
 
 /**
- * Proxy a tool call to an external MCP server
- *
- * This allows agents to execute tools on external MCP servers like Context7,
- * Playwright, CodeRabbit, etc. without needing direct access.
+ * Schema for proxy_external_tool
+ * Executes a tool on an external MCP server
  */
-export async function proxyExternalTool(
-    params: z.infer<typeof ProxyExternalToolSchema>
-): Promise<string> {
-    const builder = new ResponseBuilder({ version: '1.0.0' });
+const ProxyExternalToolInputSchema = z.object({
+  server_name: z
+    .string()
+    .min(1, 'Server name is required')
+    .describe('Name of the external MCP server (e.g., "context7", "playwright", "coderabbit")'),
+  tool_name: z
+    .string()
+    .min(1, 'Tool name is required')
+    .describe('Name of the tool to execute on the external server'),
+  params: z
+    .record(z.unknown())
+    .default({})
+    .describe('Parameters to pass to the external tool'),
+  format: z.enum(['json', 'human']).default('json').describe('Output format'),
+});
+
+/**
+ * Schema for list_external_tools
+ * Discovers available tools on external MCP servers
+ */
+const ListExternalToolsInputSchema = z.object({
+  server_name: z
+    .string()
+    .optional()
+    .describe(
+      'Optional server name to filter tools. If omitted, lists tools from all connected servers.'
+    ),
+  format: z.enum(['json', 'human']).default('json').describe('Output format'),
+});
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * Result from executing an external tool
+ */
+interface ToolCallResult {
+  success: boolean;
+  content?: unknown;
+  error?: string;
+}
+
+/**
+ * Metadata about an external tool
+ */
+interface ExternalTool {
+  server_name: string;
+  tool_name: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+/**
+ * Response data for proxy_external_tool
+ */
+interface ProxyToolResponse {
+  server_name: string;
+  tool_name: string;
+  executed: boolean;
+  result: unknown;
+  execution_time_ms: number;
+}
+
+/**
+ * Response data for list_external_tools
+ */
+interface ListToolsResponse {
+  total_servers: number;
+  total_tools: number;
+  servers: {
+    name: string;
+    connected: boolean;
+    tools_count: number;
+    tools: {
+      name: string;
+      description?: string;
+    }[];
+  }[];
+}
+
+// ============================================================================
+// Tool: proxy_external_tool
+// ============================================================================
+
+export const proxyExternalTool: Tool = {
+  name: 'proxy_external_tool',
+  description: `Execute a tool on an external MCP server.
+
+This tool allows DFO to forward tool calls to external MCP servers like Context7 (documentation),
+Playwright (browser automation), or CodeRabbit (code reviews).
+
+Example use cases:
+- Query Context7 for library documentation during development
+- Execute browser automation via Playwright for testing
+- Request code reviews from CodeRabbit for quality assurance
+
+The external server must be configured and connected in the agent's MCP configuration.`,
+
+  inputSchema: ProxyExternalToolInputSchema,
+
+  async execute(params: z.infer<typeof ProxyExternalToolInputSchema>) {
+    const builder = new ResponseBuilder({ version: VERSION });
+    const startTime = Date.now();
 
     try {
-        const { server_name, tool_name, parameters = {} } = params;
+      const manager = getMCPClientManager();
 
-        // Get MCP client manager
-        const manager = getMCPClientManager();
+      // Validate server connection
+      if (!manager.isConnected(params.server_name)) {
+        return builder.error(
+          CommonErrors.notFound('MCP server', params.server_name, {
+            suggestion:
+              'Ensure the MCP server is configured in the agent MCP config and connected. Use list_external_tools to see available servers.',
+          })
+        );
+      }
 
-        // Check if server is connected
-        if (!manager.isConnected(server_name)) {
-            return JSON.stringify(
-                builder.error({
-                    code: 'MCP_SERVER_NOT_CONNECTED',
-                    message: `MCP server '${server_name}' is not connected`,
-                    details: { server_name },
-                    suggestion: 'Ensure the agent has this MCP server configured and enabled',
-                })
-            );
-        }
+      // Execute tool on external server
+      const result: ToolCallResult = await manager.executeTool(
+        params.server_name,
+        params.tool_name,
+        params.params
+      );
 
-        // Execute tool on external server
-        const result = await manager.executeTool(server_name, tool_name, parameters);
+      if (!result.success) {
+        return builder.error({
+          code: 'EXTERNAL_TOOL_EXECUTION_FAILED',
+          message: `Failed to execute tool "${params.tool_name}" on server "${params.server_name}"`,
+          details: {
+            server: params.server_name,
+            tool: params.tool_name,
+            error: result.error,
+          },
+          suggestion: 'Check tool name and parameters. Use list_external_tools to verify available tools.',
+        });
+      }
 
-        if (!result.success) {
-            return JSON.stringify(
-                builder.error({
-                    code: 'TOOL_EXECUTION_FAILED',
-                    message: `Tool '${tool_name}' on server '${server_name}' failed: ${result.error}`,
-                    details: {
-                        server_name,
-                        tool_name,
-                        error: result.error,
-                    },
-                })
-            );
-        }
+      const executionTime = Date.now() - startTime;
 
-        // Format successful result
-        const data = {
-            server_name,
-            tool_name,
-            result: result.content,
-        };
+      const data: ProxyToolResponse = {
+        server_name: params.server_name,
+        tool_name: params.tool_name,
+        executed: true,
+        result: result.content,
+        execution_time_ms: executionTime,
+      };
 
-        const formatted = `✓ Successfully executed '${tool_name}' on ${server_name}
+      // Human-readable formatting
+      const formatted = `✅ External Tool Executed Successfully
+
+Server: ${params.server_name}
+Tool: ${params.tool_name}
+Execution Time: ${executionTime}ms
 
 Result:
-${typeof result.content === 'string' ? result.content : JSON.stringify(result.content, null, 2)}`;
+${JSON.stringify(result.content, null, 2)}`;
 
-        return JSON.stringify(
-            builder.success(data, { format: 'human', formatted })
-        );
+      return builder.success(data, {
+        format: params.format,
+        formatted,
+      });
     } catch (error: any) {
-        return JSON.stringify(builder.errorFromException(error));
+      return builder.errorFromException(error);
     }
-}
+  },
+};
 
-/**
- * List available tools on an external MCP server
- *
- * Useful for discovering what tools are available on a connected MCP server.
- */
-export async function listExternalTools(
-    params: z.infer<typeof ListExternalToolsSchema>
-): Promise<string> {
-    const builder = new ResponseBuilder({ version: '1.0.0' });
+export const listExternalTools: Tool = {
+  name: 'list_external_tools',
+  description: `List available tools from external MCP servers.
+
+Discovers all tools available on connected external MCP servers. This is useful for:
+- Understanding what capabilities are available
+- Verifying server connections
+- Finding the correct tool name for proxy_external_tool
+
+If server_name is provided, only lists tools from that server. Otherwise, lists all tools from all connected servers.`,
+
+  inputSchema: ListExternalToolsInputSchema,
+
+  async execute(params: z.infer<typeof ListExternalToolsInputSchema>) {
+    const builder = new ResponseBuilder({ version: VERSION });
 
     try {
-        const { server_name } = params;
+      const manager = getMCPClientManager();
 
-        // Get MCP client manager
-        const manager = getMCPClientManager();
+      // Get all connected servers
+      const allServers = manager.listServers();
 
-        // Check if server is connected
-        if (!manager.isConnected(server_name)) {
-            return JSON.stringify(
-                builder.error({
-                    code: 'MCP_SERVER_NOT_CONNECTED',
-                    message: `MCP server '${server_name}' is not connected`,
-                    details: { server_name },
-                    suggestion: 'Ensure the agent has this MCP server configured and enabled',
-                })
-            );
-        }
-
-        // List tools
-        const tools = manager.listTools(server_name);
-
-        // Format tools list
-        const toolsList = tools.map((tool) => ({
-            name: tool.name,
-            description: tool.description || 'No description',
-            input_schema: tool.inputSchema,
-        }));
-
-        const data = {
-            server_name,
-            tools_count: toolsList.length,
-            tools: toolsList,
-        };
-
-        const formatted = `📋 Found ${toolsList.length} tools on ${server_name}
-
-${toolsList.map((t, i) => `${i + 1}. ${t.name}
-   ${t.description}`).join('\n\n')}`;
-
-        return JSON.stringify(
-            builder.success(data, { format: 'human', formatted })
+      if (allServers.length === 0) {
+        return builder.error(
+          CommonErrors.validation({
+            field: 'external_servers',
+            message: 'No external MCP servers are connected',
+            suggestion:
+              'Configure and connect external MCP servers in the agent MCP configuration before using proxy tools.',
+          })
         );
+      }
+
+      // Filter by server_name if provided
+      const targetServers = params.server_name
+        ? allServers.filter((s) => s.name === params.server_name)
+        : allServers;
+
+      if (params.server_name && targetServers.length === 0) {
+        return builder.error(
+          CommonErrors.notFound('MCP server', params.server_name, {
+            suggestion: `Available servers: ${allServers.map((s) => s.name).join(', ')}`,
+          })
+        );
+      }
+
+      // Fetch tools from each server
+      const serversData = await Promise.all(
+        targetServers.map(async (server) => {
+          try {
+            const tools = await manager.listTools(server.name);
+            return {
+              name: server.name,
+              connected: true,
+              tools_count: tools.length,
+              tools: tools.map((t) => ({
+                name: t.name,
+                description: t.description,
+              })),
+            };
+          } catch (error) {
+            return {
+              name: server.name,
+              connected: false,
+              tools_count: 0,
+              tools: [],
+            };
+          }
+        })
+      );
+
+      const totalTools = serversData.reduce((sum, s) => sum + s.tools_count, 0);
+
+      const data: ListToolsResponse = {
+        total_servers: serversData.length,
+        total_tools: totalTools,
+        servers: serversData,
+      };
+
+      // Human-readable formatting
+      const formatted = `🔌 External MCP Servers and Tools
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Total Servers: ${data.total_servers}
+Total Tools: ${data.total_tools}
+
+${serversData
+  .map(
+    (server) => `
+📡 Server: ${server.name}
+   Status: ${server.connected ? '✓ Connected' : '✗ Disconnected'}
+   Tools: ${server.tools_count}
+
+${server.tools.map((tool) => `   • ${tool.name}${tool.description ? `\n     ${tool.description}` : ''}`).join('\n')}
+`
+  )
+  .join('\n')}`;
+
+      return builder.success(data, {
+        format: params.format,
+        formatted,
+      });
     } catch (error: any) {
-        return JSON.stringify(builder.errorFromException(error));
+      return builder.errorFromException(error);
     }
-}
+  },
+};
 
 // ============================================================================
-// Tool Exports
+// Export all tools
 // ============================================================================
 
-export const mcpProxyTools = [
-    {
-        name: 'proxy_external_tool',
-        description:
-            'Execute a tool on an external MCP server (Context7, Playwright, CodeRabbit, etc.). Allows agents to call tools from connected MCP servers.',
-        inputSchema: ProxyExternalToolSchema,
-        handler: proxyExternalTool,
-    },
-    {
-        name: 'list_external_tools',
-        description:
-            'List available tools on a connected external MCP server. Useful for discovering what tools are available.',
-        inputSchema: ListExternalToolsSchema,
-        handler: listExternalTools,
-    },
-];
+export const mcpProxyTools = [proxyExternalTool, listExternalTools];

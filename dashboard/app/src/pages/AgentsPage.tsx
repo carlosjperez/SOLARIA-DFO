@@ -1,6 +1,8 @@
-import { Bot, Activity, Clock, CheckCircle2, AlertCircle, Settings } from 'lucide-react';
+import { Bot, Activity, Clock, CheckCircle2, AlertCircle, Settings, Server } from 'lucide-react';
+import { useState } from 'react';
 import { useAgents } from '@/hooks/useApi';
 import { cn, formatRelativeTime, getStatusColor } from '@/lib/utils';
+import { AgentConfigEditor } from '@/components/agents/AgentConfigEditor';
 import type { Agent } from '@/types';
 
 const statusLabels: Record<string, { label: string; icon: React.ElementType }> = {
@@ -11,12 +13,21 @@ const statusLabels: Record<string, { label: string; icon: React.ElementType }> =
     maintenance: { label: 'Mantenimiento', icon: Settings },
 };
 
-function AgentCard({ agent }: { agent: Agent }) {
+function AgentCard({ agent, onConfigClick }: { agent: Agent; onConfigClick: (agent: Agent) => void }) {
     const statusInfo = statusLabels[agent.status] || statusLabels.inactive;
     const StatusIcon = statusInfo.icon;
 
     return (
-        <div className="rounded-xl border border-border bg-card p-6 hover:border-primary/50 transition-colors">
+        <div className="rounded-xl border border-border bg-card p-6 hover:border-primary/50 transition-colors relative">
+            {/* Config Button */}
+            <button
+                onClick={() => onConfigClick(agent)}
+                className="absolute top-4 right-4 p-2 rounded-lg hover:bg-muted transition-colors"
+                title="Configurar conexiones MCP"
+            >
+                <Server className="h-4 w-4 text-muted-foreground" />
+            </button>
+
             {/* Header */}
             <div className="flex items-start gap-4">
                 <div className="relative">
@@ -159,6 +170,7 @@ function AgentStats({ agents }: { agents: Agent[] }) {
 
 export function AgentsPage() {
     const { data: agents, isLoading } = useAgents();
+    const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
 
     if (isLoading) {
         return (
@@ -187,7 +199,7 @@ export function AgentsPage() {
             <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {agents && agents.length > 0 ? (
                     agents.map((agent: Agent) => (
-                        <AgentCard key={agent.id} agent={agent} />
+                        <AgentCard key={agent.id} agent={agent} onConfigClick={setSelectedAgent} />
                     ))
                 ) : (
                     <div className="col-span-full py-12 text-center text-muted-foreground">
@@ -195,6 +207,34 @@ export function AgentsPage() {
                     </div>
                 )}
             </div>
+
+            {/* MCP Config Modal */}
+            {selectedAgent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedAgent(null)}>
+                    <div
+                        className="bg-card border border-border rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-auto m-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-semibold">Configuración MCP</h2>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {selectedAgent.name}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedAgent(null)}
+                                className="p-2 hover:bg-muted rounded-lg transition-colors"
+                            >
+                                <span className="text-2xl">&times;</span>
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <AgentConfigEditor agentId={selectedAgent.id} agentName={selectedAgent.name} />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
