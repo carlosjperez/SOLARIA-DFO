@@ -4,9 +4,9 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.projectsRelations = exports.projectMetrics = exports.projectRequests = exports.requestStatusEnum = exports.projectDocuments = exports.projectClients = exports.documentTypeEnum = exports.projects = exports.officeOriginEnum = exports.priorityEnum = exports.projectStatusEnum = void 0;
-const mysql_core_1 = require("drizzle-orm/mysql-core");
-const drizzle_orm_1 = require("drizzle-orm");
-const users_js_1 = require("./users.js");
+var mysql_core_1 = require("drizzle-orm/mysql-core");
+var drizzle_orm_1 = require("drizzle-orm");
+var users_js_1 = require("./users.js");
 // Project status enum
 exports.projectStatusEnum = (0, mysql_core_1.mysqlEnum)('status', [
     'planning',
@@ -46,7 +46,7 @@ exports.projects = (0, mysql_core_1.mysqlTable)('projects', {
     tags: (0, mysql_core_1.json)('tags').$type(), // ["SAAS", "REACT", "B2B"]
     // Stack (JSON array of tech names)
     stack: (0, mysql_core_1.json)('stack').$type(), // ["React", "Node.js", "MariaDB"]
-    createdBy: (0, mysql_core_1.int)('created_by').references(() => users_js_1.users.id, { onDelete: 'set null' }),
+    createdBy: (0, mysql_core_1.int)('created_by').references(function () { return users_js_1.users.id; }, { onDelete: 'set null' }),
     // Office CRM link
     officeClientId: (0, mysql_core_1.int)('office_client_id'),
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
@@ -67,7 +67,7 @@ exports.projectClients = (0, mysql_core_1.mysqlTable)('project_clients', {
     projectId: (0, mysql_core_1.int)('project_id')
         .notNull()
         .unique()
-        .references(() => exports.projects.id, { onDelete: 'cascade' }),
+        .references(function () { return exports.projects.id; }, { onDelete: 'cascade' }),
     name: (0, mysql_core_1.varchar)('name', { length: 200 }).notNull(),
     fiscalName: (0, mysql_core_1.varchar)('fiscal_name', { length: 300 }),
     rfc: (0, mysql_core_1.varchar)('rfc', { length: 20 }),
@@ -87,13 +87,13 @@ exports.projectDocuments = (0, mysql_core_1.mysqlTable)('project_documents', {
     id: (0, mysql_core_1.int)('id').primaryKey().autoincrement(),
     projectId: (0, mysql_core_1.int)('project_id')
         .notNull()
-        .references(() => exports.projects.id, { onDelete: 'cascade' }),
+        .references(function () { return exports.projects.id; }, { onDelete: 'cascade' }),
     name: (0, mysql_core_1.varchar)('name', { length: 300 }).notNull(),
     type: exports.documentTypeEnum.default('other'),
     url: (0, mysql_core_1.varchar)('url', { length: 500 }).notNull(),
     description: (0, mysql_core_1.text)('description'),
     fileSize: (0, mysql_core_1.int)('file_size'),
-    uploadedBy: (0, mysql_core_1.int)('uploaded_by').references(() => users_js_1.users.id, { onDelete: 'set null' }),
+    uploadedBy: (0, mysql_core_1.int)('uploaded_by').references(function () { return users_js_1.users.id; }, { onDelete: 'set null' }),
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
     updatedAt: (0, mysql_core_1.timestamp)('updated_at').defaultNow().onUpdateNow(),
 });
@@ -111,7 +111,7 @@ exports.projectRequests = (0, mysql_core_1.mysqlTable)('project_requests', {
     id: (0, mysql_core_1.int)('id').primaryKey().autoincrement(),
     projectId: (0, mysql_core_1.int)('project_id')
         .notNull()
-        .references(() => exports.projects.id, { onDelete: 'cascade' }),
+        .references(function () { return exports.projects.id; }, { onDelete: 'cascade' }),
     text: (0, mysql_core_1.text)('text').notNull(),
     status: exports.requestStatusEnum.default('pending'),
     priority: exports.priorityEnum.default('medium'),
@@ -127,7 +127,7 @@ exports.projectMetrics = (0, mysql_core_1.mysqlTable)('project_metrics', {
     id: (0, mysql_core_1.int)('id').primaryKey().autoincrement(),
     projectId: (0, mysql_core_1.int)('project_id')
         .notNull()
-        .references(() => exports.projects.id, { onDelete: 'cascade' }),
+        .references(function () { return exports.projects.id; }, { onDelete: 'cascade' }),
     metricDate: (0, mysql_core_1.date)('metric_date').notNull(),
     completionPercentage: (0, mysql_core_1.decimal)('completion_percentage', { precision: 5, scale: 2 }).default('0'),
     agentEfficiency: (0, mysql_core_1.decimal)('agent_efficiency', { precision: 5, scale: 2 }).default('0'),
@@ -142,16 +142,20 @@ exports.projectMetrics = (0, mysql_core_1.mysqlTable)('project_metrics', {
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
 });
 // Relations
-exports.projectsRelations = (0, drizzle_orm_1.relations)(exports.projects, ({ one, many }) => ({
-    createdByUser: one(users_js_1.users, {
-        fields: [exports.projects.createdBy],
-        references: [users_js_1.users.id],
-    }),
-    client: one(exports.projectClients, {
-        fields: [exports.projects.id],
-        references: [exports.projectClients.projectId],
-    }),
-    documents: many(exports.projectDocuments),
-    requests: many(exports.projectRequests),
-    metrics: many(exports.projectMetrics),
-}));
+exports.projectsRelations = (0, drizzle_orm_1.relations)(exports.projects, function (_a) {
+    var one = _a.one, many = _a.many;
+    return ({
+        createdByUser: one(users_js_1.users, {
+            fields: [exports.projects.createdBy],
+            references: [users_js_1.users.id],
+        }),
+        client: one(exports.projectClients, {
+            fields: [exports.projects.id],
+            references: [exports.projectClients.projectId],
+        }),
+        documents: many(exports.projectDocuments),
+        requests: many(exports.projectRequests),
+        metrics: many(exports.projectMetrics),
+    });
+});
+//# sourceMappingURL=projects.js.map

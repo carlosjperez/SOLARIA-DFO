@@ -7,12 +7,12 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.epicsRelations = exports.epics = exports.epicStatusEnum = void 0;
-const mysql_core_1 = require("drizzle-orm/mysql-core");
-const drizzle_orm_1 = require("drizzle-orm");
-const projects_js_1 = require("./projects.js");
-const users_js_1 = require("./users.js");
-const sprints_js_1 = require("./sprints.js");
-const tasks_js_1 = require("./tasks.js");
+var mysql_core_1 = require("drizzle-orm/mysql-core");
+var drizzle_orm_1 = require("drizzle-orm");
+var projects_js_1 = require("./projects.js");
+var users_js_1 = require("./users.js");
+var sprints_js_1 = require("./sprints.js");
+var tasks_js_1 = require("./tasks.js");
 // Epic status enum
 exports.epicStatusEnum = (0, mysql_core_1.mysqlEnum)('status', [
     'open',
@@ -25,8 +25,8 @@ exports.epics = (0, mysql_core_1.mysqlTable)('epics', {
     id: (0, mysql_core_1.int)('id').primaryKey().autoincrement(),
     projectId: (0, mysql_core_1.int)('project_id')
         .notNull()
-        .references(() => projects_js_1.projects.id, { onDelete: 'cascade' }),
-    sprintId: (0, mysql_core_1.int)('sprint_id').references(() => sprints_js_1.sprints.id, { onDelete: 'set null' }),
+        .references(function () { return projects_js_1.projects.id; }, { onDelete: 'cascade' }),
+    sprintId: (0, mysql_core_1.int)('sprint_id').references(function () { return sprints_js_1.sprints.id; }, { onDelete: 'set null' }),
     epicNumber: (0, mysql_core_1.int)('epic_number').notNull(),
     name: (0, mysql_core_1.varchar)('name', { length: 200 }).notNull(),
     description: (0, mysql_core_1.text)('description'),
@@ -34,23 +34,27 @@ exports.epics = (0, mysql_core_1.mysqlTable)('epics', {
     status: exports.epicStatusEnum.default('open'),
     startDate: (0, mysql_core_1.date)('start_date'),
     targetDate: (0, mysql_core_1.date)('target_date'),
-    createdBy: (0, mysql_core_1.int)('created_by').references(() => users_js_1.users.id, { onDelete: 'set null' }),
+    createdBy: (0, mysql_core_1.int)('created_by').references(function () { return users_js_1.users.id; }, { onDelete: 'set null' }),
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
     updatedAt: (0, mysql_core_1.timestamp)('updated_at').defaultNow().onUpdateNow(),
 });
 // Relations definition
-exports.epicsRelations = (0, drizzle_orm_1.relations)(exports.epics, ({ one, many }) => ({
-    project: one(projects_js_1.projects, {
-        fields: [exports.epics.projectId],
-        references: [projects_js_1.projects.id],
-    }),
-    sprint: one(sprints_js_1.sprints, {
-        fields: [exports.epics.sprintId],
-        references: [sprints_js_1.sprints.id],
-    }),
-    createdByUser: one(users_js_1.users, {
-        fields: [exports.epics.createdBy],
-        references: [users_js_1.users.id],
-    }),
-    tasks: many(tasks_js_1.tasks),
-}));
+exports.epicsRelations = (0, drizzle_orm_1.relations)(exports.epics, function (_a) {
+    var one = _a.one, many = _a.many;
+    return ({
+        project: one(projects_js_1.projects, {
+            fields: [exports.epics.projectId],
+            references: [projects_js_1.projects.id],
+        }),
+        sprint: one(sprints_js_1.sprints, {
+            fields: [exports.epics.sprintId],
+            references: [sprints_js_1.sprints.id],
+        }),
+        createdByUser: one(users_js_1.users, {
+            fields: [exports.epics.createdBy],
+            references: [users_js_1.users.id],
+        }),
+        tasks: many(tasks_js_1.tasks),
+    });
+});
+//# sourceMappingURL=epics.js.map

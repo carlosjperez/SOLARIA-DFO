@@ -7,11 +7,11 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.githubTaskLinksRelations = exports.githubWorkflowRunsRelations = exports.githubWorkflowsRelations = exports.githubTaskLinks = exports.githubWorkflowRuns = exports.githubWorkflows = exports.syncStatusEnum = exports.resourceTypeEnum = exports.lastRunStatusEnum = exports.runConclusionEnum = exports.workflowRunStatusEnum = exports.triggerTypeEnum = void 0;
-const mysql_core_1 = require("drizzle-orm/mysql-core");
-const drizzle_orm_1 = require("drizzle-orm");
-const tasks_js_1 = require("./tasks.js");
-const projects_js_1 = require("./projects.js");
-const agents_js_1 = require("./agents.js");
+var mysql_core_1 = require("drizzle-orm/mysql-core");
+var drizzle_orm_1 = require("drizzle-orm");
+var tasks_js_1 = require("./tasks.js");
+var projects_js_1 = require("./projects.js");
+var agents_js_1 = require("./agents.js");
 // ============================================================================
 // Enums
 // ============================================================================
@@ -70,8 +70,8 @@ exports.githubWorkflows = (0, mysql_core_1.mysqlTable)('github_workflows', {
     // Project and Task Context
     projectId: (0, mysql_core_1.int)('project_id')
         .notNull()
-        .references(() => projects_js_1.projects.id, { onDelete: 'cascade' }),
-    taskId: (0, mysql_core_1.int)('task_id').references(() => tasks_js_1.tasks.id, { onDelete: 'set null' }),
+        .references(function () { return projects_js_1.projects.id; }, { onDelete: 'cascade' }),
+    taskId: (0, mysql_core_1.int)('task_id').references(function () { return tasks_js_1.tasks.id; }, { onDelete: 'set null' }),
     // Workflow Identification
     workflowName: (0, mysql_core_1.varchar)('workflow_name', { length: 255 }).notNull(),
     workflowPath: (0, mysql_core_1.varchar)('workflow_path', { length: 500 }).notNull(),
@@ -93,10 +93,10 @@ exports.githubWorkflows = (0, mysql_core_1.mysqlTable)('github_workflows', {
     // Metadata
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
     updatedAt: (0, mysql_core_1.timestamp)('updated_at').defaultNow().onUpdateNow(),
-    createdByAgentId: (0, mysql_core_1.int)('created_by_agent_id').references(() => agents_js_1.aiAgents.id, {
+    createdByAgentId: (0, mysql_core_1.int)('created_by_agent_id').references(function () { return agents_js_1.aiAgents.id; }, {
         onDelete: 'set null',
     }),
-}, (table) => ({
+}, function (table) { return ({
     // Indexes
     projectIdIdx: (0, mysql_core_1.index)('idx_github_workflows_project_id').on(table.projectId),
     taskIdIdx: (0, mysql_core_1.index)('idx_github_workflows_task_id').on(table.taskId),
@@ -110,7 +110,7 @@ exports.githubWorkflows = (0, mysql_core_1.mysqlTable)('github_workflows', {
     lastRunIdx: (0, mysql_core_1.index)('idx_github_workflows_last_run').on(table.lastRunStatus, table.lastRunAt),
     // Unique constraint
     workflowRepoPathUnique: (0, mysql_core_1.unique)('uq_workflow_repo_path').on(table.repository, table.workflowPath),
-}));
+}); });
 /**
  * github_workflow_runs table
  * Tracks individual GitHub Actions workflow executions
@@ -120,11 +120,11 @@ exports.githubWorkflowRuns = (0, mysql_core_1.mysqlTable)('github_workflow_runs'
     // Workflow Association
     workflowId: (0, mysql_core_1.int)('workflow_id')
         .notNull()
-        .references(() => exports.githubWorkflows.id, { onDelete: 'cascade' }),
+        .references(function () { return exports.githubWorkflows.id; }, { onDelete: 'cascade' }),
     projectId: (0, mysql_core_1.int)('project_id')
         .notNull()
-        .references(() => projects_js_1.projects.id, { onDelete: 'cascade' }),
-    taskId: (0, mysql_core_1.int)('task_id').references(() => tasks_js_1.tasks.id, { onDelete: 'set null' }),
+        .references(function () { return projects_js_1.projects.id; }, { onDelete: 'cascade' }),
+    taskId: (0, mysql_core_1.int)('task_id').references(function () { return tasks_js_1.tasks.id; }, { onDelete: 'set null' }),
     // GitHub Run Information
     githubRunId: (0, mysql_core_1.bigint)('github_run_id', { mode: 'number' }).notNull(),
     githubRunNumber: (0, mysql_core_1.int)('github_run_number').notNull(),
@@ -153,7 +153,7 @@ exports.githubWorkflowRuns = (0, mysql_core_1.mysqlTable)('github_workflow_runs'
     // Metadata
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
     updatedAt: (0, mysql_core_1.timestamp)('updated_at').defaultNow().onUpdateNow(),
-}, (table) => ({
+}, function (table) { return ({
     // Indexes
     workflowIdIdx: (0, mysql_core_1.index)('idx_github_workflow_runs_workflow_id').on(table.workflowId),
     projectIdIdx: (0, mysql_core_1.index)('idx_github_workflow_runs_project_id').on(table.projectId),
@@ -171,7 +171,7 @@ exports.githubWorkflowRuns = (0, mysql_core_1.mysqlTable)('github_workflow_runs'
     // Unique constraints
     webhookDeliveryUnique: (0, mysql_core_1.unique)('uq_webhook_delivery').on(table.webhookDeliveryId),
     githubRunIdUnique: (0, mysql_core_1.unique)('uq_github_run_id').on(table.githubRunId),
-}));
+}); });
 /**
  * github_task_links table
  * Links DFO tasks to GitHub resources (Pull Requests, Issues, Branches)
@@ -181,10 +181,10 @@ exports.githubTaskLinks = (0, mysql_core_1.mysqlTable)('github_task_links', {
     // Task Association
     taskId: (0, mysql_core_1.int)('task_id')
         .notNull()
-        .references(() => tasks_js_1.tasks.id, { onDelete: 'cascade' }),
+        .references(function () { return tasks_js_1.tasks.id; }, { onDelete: 'cascade' }),
     projectId: (0, mysql_core_1.int)('project_id')
         .notNull()
-        .references(() => projects_js_1.projects.id, { onDelete: 'cascade' }),
+        .references(function () { return projects_js_1.projects.id; }, { onDelete: 'cascade' }),
     // GitHub Resource Identification
     resourceType: exports.resourceTypeEnum.notNull(),
     repository: (0, mysql_core_1.varchar)('repository', { length: 255 }).notNull(),
@@ -205,13 +205,13 @@ exports.githubTaskLinks = (0, mysql_core_1.mysqlTable)('github_task_links', {
     syncError: (0, mysql_core_1.text)('sync_error'),
     // Auto-Creation Tracking
     autoCreated: (0, mysql_core_1.boolean)('auto_created').default(false),
-    createdByAgentId: (0, mysql_core_1.int)('created_by_agent_id').references(() => agents_js_1.aiAgents.id, {
+    createdByAgentId: (0, mysql_core_1.int)('created_by_agent_id').references(function () { return agents_js_1.aiAgents.id; }, {
         onDelete: 'set null',
     }),
     // Metadata
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
     updatedAt: (0, mysql_core_1.timestamp)('updated_at').defaultNow().onUpdateNow(),
-}, (table) => ({
+}, function (table) { return ({
     // Indexes
     taskIdIdx: (0, mysql_core_1.index)('idx_github_task_links_task_id').on(table.taskId),
     projectIdIdx: (0, mysql_core_1.index)('idx_github_task_links_project_id').on(table.projectId),
@@ -227,50 +227,60 @@ exports.githubTaskLinks = (0, mysql_core_1.mysqlTable)('github_task_links', {
     repoTypeIdx: (0, mysql_core_1.index)('idx_github_task_links_repo_type').on(table.repository, table.resourceType),
     syncErrorIdx: (0, mysql_core_1.index)('idx_github_task_links_sync_error').on(table.syncStatus, table.lastSyncedAt),
     autoCreatedIdx: (0, mysql_core_1.index)('idx_github_task_links_auto_created').on(table.autoCreated, table.createdAt),
-}));
+}); });
 // ============================================================================
 // Relations
 // ============================================================================
-exports.githubWorkflowsRelations = (0, drizzle_orm_1.relations)(exports.githubWorkflows, ({ one, many }) => ({
-    project: one(projects_js_1.projects, {
-        fields: [exports.githubWorkflows.projectId],
-        references: [projects_js_1.projects.id],
-    }),
-    task: one(tasks_js_1.tasks, {
-        fields: [exports.githubWorkflows.taskId],
-        references: [tasks_js_1.tasks.id],
-    }),
-    createdBy: one(agents_js_1.aiAgents, {
-        fields: [exports.githubWorkflows.createdByAgentId],
-        references: [agents_js_1.aiAgents.id],
-    }),
-    runs: many(exports.githubWorkflowRuns),
-}));
-exports.githubWorkflowRunsRelations = (0, drizzle_orm_1.relations)(exports.githubWorkflowRuns, ({ one }) => ({
-    workflow: one(exports.githubWorkflows, {
-        fields: [exports.githubWorkflowRuns.workflowId],
-        references: [exports.githubWorkflows.id],
-    }),
-    project: one(projects_js_1.projects, {
-        fields: [exports.githubWorkflowRuns.projectId],
-        references: [projects_js_1.projects.id],
-    }),
-    task: one(tasks_js_1.tasks, {
-        fields: [exports.githubWorkflowRuns.taskId],
-        references: [tasks_js_1.tasks.id],
-    }),
-}));
-exports.githubTaskLinksRelations = (0, drizzle_orm_1.relations)(exports.githubTaskLinks, ({ one }) => ({
-    task: one(tasks_js_1.tasks, {
-        fields: [exports.githubTaskLinks.taskId],
-        references: [tasks_js_1.tasks.id],
-    }),
-    project: one(projects_js_1.projects, {
-        fields: [exports.githubTaskLinks.projectId],
-        references: [projects_js_1.projects.id],
-    }),
-    createdBy: one(agents_js_1.aiAgents, {
-        fields: [exports.githubTaskLinks.createdByAgentId],
-        references: [agents_js_1.aiAgents.id],
-    }),
-}));
+exports.githubWorkflowsRelations = (0, drizzle_orm_1.relations)(exports.githubWorkflows, function (_a) {
+    var one = _a.one, many = _a.many;
+    return ({
+        project: one(projects_js_1.projects, {
+            fields: [exports.githubWorkflows.projectId],
+            references: [projects_js_1.projects.id],
+        }),
+        task: one(tasks_js_1.tasks, {
+            fields: [exports.githubWorkflows.taskId],
+            references: [tasks_js_1.tasks.id],
+        }),
+        createdBy: one(agents_js_1.aiAgents, {
+            fields: [exports.githubWorkflows.createdByAgentId],
+            references: [agents_js_1.aiAgents.id],
+        }),
+        runs: many(exports.githubWorkflowRuns),
+    });
+});
+exports.githubWorkflowRunsRelations = (0, drizzle_orm_1.relations)(exports.githubWorkflowRuns, function (_a) {
+    var one = _a.one;
+    return ({
+        workflow: one(exports.githubWorkflows, {
+            fields: [exports.githubWorkflowRuns.workflowId],
+            references: [exports.githubWorkflows.id],
+        }),
+        project: one(projects_js_1.projects, {
+            fields: [exports.githubWorkflowRuns.projectId],
+            references: [projects_js_1.projects.id],
+        }),
+        task: one(tasks_js_1.tasks, {
+            fields: [exports.githubWorkflowRuns.taskId],
+            references: [tasks_js_1.tasks.id],
+        }),
+    });
+});
+exports.githubTaskLinksRelations = (0, drizzle_orm_1.relations)(exports.githubTaskLinks, function (_a) {
+    var one = _a.one;
+    return ({
+        task: one(tasks_js_1.tasks, {
+            fields: [exports.githubTaskLinks.taskId],
+            references: [tasks_js_1.tasks.id],
+        }),
+        project: one(projects_js_1.projects, {
+            fields: [exports.githubTaskLinks.projectId],
+            references: [projects_js_1.projects.id],
+        }),
+        createdBy: one(agents_js_1.aiAgents, {
+            fields: [exports.githubTaskLinks.createdByAgentId],
+            references: [agents_js_1.aiAgents.id],
+        }),
+    });
+});
+//# sourceMappingURL=github-workflows.js.map

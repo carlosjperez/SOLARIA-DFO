@@ -4,12 +4,12 @@
  * Represents high-level features or workstreams within a sprint.
  * Epics group related tasks and belong to a specific sprint.
  */
-export declare const epicStatusEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"status", ["open", "in_progress", "completed", "cancelled"]>;
-export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const epicStatusEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"status", ["open", "in_progress", "completed", "cancelled"]>;
+export declare const epics: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "epics";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "epics";
             dataType: "number";
@@ -26,7 +26,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "epics";
             dataType: "number";
@@ -43,7 +43,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        sprintId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        sprintId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "sprint_id";
             tableName: "epics";
             dataType: "number";
@@ -60,7 +60,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        epicNumber: import("drizzle-orm/mysql-core").MySqlColumn<{
+        epicNumber: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "epic_number";
             tableName: "epics";
             dataType: "number";
@@ -77,7 +77,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        name: import("drizzle-orm/mysql-core").MySqlColumn<{
+        name: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "name";
             tableName: "epics";
             dataType: "string";
@@ -94,7 +94,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        description: import("drizzle-orm/mysql-core").MySqlColumn<{
+        description: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "description";
             tableName: "epics";
             dataType: "string";
@@ -111,7 +111,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        color: import("drizzle-orm/mysql-core").MySqlColumn<{
+        color: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "color";
             tableName: "epics";
             dataType: "string";
@@ -128,12 +128,12 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        status: import("drizzle-orm/mysql-core").MySqlColumn<{
+        status: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "status";
             tableName: "epics";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "completed" | "cancelled" | "in_progress" | "open";
+            data: "completed" | "open" | "cancelled" | "in_progress";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -145,7 +145,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        startDate: import("drizzle-orm/mysql-core").MySqlColumn<{
+        startDate: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "start_date";
             tableName: "epics";
             dataType: "date";
@@ -162,7 +162,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        targetDate: import("drizzle-orm/mysql-core").MySqlColumn<{
+        targetDate: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "target_date";
             tableName: "epics";
             dataType: "date";
@@ -179,7 +179,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdBy: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdBy: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_by";
             tableName: "epics";
             dataType: "number";
@@ -196,7 +196,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "epics";
             dataType: "date";
@@ -213,7 +213,7 @@ export declare const epics: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "epics";
             dataType: "date";

@@ -1,12 +1,12 @@
 /**
  * SOLARIA DFO - Tasks Schema (Drizzle ORM)
  */
-export declare const taskStatusEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"status", ["pending", "in_progress", "review", "completed", "blocked", "cancelled"]>;
-export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const taskStatusEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"status", ["pending", "in_progress", "review", "completed", "blocked", "cancelled"]>;
+export declare const tasks: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "tasks";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "tasks";
             dataType: "number";
@@ -23,7 +23,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        taskNumber: import("drizzle-orm/mysql-core").MySqlColumn<{
+        taskNumber: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "task_number";
             tableName: "tasks";
             dataType: "number";
@@ -40,7 +40,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        title: import("drizzle-orm/mysql-core").MySqlColumn<{
+        title: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "title";
             tableName: "tasks";
             dataType: "string";
@@ -57,7 +57,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        description: import("drizzle-orm/mysql-core").MySqlColumn<{
+        description: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "description";
             tableName: "tasks";
             dataType: "string";
@@ -74,7 +74,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "tasks";
             dataType: "number";
@@ -91,7 +91,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        epicId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        epicId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "epic_id";
             tableName: "tasks";
             dataType: "number";
@@ -108,7 +108,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        sprintId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        sprintId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "sprint_id";
             tableName: "tasks";
             dataType: "number";
@@ -125,7 +125,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        agentId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        agentId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "agent_id";
             tableName: "tasks";
             dataType: "number";
@@ -142,7 +142,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        assignedAgentId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        assignedAgentId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "assigned_agent_id";
             tableName: "tasks";
             dataType: "number";
@@ -159,7 +159,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        assignedBy: import("drizzle-orm/mysql-core").MySqlColumn<{
+        assignedBy: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "assigned_by";
             tableName: "tasks";
             dataType: "number";
@@ -176,12 +176,12 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        status: import("drizzle-orm/mysql-core").MySqlColumn<{
+        status: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "status";
             tableName: "tasks";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "completed" | "cancelled" | "pending" | "in_progress" | "review" | "blocked";
+            data: "completed" | "pending" | "blocked" | "cancelled" | "in_progress" | "review";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -193,12 +193,12 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        priority: import("drizzle-orm/mysql-core").MySqlColumn<{
+        priority: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "priority";
             tableName: "tasks";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "critical" | "high" | "medium" | "low";
+            data: "high" | "low" | "medium" | "critical";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -210,7 +210,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        estimatedHours: import("drizzle-orm/mysql-core").MySqlColumn<{
+        estimatedHours: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "estimated_hours";
             tableName: "tasks";
             dataType: "string";
@@ -227,7 +227,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        actualHours: import("drizzle-orm/mysql-core").MySqlColumn<{
+        actualHours: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "actual_hours";
             tableName: "tasks";
             dataType: "string";
@@ -244,7 +244,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        progress: import("drizzle-orm/mysql-core").MySqlColumn<{
+        progress: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "progress";
             tableName: "tasks";
             dataType: "number";
@@ -261,7 +261,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        deadline: import("drizzle-orm/mysql-core").MySqlColumn<{
+        deadline: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "deadline";
             tableName: "tasks";
             dataType: "date";
@@ -278,7 +278,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        notes: import("drizzle-orm/mysql-core").MySqlColumn<{
+        notes: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "notes";
             tableName: "tasks";
             dataType: "string";
@@ -295,7 +295,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "tasks";
             dataType: "date";
@@ -312,7 +312,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "tasks";
             dataType: "date";
@@ -329,7 +329,7 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        completedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        completedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "completed_at";
             tableName: "tasks";
             dataType: "date";
@@ -349,11 +349,11 @@ export declare const tasks: import("drizzle-orm/mysql-core").MySqlTableWithColum
     };
     dialect: "mysql";
 }>;
-export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const taskItems: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "task_items";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "task_items";
             dataType: "number";
@@ -370,7 +370,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        taskId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        taskId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "task_id";
             tableName: "task_items";
             dataType: "number";
@@ -387,7 +387,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        title: import("drizzle-orm/mysql-core").MySqlColumn<{
+        title: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "title";
             tableName: "task_items";
             dataType: "string";
@@ -404,7 +404,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        description: import("drizzle-orm/mysql-core").MySqlColumn<{
+        description: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "description";
             tableName: "task_items";
             dataType: "string";
@@ -421,7 +421,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        sortOrder: import("drizzle-orm/mysql-core").MySqlColumn<{
+        sortOrder: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "sort_order";
             tableName: "task_items";
             dataType: "number";
@@ -438,7 +438,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        isCompleted: import("drizzle-orm/mysql-core").MySqlColumn<{
+        isCompleted: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "is_completed";
             tableName: "task_items";
             dataType: "boolean";
@@ -455,7 +455,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        completedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        completedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "completed_at";
             tableName: "task_items";
             dataType: "date";
@@ -472,7 +472,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        completedByAgentId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        completedByAgentId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "completed_by_agent_id";
             tableName: "task_items";
             dataType: "number";
@@ -489,7 +489,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        estimatedMinutes: import("drizzle-orm/mysql-core").MySqlColumn<{
+        estimatedMinutes: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "estimated_minutes";
             tableName: "task_items";
             dataType: "number";
@@ -506,7 +506,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        actualMinutes: import("drizzle-orm/mysql-core").MySqlColumn<{
+        actualMinutes: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "actual_minutes";
             tableName: "task_items";
             dataType: "number";
@@ -523,7 +523,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        notes: import("drizzle-orm/mysql-core").MySqlColumn<{
+        notes: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "notes";
             tableName: "task_items";
             dataType: "string";
@@ -540,7 +540,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "task_items";
             dataType: "date";
@@ -557,7 +557,7 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "task_items";
             dataType: "date";
@@ -577,11 +577,11 @@ export declare const taskItems: import("drizzle-orm/mysql-core").MySqlTableWithC
     };
     dialect: "mysql";
 }>;
-export declare const taskTags: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const taskTags: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "task_tags";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "task_tags";
             dataType: "number";
@@ -598,7 +598,7 @@ export declare const taskTags: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        name: import("drizzle-orm/mysql-core").MySqlColumn<{
+        name: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "name";
             tableName: "task_tags";
             dataType: "string";
@@ -615,7 +615,7 @@ export declare const taskTags: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        description: import("drizzle-orm/mysql-core").MySqlColumn<{
+        description: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "description";
             tableName: "task_tags";
             dataType: "string";
@@ -632,7 +632,7 @@ export declare const taskTags: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        color: import("drizzle-orm/mysql-core").MySqlColumn<{
+        color: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "color";
             tableName: "task_tags";
             dataType: "string";
@@ -649,7 +649,7 @@ export declare const taskTags: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        icon: import("drizzle-orm/mysql-core").MySqlColumn<{
+        icon: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "icon";
             tableName: "task_tags";
             dataType: "string";
@@ -666,7 +666,7 @@ export declare const taskTags: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        usageCount: import("drizzle-orm/mysql-core").MySqlColumn<{
+        usageCount: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "usage_count";
             tableName: "task_tags";
             dataType: "number";
@@ -683,7 +683,7 @@ export declare const taskTags: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "task_tags";
             dataType: "date";
@@ -703,11 +703,11 @@ export declare const taskTags: import("drizzle-orm/mysql-core").MySqlTableWithCo
     };
     dialect: "mysql";
 }>;
-export declare const taskTagAssignments: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const taskTagAssignments: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "task_tag_assignments";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "task_tag_assignments";
             dataType: "number";
@@ -724,7 +724,7 @@ export declare const taskTagAssignments: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        taskId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        taskId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "task_id";
             tableName: "task_tag_assignments";
             dataType: "number";
@@ -741,7 +741,7 @@ export declare const taskTagAssignments: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        tagId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        tagId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "tag_id";
             tableName: "task_tag_assignments";
             dataType: "number";
@@ -758,7 +758,7 @@ export declare const taskTagAssignments: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        assignedBy: import("drizzle-orm/mysql-core").MySqlColumn<{
+        assignedBy: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "assigned_by";
             tableName: "task_tag_assignments";
             dataType: "number";
@@ -775,7 +775,7 @@ export declare const taskTagAssignments: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        assignedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        assignedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "assigned_at";
             tableName: "task_tag_assignments";
             dataType: "date";

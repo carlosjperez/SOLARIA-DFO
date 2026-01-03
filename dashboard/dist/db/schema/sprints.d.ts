@@ -4,13 +4,13 @@
  * Represents project phases/sprints with phase ordering and type classification.
  * Supports multiple phase types: planning, development, testing, deployment, maintenance, custom
  */
-export declare const sprintStatusEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"status", ["planned", "active", "completed", "cancelled"]>;
-export declare const phaseTypeEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"phase_type", ["planning", "development", "testing", "deployment", "maintenance", "custom"]>;
-export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const sprintStatusEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"status", ["planned", "active", "completed", "cancelled"]>;
+export declare const phaseTypeEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"phase_type", ["planning", "development", "testing", "deployment", "maintenance", "custom"]>;
+export declare const sprints: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "sprints";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "sprints";
             dataType: "number";
@@ -27,7 +27,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "sprints";
             dataType: "number";
@@ -44,7 +44,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        sprintNumber: import("drizzle-orm/mysql-core").MySqlColumn<{
+        sprintNumber: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "sprint_number";
             tableName: "sprints";
             dataType: "number";
@@ -61,7 +61,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        name: import("drizzle-orm/mysql-core").MySqlColumn<{
+        name: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "name";
             tableName: "sprints";
             dataType: "string";
@@ -78,7 +78,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        goal: import("drizzle-orm/mysql-core").MySqlColumn<{
+        goal: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "goal";
             tableName: "sprints";
             dataType: "string";
@@ -95,12 +95,12 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        status: import("drizzle-orm/mysql-core").MySqlColumn<{
+        status: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "status";
             tableName: "sprints";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "completed" | "cancelled" | "planned" | "active";
+            data: "active" | "completed" | "cancelled" | "planned";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -112,7 +112,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        startDate: import("drizzle-orm/mysql-core").MySqlColumn<{
+        startDate: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "start_date";
             tableName: "sprints";
             dataType: "date";
@@ -129,7 +129,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        endDate: import("drizzle-orm/mysql-core").MySqlColumn<{
+        endDate: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "end_date";
             tableName: "sprints";
             dataType: "date";
@@ -146,7 +146,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        velocity: import("drizzle-orm/mysql-core").MySqlColumn<{
+        velocity: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "velocity";
             tableName: "sprints";
             dataType: "number";
@@ -163,7 +163,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        capacity: import("drizzle-orm/mysql-core").MySqlColumn<{
+        capacity: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "capacity";
             tableName: "sprints";
             dataType: "number";
@@ -180,7 +180,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        phaseOrder: import("drizzle-orm/mysql-core").MySqlColumn<{
+        phaseOrder: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "phase_order";
             tableName: "sprints";
             dataType: "number";
@@ -197,7 +197,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        phaseType: import("drizzle-orm/mysql-core").MySqlColumn<{
+        phaseType: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "phase_type";
             tableName: "sprints";
             dataType: "string";
@@ -214,7 +214,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdBy: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdBy: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_by";
             tableName: "sprints";
             dataType: "number";
@@ -231,7 +231,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "sprints";
             dataType: "date";
@@ -248,7 +248,7 @@ export declare const sprints: import("drizzle-orm/mysql-core").MySqlTableWithCol
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "sprints";
             dataType: "date";

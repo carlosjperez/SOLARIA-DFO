@@ -225,6 +225,16 @@ declare class SolariaDashboardServer {
      */
     private getWorkerStatus;
     /**
+     * Get CodeRabbit review comments for a pull request
+     * GET /api/code-review/:owner/:repo/:pullNumber
+     */
+    private getCodeRabbitComments;
+    /**
+     * Resolve or dismiss a CodeRabbit comment
+     * POST /api/code-review/:owner/:repo/comments/:commentId/resolve
+     */
+    private resolveCodeRabbitComment;
+    /**
      * Trigger a GitHub Actions workflow
      * POST /api/github/trigger-workflow
      */

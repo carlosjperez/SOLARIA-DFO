@@ -4,7 +4,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.users = exports.userRoleEnum = void 0;
-const mysql_core_1 = require("drizzle-orm/mysql-core");
+var mysql_core_1 = require("drizzle-orm/mysql-core");
 // User roles enum
 exports.userRoleEnum = (0, mysql_core_1.mysqlEnum)('role', [
     'ceo',
@@ -29,3 +29,4 @@ exports.users = (0, mysql_core_1.mysqlTable)('users', {
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
     updatedAt: (0, mysql_core_1.timestamp)('updated_at').defaultNow().onUpdateNow(),
 });
+//# sourceMappingURL=users.js.map

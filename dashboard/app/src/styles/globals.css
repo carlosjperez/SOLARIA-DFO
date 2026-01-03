@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prism.js Syntax Highlighting Theme */
+@import 'prismjs/themes/prism-tomorrow.css';
+
 /* ============================================
    SOLARIA DFO - Complete Design System
    Migrated from vanilla JS dashboard

@@ -46,7 +46,7 @@ export declare const aiAgents: import("drizzle-orm/mysql-core").MySqlTableWithCo
             tableName: "ai_agents";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "project_manager" | "architect" | "developer" | "tester" | "analyst" | "designer" | "devops" | "technical_writer" | "security_auditor" | "deployment_specialist";
+            data: "analyst" | "project_manager" | "architect" | "developer" | "tester" | "designer" | "devops" | "technical_writer" | "security_auditor" | "deployment_specialist";
             driverParam: string;
             notNull: true;
             hasDefault: false;
@@ -63,7 +63,7 @@ export declare const aiAgents: import("drizzle-orm/mysql-core").MySqlTableWithCo
             tableName: "ai_agents";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "active" | "maintenance" | "busy" | "inactive" | "error";
+            data: "error" | "active" | "inactive" | "busy" | "maintenance";
             driverParam: string;
             notNull: false;
             hasDefault: true;

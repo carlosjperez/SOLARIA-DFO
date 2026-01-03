@@ -96,7 +96,7 @@ export declare const users: import("drizzle-orm/mysql-core").MySqlTableWithColum
             tableName: "users";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "ceo" | "cto" | "coo" | "cfo" | "admin" | "viewer" | "manager" | "agent";
+            data: "agent" | "admin" | "ceo" | "cto" | "coo" | "cfo" | "manager" | "viewer";
             driverParam: string;
             notNull: true;
             hasDefault: true;

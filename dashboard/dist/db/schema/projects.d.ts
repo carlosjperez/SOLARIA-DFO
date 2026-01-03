@@ -1,14 +1,14 @@
 /**
  * SOLARIA DFO - Projects Schema (Drizzle ORM)
  */
-export declare const projectStatusEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"status", ["planning", "development", "testing", "deployment", "completed", "on_hold", "cancelled"]>;
-export declare const priorityEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"priority", ["low", "medium", "high", "critical"]>;
-export declare const officeOriginEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"office_origin", ["dfo", "office"]>;
-export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const projectStatusEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"status", ["planning", "development", "testing", "deployment", "completed", "on_hold", "cancelled"]>;
+export declare const priorityEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"priority", ["low", "medium", "high", "critical"]>;
+export declare const officeOriginEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"office_origin", ["dfo", "office"]>;
+export declare const projects: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "projects";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "projects";
             dataType: "number";
@@ -25,7 +25,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        name: import("drizzle-orm/mysql-core").MySqlColumn<{
+        name: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "name";
             tableName: "projects";
             dataType: "string";
@@ -42,7 +42,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        code: import("drizzle-orm/mysql-core").MySqlColumn<{
+        code: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "code";
             tableName: "projects";
             dataType: "string";
@@ -59,7 +59,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        client: import("drizzle-orm/mysql-core").MySqlColumn<{
+        client: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "client";
             tableName: "projects";
             dataType: "string";
@@ -76,7 +76,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        officeOrigin: import("drizzle-orm/mysql-core").MySqlColumn<{
+        officeOrigin: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "office_origin";
             tableName: "projects";
             dataType: "string";
@@ -93,7 +93,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        officeVisible: import("drizzle-orm/mysql-core").MySqlColumn<{
+        officeVisible: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "office_visible";
             tableName: "projects";
             dataType: "number";
@@ -110,7 +110,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        description: import("drizzle-orm/mysql-core").MySqlColumn<{
+        description: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "description";
             tableName: "projects";
             dataType: "string";
@@ -127,12 +127,12 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        status: import("drizzle-orm/mysql-core").MySqlColumn<{
+        status: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "status";
             tableName: "projects";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "planning" | "development" | "testing" | "deployment" | "completed" | "on_hold" | "cancelled";
+            data: "completed" | "planning" | "development" | "testing" | "deployment" | "on_hold" | "cancelled";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -144,12 +144,12 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        priority: import("drizzle-orm/mysql-core").MySqlColumn<{
+        priority: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "priority";
             tableName: "projects";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "critical" | "high" | "medium" | "low";
+            data: "high" | "low" | "medium" | "critical";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -161,7 +161,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        budget: import("drizzle-orm/mysql-core").MySqlColumn<{
+        budget: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "budget";
             tableName: "projects";
             dataType: "string";
@@ -178,7 +178,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        actualCost: import("drizzle-orm/mysql-core").MySqlColumn<{
+        actualCost: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "actual_cost";
             tableName: "projects";
             dataType: "string";
@@ -195,7 +195,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        completionPercentage: import("drizzle-orm/mysql-core").MySqlColumn<{
+        completionPercentage: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "completion_percentage";
             tableName: "projects";
             dataType: "number";
@@ -212,7 +212,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        startDate: import("drizzle-orm/mysql-core").MySqlColumn<{
+        startDate: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "start_date";
             tableName: "projects";
             dataType: "date";
@@ -229,7 +229,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        deadline: import("drizzle-orm/mysql-core").MySqlColumn<{
+        deadline: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "deadline";
             tableName: "projects";
             dataType: "date";
@@ -246,7 +246,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        productionUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+        productionUrl: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "production_url";
             tableName: "projects";
             dataType: "string";
@@ -263,7 +263,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        stagingUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+        stagingUrl: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "staging_url";
             tableName: "projects";
             dataType: "string";
@@ -280,7 +280,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        localUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+        localUrl: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "local_url";
             tableName: "projects";
             dataType: "string";
@@ -297,7 +297,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        repoUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+        repoUrl: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "repo_url";
             tableName: "projects";
             dataType: "string";
@@ -314,7 +314,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        tags: import("drizzle-orm/mysql-core").MySqlColumn<{
+        tags: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "tags";
             tableName: "projects";
             dataType: "json";
@@ -333,7 +333,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
         }, {}, {
             $type: string[];
         }>;
-        stack: import("drizzle-orm/mysql-core").MySqlColumn<{
+        stack: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "stack";
             tableName: "projects";
             dataType: "json";
@@ -352,7 +352,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
         }, {}, {
             $type: string[];
         }>;
-        createdBy: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdBy: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_by";
             tableName: "projects";
             dataType: "number";
@@ -369,7 +369,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        officeClientId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        officeClientId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "office_client_id";
             tableName: "projects";
             dataType: "number";
@@ -386,7 +386,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "projects";
             dataType: "date";
@@ -403,7 +403,7 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "projects";
             dataType: "date";
@@ -423,12 +423,12 @@ export declare const projects: import("drizzle-orm/mysql-core").MySqlTableWithCo
     };
     dialect: "mysql";
 }>;
-export declare const documentTypeEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"type", ["spec", "contract", "manual", "design", "report", "other"]>;
-export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const documentTypeEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"type", ["spec", "contract", "manual", "design", "report", "other"]>;
+export declare const projectClients: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "project_clients";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "project_clients";
             dataType: "number";
@@ -445,7 +445,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "project_clients";
             dataType: "number";
@@ -462,7 +462,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        name: import("drizzle-orm/mysql-core").MySqlColumn<{
+        name: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "name";
             tableName: "project_clients";
             dataType: "string";
@@ -479,7 +479,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        fiscalName: import("drizzle-orm/mysql-core").MySqlColumn<{
+        fiscalName: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "fiscal_name";
             tableName: "project_clients";
             dataType: "string";
@@ -496,7 +496,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        rfc: import("drizzle-orm/mysql-core").MySqlColumn<{
+        rfc: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "rfc";
             tableName: "project_clients";
             dataType: "string";
@@ -513,7 +513,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        website: import("drizzle-orm/mysql-core").MySqlColumn<{
+        website: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "website";
             tableName: "project_clients";
             dataType: "string";
@@ -530,7 +530,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        address: import("drizzle-orm/mysql-core").MySqlColumn<{
+        address: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "address";
             tableName: "project_clients";
             dataType: "string";
@@ -547,7 +547,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        fiscalAddress: import("drizzle-orm/mysql-core").MySqlColumn<{
+        fiscalAddress: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "fiscal_address";
             tableName: "project_clients";
             dataType: "string";
@@ -564,7 +564,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        contactName: import("drizzle-orm/mysql-core").MySqlColumn<{
+        contactName: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "contact_name";
             tableName: "project_clients";
             dataType: "string";
@@ -581,7 +581,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        contactEmail: import("drizzle-orm/mysql-core").MySqlColumn<{
+        contactEmail: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "contact_email";
             tableName: "project_clients";
             dataType: "string";
@@ -598,7 +598,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        contactPhone: import("drizzle-orm/mysql-core").MySqlColumn<{
+        contactPhone: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "contact_phone";
             tableName: "project_clients";
             dataType: "string";
@@ -615,7 +615,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        logoUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+        logoUrl: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "logo_url";
             tableName: "project_clients";
             dataType: "string";
@@ -632,7 +632,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        notes: import("drizzle-orm/mysql-core").MySqlColumn<{
+        notes: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "notes";
             tableName: "project_clients";
             dataType: "string";
@@ -649,7 +649,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "project_clients";
             dataType: "date";
@@ -666,7 +666,7 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "project_clients";
             dataType: "date";
@@ -686,11 +686,11 @@ export declare const projectClients: import("drizzle-orm/mysql-core").MySqlTable
     };
     dialect: "mysql";
 }>;
-export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const projectDocuments: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "project_documents";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "project_documents";
             dataType: "number";
@@ -707,7 +707,7 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "project_documents";
             dataType: "number";
@@ -724,7 +724,7 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        name: import("drizzle-orm/mysql-core").MySqlColumn<{
+        name: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "name";
             tableName: "project_documents";
             dataType: "string";
@@ -741,12 +741,12 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        type: import("drizzle-orm/mysql-core").MySqlColumn<{
+        type: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "type";
             tableName: "project_documents";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "spec" | "contract" | "manual" | "design" | "report" | "other";
+            data: "other" | "manual" | "report" | "spec" | "contract" | "design";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -758,7 +758,7 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        url: import("drizzle-orm/mysql-core").MySqlColumn<{
+        url: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "url";
             tableName: "project_documents";
             dataType: "string";
@@ -775,7 +775,7 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        description: import("drizzle-orm/mysql-core").MySqlColumn<{
+        description: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "description";
             tableName: "project_documents";
             dataType: "string";
@@ -792,7 +792,7 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        fileSize: import("drizzle-orm/mysql-core").MySqlColumn<{
+        fileSize: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "file_size";
             tableName: "project_documents";
             dataType: "number";
@@ -809,7 +809,7 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        uploadedBy: import("drizzle-orm/mysql-core").MySqlColumn<{
+        uploadedBy: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "uploaded_by";
             tableName: "project_documents";
             dataType: "number";
@@ -826,7 +826,7 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "project_documents";
             dataType: "date";
@@ -843,7 +843,7 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "project_documents";
             dataType: "date";
@@ -863,12 +863,12 @@ export declare const projectDocuments: import("drizzle-orm/mysql-core").MySqlTab
     };
     dialect: "mysql";
 }>;
-export declare const requestStatusEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"status", ["pending", "approved", "in_review", "in_progress", "completed", "rejected"]>;
-export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const requestStatusEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"status", ["pending", "approved", "in_review", "in_progress", "completed", "rejected"]>;
+export declare const projectRequests: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "project_requests";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "project_requests";
             dataType: "number";
@@ -885,7 +885,7 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "project_requests";
             dataType: "number";
@@ -902,7 +902,7 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        text: import("drizzle-orm/mysql-core").MySqlColumn<{
+        text: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "text";
             tableName: "project_requests";
             dataType: "string";
@@ -919,12 +919,12 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        status: import("drizzle-orm/mysql-core").MySqlColumn<{
+        status: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "status";
             tableName: "project_requests";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "completed" | "pending" | "approved" | "in_review" | "in_progress" | "rejected";
+            data: "completed" | "pending" | "rejected" | "approved" | "in_review" | "in_progress";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -936,12 +936,12 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        priority: import("drizzle-orm/mysql-core").MySqlColumn<{
+        priority: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "priority";
             tableName: "project_requests";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "critical" | "high" | "medium" | "low";
+            data: "high" | "low" | "medium" | "critical";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -953,7 +953,7 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        requestedBy: import("drizzle-orm/mysql-core").MySqlColumn<{
+        requestedBy: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "requested_by";
             tableName: "project_requests";
             dataType: "string";
@@ -970,7 +970,7 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        assignedTo: import("drizzle-orm/mysql-core").MySqlColumn<{
+        assignedTo: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "assigned_to";
             tableName: "project_requests";
             dataType: "number";
@@ -987,7 +987,7 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        notes: import("drizzle-orm/mysql-core").MySqlColumn<{
+        notes: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "notes";
             tableName: "project_requests";
             dataType: "string";
@@ -1004,7 +1004,7 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        resolvedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        resolvedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "resolved_at";
             tableName: "project_requests";
             dataType: "date";
@@ -1021,7 +1021,7 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "project_requests";
             dataType: "date";
@@ -1038,7 +1038,7 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "project_requests";
             dataType: "date";
@@ -1058,11 +1058,11 @@ export declare const projectRequests: import("drizzle-orm/mysql-core").MySqlTabl
     };
     dialect: "mysql";
 }>;
-export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const projectMetrics: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "project_metrics";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "project_metrics";
             dataType: "number";
@@ -1079,7 +1079,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "project_metrics";
             dataType: "number";
@@ -1096,7 +1096,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        metricDate: import("drizzle-orm/mysql-core").MySqlColumn<{
+        metricDate: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "metric_date";
             tableName: "project_metrics";
             dataType: "date";
@@ -1113,7 +1113,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        completionPercentage: import("drizzle-orm/mysql-core").MySqlColumn<{
+        completionPercentage: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "completion_percentage";
             tableName: "project_metrics";
             dataType: "string";
@@ -1130,7 +1130,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        agentEfficiency: import("drizzle-orm/mysql-core").MySqlColumn<{
+        agentEfficiency: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "agent_efficiency";
             tableName: "project_metrics";
             dataType: "string";
@@ -1147,7 +1147,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        codeQualityScore: import("drizzle-orm/mysql-core").MySqlColumn<{
+        codeQualityScore: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "code_quality_score";
             tableName: "project_metrics";
             dataType: "string";
@@ -1164,7 +1164,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        testCoverage: import("drizzle-orm/mysql-core").MySqlColumn<{
+        testCoverage: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "test_coverage";
             tableName: "project_metrics";
             dataType: "string";
@@ -1181,7 +1181,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        totalHoursWorked: import("drizzle-orm/mysql-core").MySqlColumn<{
+        totalHoursWorked: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "total_hours_worked";
             tableName: "project_metrics";
             dataType: "string";
@@ -1198,7 +1198,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        tasksCompleted: import("drizzle-orm/mysql-core").MySqlColumn<{
+        tasksCompleted: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "tasks_completed";
             tableName: "project_metrics";
             dataType: "number";
@@ -1215,7 +1215,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        tasksPending: import("drizzle-orm/mysql-core").MySqlColumn<{
+        tasksPending: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "tasks_pending";
             tableName: "project_metrics";
             dataType: "number";
@@ -1232,7 +1232,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        tasksBlocked: import("drizzle-orm/mysql-core").MySqlColumn<{
+        tasksBlocked: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "tasks_blocked";
             tableName: "project_metrics";
             dataType: "number";
@@ -1249,7 +1249,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        budgetUsed: import("drizzle-orm/mysql-core").MySqlColumn<{
+        budgetUsed: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "budget_used";
             tableName: "project_metrics";
             dataType: "string";
@@ -1266,7 +1266,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        performanceScore: import("drizzle-orm/mysql-core").MySqlColumn<{
+        performanceScore: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "performance_score";
             tableName: "project_metrics";
             dataType: "string";
@@ -1283,7 +1283,7 @@ export declare const projectMetrics: import("drizzle-orm/mysql-core").MySqlTable
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "project_metrics";
             dataType: "date";

@@ -6,16 +6,13 @@
  * Configures Redis connection and default job options for BullMQ queues.
  * Used by AgentExecutionService and Worker processes.
  */
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JobPriority = exports.defaultJobOptions = exports.QueueNames = void 0;
 exports.createRedisConnection = createRedisConnection;
 exports.getQueueOptions = getQueueOptions;
 exports.getWorkerOptions = getWorkerOptions;
 exports.taskPriorityToJobPriority = taskPriorityToJobPriority;
-const ioredis_1 = __importDefault(require("ioredis"));
+var ioredis_1 = require("ioredis");
 // ============================================================================
 // Redis Connection
 // ============================================================================
@@ -24,13 +21,13 @@ const ioredis_1 = __importDefault(require("ioredis"));
  * Uses the same REDIS_URL as the main server for consistency
  */
 function createRedisConnection() {
-    const redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
+    var redisUrl = process.env.REDIS_URL || 'redis://redis:6379';
     return new ioredis_1.default(redisUrl, {
         maxRetriesPerRequest: null, // Required for BullMQ
         enableReadyCheck: false, // Required for BullMQ
-        retryStrategy: (times) => {
+        retryStrategy: function (times) {
             // Exponential backoff with max 30 seconds
-            const delay = Math.min(times * 100, 30000);
+            var delay = Math.min(times * 100, 30000);
             return delay;
         }
     });
@@ -111,7 +108,7 @@ exports.JobPriority = {
  * Maps task priority to job priority
  */
 function taskPriorityToJobPriority(taskPriority) {
-    const map = {
+    var map = {
         'critical': exports.JobPriority.CRITICAL,
         'high': exports.JobPriority.HIGH,
         'medium': exports.JobPriority.MEDIUM,
@@ -119,3 +116,4 @@ function taskPriorityToJobPriority(taskPriority) {
     };
     return map[taskPriority] || exports.JobPriority.MEDIUM;
 }
+//# sourceMappingURL=queue.js.map

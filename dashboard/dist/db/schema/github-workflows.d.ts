@@ -4,21 +4,21 @@
  *
  * Schema for GitHub Actions workflows, runs, and task-GitHub resource links
  */
-export declare const triggerTypeEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"trigger_type", ["manual", "push", "pull_request", "schedule", "workflow_dispatch"]>;
-export declare const workflowRunStatusEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"status", ["queued", "in_progress", "completed"]>;
-export declare const runConclusionEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"conclusion", ["success", "failure", "cancelled", "skipped", "timed_out", "action_required", "neutral"]>;
-export declare const lastRunStatusEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"last_run_status", ["success", "failure", "in_progress", "cancelled", "skipped", "pending"]>;
-export declare const resourceTypeEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"resource_type", ["pull_request", "issue", "branch", "commit", "release"]>;
-export declare const syncStatusEnum: import("drizzle-orm/mysql-core").MySqlEnumColumnBuilderInitial<"sync_status", ["pending", "synced", "error"]>;
+export declare const triggerTypeEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"trigger_type", ["manual", "push", "pull_request", "schedule", "workflow_dispatch"]>;
+export declare const workflowRunStatusEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"status", ["queued", "in_progress", "completed"]>;
+export declare const runConclusionEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"conclusion", ["success", "failure", "cancelled", "skipped", "timed_out", "action_required", "neutral"]>;
+export declare const lastRunStatusEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"last_run_status", ["success", "failure", "in_progress", "cancelled", "skipped", "pending"]>;
+export declare const resourceTypeEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"resource_type", ["pull_request", "issue", "branch", "commit", "release"]>;
+export declare const syncStatusEnum: import("drizzle-orm/mysql-core/index.js").MySqlEnumColumnBuilderInitial<"sync_status", ["pending", "synced", "error"]>;
 /**
  * github_workflows table
  * Stores GitHub Actions workflow definitions and trigger configurations
  */
-export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const githubWorkflows: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "github_workflows";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "github_workflows";
             dataType: "number";
@@ -35,7 +35,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "github_workflows";
             dataType: "number";
@@ -52,7 +52,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        taskId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        taskId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "task_id";
             tableName: "github_workflows";
             dataType: "number";
@@ -69,7 +69,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        workflowName: import("drizzle-orm/mysql-core").MySqlColumn<{
+        workflowName: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "workflow_name";
             tableName: "github_workflows";
             dataType: "string";
@@ -86,7 +86,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        workflowPath: import("drizzle-orm/mysql-core").MySqlColumn<{
+        workflowPath: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "workflow_path";
             tableName: "github_workflows";
             dataType: "string";
@@ -103,7 +103,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        repository: import("drizzle-orm/mysql-core").MySqlColumn<{
+        repository: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "repository";
             tableName: "github_workflows";
             dataType: "string";
@@ -120,7 +120,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        description: import("drizzle-orm/mysql-core").MySqlColumn<{
+        description: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "description";
             tableName: "github_workflows";
             dataType: "string";
@@ -137,12 +137,12 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        triggerType: import("drizzle-orm/mysql-core").MySqlColumn<{
+        triggerType: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "trigger_type";
             tableName: "github_workflows";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "push" | "manual" | "pull_request" | "schedule" | "workflow_dispatch";
+            data: "push" | "manual" | "pull_request" | "workflow_dispatch" | "schedule";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -154,7 +154,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        triggerConfig: import("drizzle-orm/mysql-core").MySqlColumn<{
+        triggerConfig: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "trigger_config";
             tableName: "github_workflows";
             dataType: "json";
@@ -183,7 +183,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
                 events?: string[];
             };
         }>;
-        enabled: import("drizzle-orm/mysql-core").MySqlColumn<{
+        enabled: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "enabled";
             tableName: "github_workflows";
             dataType: "boolean";
@@ -200,7 +200,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        autoTrigger: import("drizzle-orm/mysql-core").MySqlColumn<{
+        autoTrigger: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "auto_trigger";
             tableName: "github_workflows";
             dataType: "boolean";
@@ -217,7 +217,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        lastRunId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        lastRunId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "last_run_id";
             tableName: "github_workflows";
             dataType: "number";
@@ -234,12 +234,12 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        lastRunStatus: import("drizzle-orm/mysql-core").MySqlColumn<{
+        lastRunStatus: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "last_run_status";
             tableName: "github_workflows";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "skipped" | "in_progress" | "failure" | "success" | "pending" | "cancelled";
+            data: "skipped" | "pending" | "success" | "failure" | "cancelled" | "in_progress";
             driverParam: string;
             notNull: false;
             hasDefault: false;
@@ -251,7 +251,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        lastRunAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        lastRunAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "last_run_at";
             tableName: "github_workflows";
             dataType: "date";
@@ -268,7 +268,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        totalRuns: import("drizzle-orm/mysql-core").MySqlColumn<{
+        totalRuns: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "total_runs";
             tableName: "github_workflows";
             dataType: "number";
@@ -285,7 +285,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        successfulRuns: import("drizzle-orm/mysql-core").MySqlColumn<{
+        successfulRuns: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "successful_runs";
             tableName: "github_workflows";
             dataType: "number";
@@ -302,7 +302,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        failedRuns: import("drizzle-orm/mysql-core").MySqlColumn<{
+        failedRuns: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "failed_runs";
             tableName: "github_workflows";
             dataType: "number";
@@ -319,7 +319,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "github_workflows";
             dataType: "date";
@@ -336,7 +336,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "github_workflows";
             dataType: "date";
@@ -353,7 +353,7 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdByAgentId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdByAgentId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_by_agent_id";
             tableName: "github_workflows";
             dataType: "number";
@@ -377,11 +377,11 @@ export declare const githubWorkflows: import("drizzle-orm/mysql-core").MySqlTabl
  * github_workflow_runs table
  * Tracks individual GitHub Actions workflow executions
  */
-export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "github_workflow_runs";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "github_workflow_runs";
             dataType: "number";
@@ -398,7 +398,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        workflowId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        workflowId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "workflow_id";
             tableName: "github_workflow_runs";
             dataType: "number";
@@ -415,7 +415,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "github_workflow_runs";
             dataType: "number";
@@ -432,7 +432,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        taskId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        taskId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "task_id";
             tableName: "github_workflow_runs";
             dataType: "number";
@@ -449,7 +449,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        githubRunId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        githubRunId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "github_run_id";
             tableName: "github_workflow_runs";
             dataType: "number";
@@ -466,7 +466,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        githubRunNumber: import("drizzle-orm/mysql-core").MySqlColumn<{
+        githubRunNumber: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "github_run_number";
             tableName: "github_workflow_runs";
             dataType: "number";
@@ -483,7 +483,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        workflowName: import("drizzle-orm/mysql-core").MySqlColumn<{
+        workflowName: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "workflow_name";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -500,7 +500,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        repository: import("drizzle-orm/mysql-core").MySqlColumn<{
+        repository: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "repository";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -517,7 +517,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        triggerEvent: import("drizzle-orm/mysql-core").MySqlColumn<{
+        triggerEvent: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "trigger_event";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -534,7 +534,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        triggeredBy: import("drizzle-orm/mysql-core").MySqlColumn<{
+        triggeredBy: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "triggered_by";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -551,7 +551,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        branch: import("drizzle-orm/mysql-core").MySqlColumn<{
+        branch: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "branch";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -568,7 +568,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        commitSha: import("drizzle-orm/mysql-core").MySqlColumn<{
+        commitSha: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "commit_sha";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -585,7 +585,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        commitMessage: import("drizzle-orm/mysql-core").MySqlColumn<{
+        commitMessage: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "commit_message";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -602,12 +602,12 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        status: import("drizzle-orm/mysql-core").MySqlColumn<{
+        status: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "status";
             tableName: "github_workflow_runs";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "completed" | "queued" | "in_progress";
+            data: "completed" | "in_progress" | "queued";
             driverParam: string;
             notNull: false;
             hasDefault: true;
@@ -619,12 +619,12 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        conclusion: import("drizzle-orm/mysql-core").MySqlColumn<{
+        conclusion: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "conclusion";
             tableName: "github_workflow_runs";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "skipped" | "failure" | "success" | "cancelled" | "timed_out" | "action_required" | "neutral";
+            data: "skipped" | "success" | "failure" | "cancelled" | "neutral" | "timed_out" | "action_required";
             driverParam: string;
             notNull: false;
             hasDefault: false;
@@ -636,7 +636,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        startedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        startedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "started_at";
             tableName: "github_workflow_runs";
             dataType: "date";
@@ -653,7 +653,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        completedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        completedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "completed_at";
             tableName: "github_workflow_runs";
             dataType: "date";
@@ -670,7 +670,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        durationSeconds: import("drizzle-orm/mysql-core").MySqlColumn<{
+        durationSeconds: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "duration_seconds";
             tableName: "github_workflow_runs";
             dataType: "number";
@@ -687,7 +687,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        runUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+        runUrl: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "run_url";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -704,7 +704,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        logsUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+        logsUrl: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "logs_url";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -721,7 +721,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        errorMessage: import("drizzle-orm/mysql-core").MySqlColumn<{
+        errorMessage: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "error_message";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -738,7 +738,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        webhookReceivedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        webhookReceivedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "webhook_received_at";
             tableName: "github_workflow_runs";
             dataType: "date";
@@ -755,7 +755,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        webhookEventType: import("drizzle-orm/mysql-core").MySqlColumn<{
+        webhookEventType: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "webhook_event_type";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -772,7 +772,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        webhookDeliveryId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        webhookDeliveryId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "webhook_delivery_id";
             tableName: "github_workflow_runs";
             dataType: "string";
@@ -789,7 +789,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "github_workflow_runs";
             dataType: "date";
@@ -806,7 +806,7 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "github_workflow_runs";
             dataType: "date";
@@ -830,11 +830,11 @@ export declare const githubWorkflowRuns: import("drizzle-orm/mysql-core").MySqlT
  * github_task_links table
  * Links DFO tasks to GitHub resources (Pull Requests, Issues, Branches)
  */
-export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTableWithColumns<{
+export declare const githubTaskLinks: import("drizzle-orm/mysql-core/table.js").MySqlTableWithColumns<{
     name: "github_task_links";
     schema: undefined;
     columns: {
-        id: import("drizzle-orm/mysql-core").MySqlColumn<{
+        id: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "id";
             tableName: "github_task_links";
             dataType: "number";
@@ -851,7 +851,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        taskId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        taskId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "task_id";
             tableName: "github_task_links";
             dataType: "number";
@@ -868,7 +868,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        projectId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        projectId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "project_id";
             tableName: "github_task_links";
             dataType: "number";
@@ -885,12 +885,12 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        resourceType: import("drizzle-orm/mysql-core").MySqlColumn<{
+        resourceType: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "resource_type";
             tableName: "github_task_links";
             dataType: "string";
             columnType: "MySqlEnumColumn";
-            data: "pull_request" | "issue" | "branch" | "commit" | "release";
+            data: "release" | "issue" | "pull_request" | "branch" | "commit";
             driverParam: string;
             notNull: true;
             hasDefault: false;
@@ -902,7 +902,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        repository: import("drizzle-orm/mysql-core").MySqlColumn<{
+        repository: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "repository";
             tableName: "github_task_links";
             dataType: "string";
@@ -919,7 +919,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        githubPrNumber: import("drizzle-orm/mysql-core").MySqlColumn<{
+        githubPrNumber: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "github_pr_number";
             tableName: "github_task_links";
             dataType: "number";
@@ -936,7 +936,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        githubIssueNumber: import("drizzle-orm/mysql-core").MySqlColumn<{
+        githubIssueNumber: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "github_issue_number";
             tableName: "github_task_links";
             dataType: "number";
@@ -953,7 +953,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        branchName: import("drizzle-orm/mysql-core").MySqlColumn<{
+        branchName: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "branch_name";
             tableName: "github_task_links";
             dataType: "string";
@@ -970,7 +970,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        commitSha: import("drizzle-orm/mysql-core").MySqlColumn<{
+        commitSha: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "commit_sha";
             tableName: "github_task_links";
             dataType: "string";
@@ -987,7 +987,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        releaseTag: import("drizzle-orm/mysql-core").MySqlColumn<{
+        releaseTag: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "release_tag";
             tableName: "github_task_links";
             dataType: "string";
@@ -1004,7 +1004,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        title: import("drizzle-orm/mysql-core").MySqlColumn<{
+        title: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "title";
             tableName: "github_task_links";
             dataType: "string";
@@ -1021,7 +1021,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        description: import("drizzle-orm/mysql-core").MySqlColumn<{
+        description: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "description";
             tableName: "github_task_links";
             dataType: "string";
@@ -1038,7 +1038,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        githubUrl: import("drizzle-orm/mysql-core").MySqlColumn<{
+        githubUrl: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "github_url";
             tableName: "github_task_links";
             dataType: "string";
@@ -1055,7 +1055,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        resourceStatus: import("drizzle-orm/mysql-core").MySqlColumn<{
+        resourceStatus: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "resource_status";
             tableName: "github_task_links";
             dataType: "string";
@@ -1072,7 +1072,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        syncStatus: import("drizzle-orm/mysql-core").MySqlColumn<{
+        syncStatus: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "sync_status";
             tableName: "github_task_links";
             dataType: "string";
@@ -1089,7 +1089,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        lastSyncedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        lastSyncedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "last_synced_at";
             tableName: "github_task_links";
             dataType: "date";
@@ -1106,7 +1106,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        syncError: import("drizzle-orm/mysql-core").MySqlColumn<{
+        syncError: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "sync_error";
             tableName: "github_task_links";
             dataType: "string";
@@ -1123,7 +1123,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        autoCreated: import("drizzle-orm/mysql-core").MySqlColumn<{
+        autoCreated: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "auto_created";
             tableName: "github_task_links";
             dataType: "boolean";
@@ -1140,7 +1140,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdByAgentId: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdByAgentId: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_by_agent_id";
             tableName: "github_task_links";
             dataType: "number";
@@ -1157,7 +1157,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        createdAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        createdAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "created_at";
             tableName: "github_task_links";
             dataType: "date";
@@ -1174,7 +1174,7 @@ export declare const githubTaskLinks: import("drizzle-orm/mysql-core").MySqlTabl
             identity: undefined;
             generated: undefined;
         }, {}, {}>;
-        updatedAt: import("drizzle-orm/mysql-core").MySqlColumn<{
+        updatedAt: import("drizzle-orm/mysql-core/index.js").MySqlColumn<{
             name: "updated_at";
             tableName: "github_task_links";
             dataType: "date";

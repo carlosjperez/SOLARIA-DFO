@@ -4,8 +4,8 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.agentStatesRelations = exports.aiAgentsRelations = exports.agentMetrics = exports.agentStates = exports.aiAgents = exports.agentStatusEnum = exports.agentRoleEnum = void 0;
-const mysql_core_1 = require("drizzle-orm/mysql-core");
-const drizzle_orm_1 = require("drizzle-orm");
+var mysql_core_1 = require("drizzle-orm/mysql-core");
+var drizzle_orm_1 = require("drizzle-orm");
 // Agent role enum
 exports.agentRoleEnum = (0, mysql_core_1.mysqlEnum)('role', [
     'project_manager',
@@ -43,7 +43,7 @@ exports.agentStates = (0, mysql_core_1.mysqlTable)('agent_states', {
     id: (0, mysql_core_1.int)('id').primaryKey().autoincrement(),
     agentId: (0, mysql_core_1.int)('agent_id')
         .notNull()
-        .references(() => exports.aiAgents.id, { onDelete: 'cascade' }),
+        .references(function () { return exports.aiAgents.id; }, { onDelete: 'cascade' }),
     status: (0, mysql_core_1.varchar)('status', { length: 50 }).notNull(),
     currentTask: (0, mysql_core_1.text)('current_task'),
     lastHeartbeat: (0, mysql_core_1.timestamp)('last_heartbeat').defaultNow(),
@@ -54,22 +54,29 @@ exports.agentMetrics = (0, mysql_core_1.mysqlTable)('agent_metrics', {
     id: (0, mysql_core_1.int)('id').primaryKey().autoincrement(),
     agentId: (0, mysql_core_1.int)('agent_id')
         .notNull()
-        .references(() => exports.aiAgents.id, { onDelete: 'cascade' }),
+        .references(function () { return exports.aiAgents.id; }, { onDelete: 'cascade' }),
     metricType: (0, mysql_core_1.varchar)('metric_type', { length: 50 }).notNull(),
     metricValue: (0, mysql_core_1.decimal)('metric_value', { precision: 10, scale: 4 }).notNull(),
     createdAt: (0, mysql_core_1.timestamp)('created_at').defaultNow(),
 });
 // Relations
-exports.aiAgentsRelations = (0, drizzle_orm_1.relations)(exports.aiAgents, ({ one, many }) => ({
-    state: one(exports.agentStates, {
-        fields: [exports.aiAgents.id],
-        references: [exports.agentStates.agentId],
-    }),
-    metrics: many(exports.agentMetrics),
-}));
-exports.agentStatesRelations = (0, drizzle_orm_1.relations)(exports.agentStates, ({ one }) => ({
-    agent: one(exports.aiAgents, {
-        fields: [exports.agentStates.agentId],
-        references: [exports.aiAgents.id],
-    }),
-}));
+exports.aiAgentsRelations = (0, drizzle_orm_1.relations)(exports.aiAgents, function (_a) {
+    var one = _a.one, many = _a.many;
+    return ({
+        state: one(exports.agentStates, {
+            fields: [exports.aiAgents.id],
+            references: [exports.agentStates.agentId],
+        }),
+        metrics: many(exports.agentMetrics),
+    });
+});
+exports.agentStatesRelations = (0, drizzle_orm_1.relations)(exports.agentStates, function (_a) {
+    var one = _a.one;
+    return ({
+        agent: one(exports.aiAgents, {
+            fields: [exports.agentStates.agentId],
+            references: [exports.aiAgents.id],
+        }),
+    });
+});
+//# sourceMappingURL=agents.js.map
