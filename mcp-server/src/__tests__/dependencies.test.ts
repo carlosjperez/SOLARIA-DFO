@@ -475,13 +475,15 @@ describe('Task Dependencies Endpoints', () => {
   describe('detect_dependency_cycles', () => {
     it('should detect no cycle for linear chain', async () => {
       mockQuery
-        .mockResolvedValueOnce([{ id: 3 }]) // task exists
-        .mockResolvedValueOnce([{ id: 2 }]) // depends_on exists
+        .mockResolvedValueOnce([{ id: 3 }]) // taskExists(3)
+        .mockResolvedValueOnce([{ id: 2 }]) // taskExists(2)
         .mockResolvedValueOnce([
           { task_id: 2, depends_on_task_id: 1, task_code: 'DFN-002' },
-        ]) // existing deps
-        .mockResolvedValueOnce([{ task_code: 'DFN-003' }])
-        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]);
+        ]) // allDeps in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-003' }]) // getTaskCode(3) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]) // getTaskCode(2) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-003' }]) // getTaskCode(3) in execute
+        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]); // getTaskCode(2) in execute
 
       const result = await detectDependencyCycles.execute({
         task_id: 3,
@@ -498,13 +500,15 @@ describe('Task Dependencies Endpoints', () => {
 
     it('should detect direct cycle (A->B->A)', async () => {
       mockQuery
-        .mockResolvedValueOnce([{ id: 1 }])
-        .mockResolvedValueOnce([{ id: 2 }])
+        .mockResolvedValueOnce([{ id: 1 }]) // taskExists(1)
+        .mockResolvedValueOnce([{ id: 2 }]) // taskExists(2)
         .mockResolvedValueOnce([
           { task_id: 2, depends_on_task_id: 1, task_code: 'DFN-002' },
-        ])
-        .mockResolvedValueOnce([{ task_code: 'DFN-001' }])
-        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]);
+        ]) // allDeps in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]) // getTaskCode(1) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]) // getTaskCode(2) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]) // getTaskCode(1) in execute
+        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]); // getTaskCode(2) in execute
 
       const result = await detectDependencyCycles.execute({
         task_id: 1, // DFN-001 depends on DFN-002
@@ -522,14 +526,16 @@ describe('Task Dependencies Endpoints', () => {
 
     it('should detect indirect cycle (A->B->C->A)', async () => {
       mockQuery
-        .mockResolvedValueOnce([{ id: 1 }])
-        .mockResolvedValueOnce([{ id: 3 }])
+        .mockResolvedValueOnce([{ id: 1 }]) // taskExists(1)
+        .mockResolvedValueOnce([{ id: 3 }]) // taskExists(3)
         .mockResolvedValueOnce([
           { task_id: 2, depends_on_task_id: 1, task_code: 'DFN-002' },
           { task_id: 3, depends_on_task_id: 2, task_code: 'DFN-003' },
-        ])
-        .mockResolvedValueOnce([{ task_code: 'DFN-001' }])
-        .mockResolvedValueOnce([{ task_code: 'DFN-003' }]);
+        ]) // allDeps in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]) // getTaskCode(1) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-003' }]) // getTaskCode(3) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]) // getTaskCode(1) in execute
+        .mockResolvedValueOnce([{ task_code: 'DFN-003' }]); // getTaskCode(3) in execute
 
       const result = await detectDependencyCycles.execute({
         task_id: 1, // DFN-001 depends on DFN-003
@@ -545,9 +551,11 @@ describe('Task Dependencies Endpoints', () => {
 
     it('should detect self-dependency cycle', async () => {
       mockQuery
-        .mockResolvedValueOnce([{ id: 1 }])
-        .mockResolvedValueOnce([{ id: 1 }])
-        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]);
+        .mockResolvedValueOnce([{ id: 1 }]) // taskExists(1)
+        .mockResolvedValueOnce([{ id: 1 }]) // taskExists(1)
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]) // getTaskCode(1) in detectCycle (early return)
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]) // getTaskCode(1) in execute
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]); // getTaskCode(1) in execute
 
       const result = await detectDependencyCycles.execute({
         task_id: 1,
@@ -563,16 +571,18 @@ describe('Task Dependencies Endpoints', () => {
 
     it('should handle complex graph without cycle', async () => {
       mockQuery
-        .mockResolvedValueOnce([{ id: 5 }])
-        .mockResolvedValueOnce([{ id: 4 }])
+        .mockResolvedValueOnce([{ id: 5 }]) // taskExists(5)
+        .mockResolvedValueOnce([{ id: 4 }]) // taskExists(4)
         .mockResolvedValueOnce([
           { task_id: 2, depends_on_task_id: 1, task_code: 'DFN-002' },
           { task_id: 3, depends_on_task_id: 1, task_code: 'DFN-003' },
           { task_id: 4, depends_on_task_id: 2, task_code: 'DFN-004' },
           { task_id: 4, depends_on_task_id: 3, task_code: 'DFN-004' },
-        ])
-        .mockResolvedValueOnce([{ task_code: 'DFN-005' }])
-        .mockResolvedValueOnce([{ task_code: 'DFN-004' }]);
+        ]) // allDeps in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-005' }]) // getTaskCode(5) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-004' }]) // getTaskCode(4) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-005' }]) // getTaskCode(5) in execute
+        .mockResolvedValueOnce([{ task_code: 'DFN-004' }]); // getTaskCode(4) in execute
 
       const result = await detectDependencyCycles.execute({
         task_id: 5,
@@ -588,11 +598,13 @@ describe('Task Dependencies Endpoints', () => {
 
     it('should format human output for cycle detection', async () => {
       mockQuery
-        .mockResolvedValueOnce([{ id: 1 }])
-        .mockResolvedValueOnce([{ id: 2 }])
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ task_code: 'DFN-001' }])
-        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]);
+        .mockResolvedValueOnce([{ id: 1 }]) // taskExists(1)
+        .mockResolvedValueOnce([{ id: 2 }]) // taskExists(2)
+        .mockResolvedValueOnce([]) // allDeps in detectCycle (empty)
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]) // getTaskCode(1) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]) // getTaskCode(2) in detectCycle
+        .mockResolvedValueOnce([{ task_code: 'DFN-001' }]) // getTaskCode(1) in execute
+        .mockResolvedValueOnce([{ task_code: 'DFN-002' }]); // getTaskCode(2) in execute
 
       const result = await detectDependencyCycles.execute({
         task_id: 1,

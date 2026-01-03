@@ -7,22 +7,30 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { getStats } from '../endpoints/stats.js'
-import { db } from '../database.js'
+import type { Database } from '../database.js';
 
-// Mock database
-jest.mock('../database', () => ({
-  db: {
-    query: jest.fn(),
-  },
+// Create mock database
+const mockQuery = jest.fn<(sql: string, params?: any[]) => Promise<any[]>>();
+
+const mockDb: Database = {
+  query: mockQuery,
+  execute: jest.fn(),
+};
+
+// Mock the database module
+jest.unstable_mockModule('../database.js', () => ({
+  db: mockDb,
 }));
+
+// Import after mocking
+const { getStats } = await import('../endpoints/stats.js');
 
 describe('get_stats Endpoint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
     // Default mock responses
-    (db.query as jest.Mock).mockImplementation((query: string) => {
+    mockQuery.mockImplementation((query: string) => {
       // Task status query
       if (query.includes('SUM(CASE WHEN status')) {
         return [{
@@ -163,7 +171,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should handle zero tasks gracefully', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
           return [{ total: 0, pending: 0, in_progress: 0, completed: 0, blocked: 0 }];
         }
@@ -213,7 +221,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should detect upward velocity trend', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM sprints s')) {
           return [
             { sprint_id: 3, points: 50 },
@@ -232,7 +240,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should detect downward velocity trend', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM sprints s')) {
           return [
             { sprint_id: 3, points: 30 },
@@ -251,7 +259,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should detect stable velocity trend', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM sprints s')) {
           return [
             { sprint_id: 3, points: 40 },
@@ -282,7 +290,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should return 100 for empty project', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
           return [{ total: 0, pending: 0, in_progress: 0, completed: 0, blocked: 0 }];
         }
@@ -303,10 +311,10 @@ describe('get_stats Endpoint', () => {
       const result = await getStats.execute({ project_id: 98 });
 
       expect(result.success).toBe(true);
-      expect(db.query).toHaveBeenCalled();
+      expect(mockQuery).toHaveBeenCalled();
 
       // Check that project_id was passed to queries
-      const calls = (db.query as jest.Mock).mock.calls;
+      const calls = mockQuery.mock.calls;
       const hasProjectFilter = calls.some(call =>
         call[1]?.includes(98)
       );
@@ -364,7 +372,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should handle agents with no tasks', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM agents a')) {
           return [
             { agent_id: 1, agent_name: 'Agent 1', agent_status: 'active', tasks_assigned: 0, tasks_completed: 0 },
@@ -452,7 +460,7 @@ describe('get_stats Endpoint', () => {
 
   describe('Edge Cases', () => {
     it('should handle empty project returns zeros', async () => {
-      (db.query as jest.Mock).mockReturnValue([]);
+      mockQuery.mockReturnValue([]);
 
       const result = await getStats.execute({ project_id: 999 });
 
@@ -460,7 +468,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should handle single task project', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
           return [{ total: 1, pending: 0, in_progress: 0, completed: 1, blocked: 0 }];
         }
@@ -480,7 +488,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should handle all tasks completed', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
           return [{ total: 50, pending: 0, in_progress: 0, completed: 50, blocked: 0 }];
         }
@@ -496,7 +504,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should handle all tasks blocked', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
           return [{ total: 10, pending: 0, in_progress: 0, completed: 0, blocked: 10 }];
         }
@@ -512,7 +520,7 @@ describe('get_stats Endpoint', () => {
     });
 
     it('should handle no active agents', async () => {
-      (db.query as jest.Mock).mockImplementation((query: string) => {
+      mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM agents a')) {
           return [];
         }
@@ -554,7 +562,7 @@ describe('get_stats Endpoint', () => {
 
   describe('Database Error Handling', () => {
     it('should handle database errors gracefully', async () => {
-      (db.query as jest.Mock).mockRejectedValue(new Error('Database connection failed'));
+      mockQuery.mockRejectedValue(new Error('Database connection failed'));
 
       const result = await getStats.execute({});
 

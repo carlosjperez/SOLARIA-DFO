@@ -89,8 +89,8 @@ export function useProjects() {
         queryKey: ['projects'],
         queryFn: async () => {
             const { data } = await projectsApi.getAll();
-            // API returns { projects: [...] } not { data: [...] }
-            const projects = data.projects || data.data || [];
+            // API returns direct array (backend line 1766: res.json(projects))
+            const projects = Array.isArray(data) ? data : (data.projects || data.data || []);
             // Map API fields to frontend types
             // Note: axios interceptor transforms snake_case to camelCase (total_tasks -> totalTasks)
             return projects.map((p: Record<string, unknown>) => transformProjectData(p));

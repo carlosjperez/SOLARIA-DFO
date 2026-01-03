@@ -116,7 +116,7 @@ async function getDocumentById(
       AND (? IS NULL OR d.project_id = ?)
   `;
 
-  const results = await db.query(query, [documentId, projectId, projectId]);
+  const [results] = await db.query(query, [documentId, projectId, projectId]);
   return results[0] || null;
 }
 
@@ -136,7 +136,7 @@ async function isDuplicateName(
       AND (? IS NULL OR id != ?)
   `;
 
-  const results = await db.query(query, [name, projectId, projectId, excludeId, excludeId]);
+  const [results] = await db.query(query, [name, projectId, projectId, excludeId, excludeId]);
   return (results[0]?.count || 0) > 0;
 }
 
@@ -152,17 +152,20 @@ export const createInlineDocument: Tool = {
   description: 'Create a new inline document stored directly in the system',
   inputSchema: CreateDocumentInputSchema,
 
-  async execute(params: z.infer<typeof CreateDocumentInputSchema>) {
+  async execute(args: any) {
+    // Validate input params
+    const params = CreateDocumentInputSchema.parse(args);
+
     const builder = new ResponseBuilder({ version: VERSION });
 
     try {
       // Check for duplicate name
       if (await isDuplicateName(params.name, params.project_id)) {
-        return builder.error(
-          'DUPLICATE_DOCUMENT',
-          `A document with name "${params.name}" already exists`,
-          { name: params.name }
-        );
+        return builder.error({
+          code: 'DUPLICATE_DOCUMENT',
+          message: `A document with name "${params.name}" already exists`,
+          details: { name: params.name },
+        });
       }
 
       const query = `
@@ -206,7 +209,10 @@ export const getInlineDocument: Tool = {
   description: 'Get a specific inline document by ID with full content',
   inputSchema: GetDocumentInputSchema,
 
-  async execute(params: z.infer<typeof GetDocumentInputSchema>) {
+  async execute(args: any) {
+    // Validate input params
+    const params = GetDocumentInputSchema.parse(args);
+
     const builder = new ResponseBuilder({ version: VERSION });
 
     try {
@@ -217,11 +223,11 @@ export const getInlineDocument: Tool = {
       );
 
       if (!document) {
-        return builder.error(
-          'DOCUMENT_NOT_FOUND',
-          `Document with ID ${params.document_id} not found`,
-          { document_id: params.document_id }
-        );
+        return builder.error({
+          code: 'DOCUMENT_NOT_FOUND',
+          message: `Document with ID ${params.document_id} not found`,
+          details: { document_id: params.document_id },
+        });
       }
 
       const formatted = params.format === 'human'
@@ -246,7 +252,10 @@ export const listInlineDocuments: Tool = {
   description: 'List all inline documents for a project',
   inputSchema: ListDocumentsInputSchema,
 
-  async execute(params: z.infer<typeof ListDocumentsInputSchema>) {
+  async execute(args: any) {
+    // Validate input params
+    const params = ListDocumentsInputSchema.parse(args);
+
     const builder = new ResponseBuilder({ version: VERSION });
 
     try {
@@ -263,7 +272,7 @@ export const listInlineDocuments: Tool = {
         LIMIT ?
       `;
 
-      const documents = await db.query(query, [
+      const [documents] = await db.query(query, [
         params.project_id, params.project_id,
         params.type, params.type,
         params.limit,
@@ -298,7 +307,10 @@ export const updateInlineDocument: Tool = {
   description: 'Update an inline document, creating a new version',
   inputSchema: UpdateDocumentInputSchema,
 
-  async execute(params: z.infer<typeof UpdateDocumentInputSchema>) {
+  async execute(args: any) {
+    // Validate input params
+    const params = UpdateDocumentInputSchema.parse(args);
+
     const builder = new ResponseBuilder({ version: VERSION });
 
     try {
@@ -306,22 +318,22 @@ export const updateInlineDocument: Tool = {
       const existing = await getDocumentById(params.document_id, params.project_id);
 
       if (!existing) {
-        return builder.error(
-          'DOCUMENT_NOT_FOUND',
-          `Document with ID ${params.document_id} not found`,
-          { document_id: params.document_id }
-        );
+        return builder.error({
+          code: 'DOCUMENT_NOT_FOUND',
+          message: `Document with ID ${params.document_id} not found`,
+          details: { document_id: params.document_id },
+        });
       }
 
       // Check for duplicate name if name is being changed
       const newName = params.name || existing.name;
       if (params.name && params.name !== existing.name) {
         if (await isDuplicateName(params.name, params.project_id, params.document_id)) {
-          return builder.error(
-            'DUPLICATE_DOCUMENT',
-            `A document with name "${params.name}" already exists`,
-            { name: params.name }
-          );
+          return builder.error({
+            code: 'DUPLICATE_DOCUMENT',
+            message: `A document with name "${params.name}" already exists`,
+            details: { name: params.name },
+          });
         }
       }
 
@@ -378,7 +390,10 @@ export const deleteInlineDocument: Tool = {
   description: 'Delete an inline document (soft delete)',
   inputSchema: DeleteDocumentInputSchema,
 
-  async execute(params: z.infer<typeof DeleteDocumentInputSchema>) {
+  async execute(args: any) {
+    // Validate input params
+    const params = DeleteDocumentInputSchema.parse(args);
+
     const builder = new ResponseBuilder({ version: VERSION });
 
     try {
@@ -386,11 +401,11 @@ export const deleteInlineDocument: Tool = {
       const existing = await getDocumentById(params.document_id, params.project_id);
 
       if (!existing) {
-        return builder.error(
-          'DOCUMENT_NOT_FOUND',
-          `Document with ID ${params.document_id} not found or already deleted`,
-          { document_id: params.document_id }
-        );
+        return builder.error({
+          code: 'DOCUMENT_NOT_FOUND',
+          message: `Document with ID ${params.document_id} not found or already deleted`,
+          details: { document_id: params.document_id },
+        });
       }
 
       // Soft delete
@@ -424,7 +439,10 @@ export const searchDocuments: Tool = {
   description: 'Search across all inline documents using full-text search',
   inputSchema: SearchDocumentsInputSchema,
 
-  async execute(params: z.infer<typeof SearchDocumentsInputSchema>) {
+  async execute(args: any) {
+    // Validate input params
+    const params = SearchDocumentsInputSchema.parse(args);
+
     const builder = new ResponseBuilder({ version: VERSION });
 
     try {
@@ -445,7 +463,7 @@ export const searchDocuments: Tool = {
         LIMIT ?
       `;
 
-      const documents = await db.query(query, [
+      const [documents] = await db.query(query, [
         searchPattern, searchPattern,
         params.project_id, params.project_id,
         params.type, params.type,

@@ -7,15 +7,23 @@
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { getReadyTasks } from '../endpoints/ready-tasks.js'
-import { db } from '../database.js'
+import type { Database } from '../database.js';
 
-// Mock database
-jest.mock('../database', () => ({
-  db: {
-    query: jest.fn(),
-  },
+// Create mock database
+const mockQuery = jest.fn<(sql: string, params?: any[]) => Promise<any[]>>();
+
+const mockDb: Database = {
+  query: mockQuery,
+  execute: jest.fn(),
+};
+
+// Mock the database module
+jest.unstable_mockModule('../database.js', () => ({
+  db: mockDb,
 }));
+
+// Import after mocking
+const { getReadyTasks } = await import('../endpoints/ready-tasks.js');
 
 describe('get_ready_tasks Endpoint', () => {
   beforeEach(() => {
@@ -36,7 +44,7 @@ describe('get_ready_tasks Endpoint', () => {
         },
       ];
 
-      (db.query as jest.Mock).mockResolvedValue(mockTasks);
+      mockQuery.mockResolvedValue(mockTasks as any);
 
       const params = {
         project_id: 98,
@@ -58,7 +66,7 @@ describe('get_ready_tasks Endpoint', () => {
     });
 
     it('should use default limit of 10', async () => {
-      (db.query as jest.Mock).mockResolvedValue([]);
+      mockQuery.mockResolvedValue([] as any);
 
       const params = {
         format: 'json' as const,
@@ -66,7 +74,8 @@ describe('get_ready_tasks Endpoint', () => {
 
       await getReadyTasks.execute(params);
 
-      const queryCall = (db.query as jest.Mock).mock.calls[0];
+      expect(mockQuery).toHaveBeenCalled();
+      const queryCall = mockQuery.mock.calls[0];
       const queryParams = queryCall[1];
       expect(queryParams[queryParams.length - 1]).toBe(10);
     });
@@ -117,7 +126,7 @@ describe('get_ready_tasks Endpoint', () => {
         },
       ];
 
-      (db.query as jest.Mock).mockResolvedValue(mockTasks);
+      mockQuery.mockResolvedValue(mockTasks as any);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -151,7 +160,7 @@ describe('get_ready_tasks Endpoint', () => {
         },
       ];
 
-      (db.query as jest.Mock).mockResolvedValue(mockTasks);
+      mockQuery.mockResolvedValue(mockTasks as any);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -181,7 +190,7 @@ describe('get_ready_tasks Endpoint', () => {
         readiness_score: 50,
       };
 
-      (db.query as jest.Mock).mockResolvedValue([taskWithAgent, taskUnassigned]);
+      mockQuery.mockResolvedValue([taskWithAgent, taskUnassigned] as any);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -207,7 +216,7 @@ describe('get_ready_tasks Endpoint', () => {
         // Task with blocker should be filtered out by SQL WHERE blocker_count = 0
       ];
 
-      (db.query as jest.Mock).mockResolvedValue(mockTasks);
+      mockQuery.mockResolvedValue(mockTasks as any);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -234,9 +243,9 @@ describe('get_ready_tasks Endpoint', () => {
         },
       ];
 
-      (db.query as jest.Mock)
+      mockQuery
         .mockRejectedValueOnce(dbError)
-        .mockResolvedValueOnce(fallbackTasks);
+        .mockResolvedValueOnce(fallbackTasks as any);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -246,7 +255,7 @@ describe('get_ready_tasks Endpoint', () => {
       }
 
       // Should call query twice (initial + fallback)
-      expect(db.query).toHaveBeenCalledTimes(2);
+      expect(mockQuery).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -266,7 +275,7 @@ describe('get_ready_tasks Endpoint', () => {
         readiness_score: 95,
       };
 
-      (db.query as jest.Mock).mockResolvedValue([mockTask]);
+      mockQuery.mockResolvedValue([mockTask] as any);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -293,7 +302,7 @@ describe('get_ready_tasks Endpoint', () => {
         readiness_score: 80,
       };
 
-      (db.query as jest.Mock).mockResolvedValue([mockTask]);
+      mockQuery.mockResolvedValue([mockTask] as any);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -322,7 +331,7 @@ describe('get_ready_tasks Endpoint', () => {
         },
       ];
 
-      (db.query as jest.Mock).mockResolvedValue(mockTasks);
+      mockQuery.mockResolvedValue(mockTasks as any);
 
       const result = await getReadyTasks.execute({ format: 'human' });
 
@@ -339,7 +348,7 @@ describe('get_ready_tasks Endpoint', () => {
     });
 
     it('should show empty state message when no tasks ready', async () => {
-      (db.query as jest.Mock).mockResolvedValue([]);
+      mockQuery.mockResolvedValue([] as any);
 
       const result = await getReadyTasks.execute({ format: 'human' });
 
@@ -356,7 +365,7 @@ describe('get_ready_tasks Endpoint', () => {
     it('should handle database errors', async () => {
       const dbError = new Error('Connection refused');
 
-      (db.query as jest.Mock).mockRejectedValue(dbError);
+      mockQuery.mockRejectedValue(dbError);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -368,7 +377,7 @@ describe('get_ready_tasks Endpoint', () => {
     });
 
     it('should include metadata in responses', async () => {
-      (db.query as jest.Mock).mockResolvedValue([]);
+      mockQuery.mockResolvedValue([] as any);
 
       const result = await getReadyTasks.execute({ format: 'json' });
 
@@ -385,35 +394,35 @@ describe('get_ready_tasks Endpoint', () => {
 
   describe('Query Parameter Handling', () => {
     it('should filter by project_id', async () => {
-      (db.query as jest.Mock).mockResolvedValue([]);
+      mockQuery.mockResolvedValue([] as any);
 
       await getReadyTasks.execute({
         project_id: 98,
         format: 'json',
       });
 
-      const queryCall = (db.query as jest.Mock).mock.calls[0];
+      const queryCall = mockQuery.mock.calls[0];
       const queryParams = queryCall[1];
       expect(queryParams[0]).toBe(98); // First project_id
       expect(queryParams[1]).toBe(98); // Second project_id (for NULL check)
     });
 
     it('should filter by agent_id', async () => {
-      (db.query as jest.Mock).mockResolvedValue([]);
+      mockQuery.mockResolvedValue([] as any);
 
       await getReadyTasks.execute({
         agent_id: 11,
         format: 'json',
       });
 
-      const queryCall = (db.query as jest.Mock).mock.calls[0];
+      const queryCall = mockQuery.mock.calls[0];
       const queryParams = queryCall[1];
       expect(queryParams[2]).toBe(11); // First agent_id
       expect(queryParams[3]).toBe(11); // Second agent_id
     });
 
     it('should return filter metadata', async () => {
-      (db.query as jest.Mock).mockResolvedValue([]);
+      mockQuery.mockResolvedValue([] as any);
 
       const result = await getReadyTasks.execute({
         project_id: 98,

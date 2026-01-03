@@ -7,33 +7,44 @@
  */
 
 import { describe, it, expect, beforeEach, jest, afterEach } from '@jest/globals';
-import { getHealth } from '../endpoints/health.js'
-import { db } from '../database.js'
+import type { Database } from '../database.js';
 
-// Mock modules
-jest.mock('../database', () => ({
-  db: {
-    query: jest.fn(),
-  },
-}));
+// Create mock database
+const mockQuery = jest.fn<(sql: string, params?: any[]) => Promise<any[]>>();
 
-// Mock os module
-const mockOs = {
+const mockDb: Database = {
+  query: mockQuery,
+  execute: jest.fn(),
+};
+
+// Mock os module functions
+const mockOsFunctions = {
   totalmem: jest.fn(() => 16 * 1024 * 1024 * 1024), // 16GB
   freemem: jest.fn(() => 8 * 1024 * 1024 * 1024), // 8GB
   loadavg: jest.fn(() => [1.5, 1.2, 1.0]),
   cpus: jest.fn(() => new Array(4).fill({})), // 4 CPUs
 };
 
-jest.mock('os', () => mockOs);
+// Mock child_process exec
+const mockExec = jest.fn();
+
+// Mock the database module
+jest.unstable_mockModule('../database.js', () => ({
+  db: mockDb,
+}));
+
+// Mock os module
+jest.unstable_mockModule('os', () => ({
+  default: mockOsFunctions,
+}));
 
 // Mock child_process
-const mockExec = jest.fn();
-jest.mock('child_process', () => ({
+jest.unstable_mockModule('child_process', () => ({
   exec: mockExec,
 }));
 
-jest.mock('util', () => ({
+// Mock util
+jest.unstable_mockModule('util', () => ({
   promisify: (fn: any) => (...args: any[]) => new Promise((resolve, reject) => {
     mockExec(...args, (err: any, stdout: any, stderr: any) => {
       if (err) reject(err);
@@ -42,12 +53,15 @@ jest.mock('util', () => ({
   }),
 }));
 
+// Import after mocking
+const { getHealth } = await import('../endpoints/health.js');
+
 describe('get_health Endpoint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
     // Default mocks for healthy state
-    (db.query as jest.Mock).mockResolvedValue([{ 1: 1 }]);
+    mockQuery.mockResolvedValue([[{ 1: 1 }], undefined] as any);
 
     // Mock disk check (df command)
     mockExec.mockImplementation((cmd: string, callback: Function) => {
@@ -55,10 +69,10 @@ describe('get_health Endpoint', () => {
     });
 
     // Reset os mocks
-    mockOs.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
-    mockOs.freemem.mockReturnValue(8 * 1024 * 1024 * 1024);
-    mockOs.loadavg.mockReturnValue([1.5, 1.2, 1.0]);
-    mockOs.cpus.mockReturnValue(new Array(4).fill({}));
+    mockOsFunctions.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
+    mockOsFunctions.freemem.mockReturnValue(8 * 1024 * 1024 * 1024);
+    mockOsFunctions.loadavg.mockReturnValue([1.5, 1.2, 1.0]);
+    mockOsFunctions.cpus.mockReturnValue(new Array(4).fill({}));
   });
 
   afterEach(() => {
@@ -164,8 +178,8 @@ describe('get_health Endpoint', () => {
   describe('Degraded State', () => {
     it('should return degraded when single check is degraded', async () => {
       // Set high memory usage (75%)
-      mockOs.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
-      mockOs.freemem.mockReturnValue(4 * 1024 * 1024 * 1024); // 4GB free = 75% used
+      mockOsFunctions.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
+      mockOsFunctions.freemem.mockReturnValue(4 * 1024 * 1024 * 1024); // 4GB free = 75% used
 
       const result = await getHealth.execute({ format: 'json' });
 
@@ -177,8 +191,8 @@ describe('get_health Endpoint', () => {
     });
 
     it('should return degraded for high memory usage', async () => {
-      mockOs.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
-      mockOs.freemem.mockReturnValue(3.2 * 1024 * 1024 * 1024); // 80% used
+      mockOsFunctions.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
+      mockOsFunctions.freemem.mockReturnValue(3.2 * 1024 * 1024 * 1024); // 80% used
 
       const result = await getHealth.execute({ format: 'json' });
 
@@ -202,8 +216,8 @@ describe('get_health Endpoint', () => {
     });
 
     it('should return degraded for high CPU load', async () => {
-      mockOs.loadavg.mockReturnValue([3.2, 3.0, 2.8]); // 80% of 4 CPUs
-      mockOs.cpus.mockReturnValue(new Array(4).fill({}));
+      mockOsFunctions.loadavg.mockReturnValue([3.2, 3.0, 2.8]); // 80% of 4 CPUs
+      mockOsFunctions.cpus.mockReturnValue(new Array(4).fill({}));
 
       const result = await getHealth.execute({ format: 'json' });
 
@@ -215,9 +229,9 @@ describe('get_health Endpoint', () => {
 
     it('should return degraded for slow database response', async () => {
       // Mock slow database
-      (db.query as jest.Mock).mockImplementation(async () => {
+      mockQuery.mockImplementation(async () => {
         await new Promise(resolve => setTimeout(resolve, 150)); // 150ms delay
-        return [{ 1: 1 }];
+        return [[{ 1: 1 }], undefined] as any;
       });
 
       const result = await getHealth.execute({ format: 'json' });
@@ -232,7 +246,7 @@ describe('get_health Endpoint', () => {
 
   describe('Unhealthy State', () => {
     it('should return unhealthy when database connection fails', async () => {
-      (db.query as jest.Mock).mockRejectedValue(new Error('Connection refused'));
+      mockQuery.mockRejectedValue(new Error('Connection refused'));
 
       const result = await getHealth.execute({ format: 'json' });
 
@@ -244,8 +258,8 @@ describe('get_health Endpoint', () => {
     });
 
     it('should return unhealthy when critical threshold exceeded', async () => {
-      mockOs.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
-      mockOs.freemem.mockReturnValue(1.5 * 1024 * 1024 * 1024); // 90% used
+      mockOsFunctions.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
+      mockOsFunctions.freemem.mockReturnValue(1.5 * 1024 * 1024 * 1024); // 90% used
 
       const result = await getHealth.execute({ format: 'json' });
 
@@ -257,9 +271,9 @@ describe('get_health Endpoint', () => {
     });
 
     it('should return unhealthy when multiple failures occur', async () => {
-      (db.query as jest.Mock).mockRejectedValue(new Error('Connection refused'));
-      mockOs.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
-      mockOs.freemem.mockReturnValue(1.5 * 1024 * 1024 * 1024); // 90% used
+      mockQuery.mockRejectedValue(new Error('Connection refused'));
+      mockOsFunctions.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
+      mockOsFunctions.freemem.mockReturnValue(1.5 * 1024 * 1024 * 1024); // 90% used
 
       const result = await getHealth.execute({ format: 'json' });
 
@@ -273,7 +287,7 @@ describe('get_health Endpoint', () => {
     it('should include error details in unhealthy database check', async () => {
       const dbError = new Error('Connection refused');
       (dbError as any).code = 'ECONNREFUSED';
-      (db.query as jest.Mock).mockRejectedValue(dbError);
+      mockQuery.mockRejectedValue(dbError);
 
       const result = await getHealth.execute({ format: 'json' });
 
@@ -327,8 +341,8 @@ describe('get_health Endpoint', () => {
     });
 
     it('should show degraded icon for degraded check', async () => {
-      mockOs.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
-      mockOs.freemem.mockReturnValue(4 * 1024 * 1024 * 1024); // 75% used
+      mockOsFunctions.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
+      mockOsFunctions.freemem.mockReturnValue(4 * 1024 * 1024 * 1024); // 75% used
 
       const result = await getHealth.execute({ format: 'human' });
 
@@ -341,7 +355,7 @@ describe('get_health Endpoint', () => {
 
   describe('Edge Cases', () => {
     it('should handle Redis not configured gracefully', async () => {
-      const result = await getHealth.execute({ format: 'json' });
+      const result = await getHealth.execute({ format: 'json', include_details: true });
 
       expect(result.success).toBe(true);
       if (result.success) {
@@ -421,8 +435,8 @@ describe('get_health Endpoint', () => {
     });
 
     it('should count warnings correctly', async () => {
-      mockOs.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
-      mockOs.freemem.mockReturnValue(4 * 1024 * 1024 * 1024); // 75% used
+      mockOsFunctions.totalmem.mockReturnValue(16 * 1024 * 1024 * 1024);
+      mockOsFunctions.freemem.mockReturnValue(4 * 1024 * 1024 * 1024); // 75% used
 
       const result = await getHealth.execute({ format: 'json' });
 
@@ -433,7 +447,7 @@ describe('get_health Endpoint', () => {
     });
 
     it('should count failures correctly', async () => {
-      (db.query as jest.Mock).mockRejectedValue(new Error('Connection refused'));
+      mockQuery.mockRejectedValue(new Error('Connection refused'));
 
       const result = await getHealth.execute({ format: 'json' });
 

@@ -132,7 +132,10 @@ export const getReadyTasks: Tool = {
   description: 'Get tasks that are ready to work on (no blockers, actionable state, priority-ordered)',
   inputSchema: GetReadyTasksInputSchema,
 
-  async execute(params: z.infer<typeof GetReadyTasksInputSchema>) {
+  async execute(args: any) {
+    // Validate input params and apply defaults
+    const params = GetReadyTasksInputSchema.parse(args);
+
     const builder = new ResponseBuilder({ version: '2.0.0' });
 
     try {

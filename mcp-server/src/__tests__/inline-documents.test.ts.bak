@@ -45,11 +45,11 @@ describe('Inline Documents Endpoints', () => {
   describe('createInlineDocument', () => {
     it('should create document with valid data', async () => {
       // Mock no duplicate
-      mockQuery.mockResolvedValueOnce([[{ count: 0 }], undefined] as any);
+      mockedDb.query.mockResolvedValueOnce([{ count: 0 }]);
       // Mock insert
-      mockExecute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
+      mockedDb.execute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
       // Mock get created document
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         project_id: 1,
         name: 'Test Document',
@@ -60,7 +60,7 @@ describe('Inline Documents Endpoints', () => {
         created_at: '2025-12-27T00:00:00Z',
         updated_at: '2025-12-27T00:00:00Z',
         project_name: 'Test Project',
-      }], undefined] as any);
+      }]);
 
       const result = await createInlineDocument.execute({
         project_id: 1,
@@ -76,9 +76,9 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should create document with minimum required fields', async () => {
-      mockQuery.mockResolvedValueOnce([[{ count: 0 }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{ count: 0 }]);
+      mockedDb.execute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Min Doc',
         type: 'plan',
@@ -87,7 +87,7 @@ describe('Inline Documents Endpoints', () => {
         is_active: true,
         created_at: '2025-12-27T00:00:00Z',
         updated_at: '2025-12-27T00:00:00Z',
-      }], undefined] as any);
+      }]);
 
       const result = await createInlineDocument.execute({
         name: 'Min Doc',
@@ -99,7 +99,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should reject duplicate document name', async () => {
-      mockQuery.mockResolvedValueOnce([[{ count: 1 }], undefined] as any); // duplicate exists
+      mockedDb.query.mockResolvedValueOnce([{ count: 1 }]); // duplicate exists
 
       const result = await createInlineDocument.execute({
         name: 'Duplicate Name',
@@ -112,55 +112,40 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should reject name too short', async () => {
-      try {
-        const result = await createInlineDocument.execute({
-          name: 'AB', // less than 3 chars
-          content_md: 'Content',
-        } as any);
+      const result = await createInlineDocument.execute({
+        name: 'AB', // less than 3 chars
+        content_md: 'Content',
+      } as any);
 
-        // If validation passed unexpectedly
-        expect(result.success).toBe(false);
-      } catch (error: any) {
-        // Zod validation should throw before execute
-        expect(error.message || error.toString()).toContain('at least 3 character');
-      }
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('VALIDATION_ERROR');
     });
 
     it('should reject empty content', async () => {
-      try {
-        const result = await createInlineDocument.execute({
-          name: 'Test Doc',
-          content_md: '', // empty
-        } as any);
+      const result = await createInlineDocument.execute({
+        name: 'Test Doc',
+        content_md: '', // empty
+      } as any);
 
-        // If validation passed unexpectedly
-        expect(result.success).toBe(false);
-      } catch (error: any) {
-        // Zod validation should throw before execute
-        expect(error.message || error.toString()).toContain('at least 1 character');
-      }
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('VALIDATION_ERROR');
     });
 
     it('should reject invalid type', async () => {
-      try {
-        const result = await createInlineDocument.execute({
-          name: 'Test Doc',
-          content_md: 'Content',
-          type: 'invalid_type' as any,
-        });
+      const result = await createInlineDocument.execute({
+        name: 'Test Doc',
+        content_md: 'Content',
+        type: 'invalid_type' as any,
+      });
 
-        // If validation passed unexpectedly
-        expect(result.success).toBe(false);
-      } catch (error: any) {
-        // Zod validation should throw before execute
-        expect(error.message || error.toString()).toContain('Invalid enum value');
-      }
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('VALIDATION_ERROR');
     });
 
     it('should return human format when requested', async () => {
-      mockQuery.mockResolvedValueOnce([[{ count: 0 }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{ count: 0 }]);
+      mockedDb.execute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Test Document',
         type: 'spec',
@@ -169,7 +154,7 @@ describe('Inline Documents Endpoints', () => {
         is_active: true,
         created_at: '2025-12-27T00:00:00Z',
         updated_at: '2025-12-27T00:00:00Z',
-      }], undefined] as any);
+      }]);
 
       const result = await createInlineDocument.execute({
         name: 'Test Document',
@@ -188,7 +173,7 @@ describe('Inline Documents Endpoints', () => {
 
   describe('getInlineDocument', () => {
     it('should get existing document with content', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         project_id: 1,
         name: 'Test Doc',
@@ -199,7 +184,7 @@ describe('Inline Documents Endpoints', () => {
         created_at: '2025-12-27T00:00:00Z',
         updated_at: '2025-12-27T00:00:00Z',
         project_name: 'Test Project',
-      }], undefined] as any);
+      }]);
 
       const result = await getInlineDocument.execute({
         document_id: 1,
@@ -213,7 +198,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should get document without content when requested', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Test Doc',
         type: 'spec',
@@ -221,7 +206,7 @@ describe('Inline Documents Endpoints', () => {
         is_active: true,
         created_at: '2025-12-27T00:00:00Z',
         updated_at: '2025-12-27T00:00:00Z',
-      }], undefined] as any);
+      }]);
 
       const result = await getInlineDocument.execute({
         document_id: 1,
@@ -234,7 +219,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should return 404 for non-existent document', async () => {
-      mockQuery.mockResolvedValueOnce([[], undefined] as any); // no document found
+      mockedDb.query.mockResolvedValueOnce([]); // no document found
 
       const result = await getInlineDocument.execute({
         document_id: 999,
@@ -246,7 +231,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should return 404 for deleted document', async () => {
-      mockQuery.mockResolvedValueOnce([[], undefined] as any); // is_active = 0 means not found
+      mockedDb.query.mockResolvedValueOnce([]); // is_active = 0 means not found
 
       const result = await getInlineDocument.execute({
         document_id: 1,
@@ -258,7 +243,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should enforce project isolation', async () => {
-      mockQuery.mockResolvedValueOnce([[], undefined] as any); // project_id mismatch
+      mockedDb.query.mockResolvedValueOnce([]); // project_id mismatch
 
       const result = await getInlineDocument.execute({
         document_id: 1,
@@ -271,7 +256,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should return human format when requested', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Test Doc',
         type: 'spec',
@@ -281,7 +266,7 @@ describe('Inline Documents Endpoints', () => {
         created_at: '2025-12-27T00:00:00Z',
         updated_at: '2025-12-27T00:00:00Z',
         project_name: 'Test Project',
-      }], undefined] as any);
+      }]);
 
       const result = await getInlineDocument.execute({
         document_id: 1,
@@ -300,10 +285,10 @@ describe('Inline Documents Endpoints', () => {
 
   describe('listInlineDocuments', () => {
     it('should list all documents', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc 1', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
         { id: 2, name: 'Doc 2', type: 'plan', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         format: 'json',
@@ -315,9 +300,9 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should filter by project_id', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc 1', project_id: 1, type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         project_id: 1,
@@ -326,16 +311,16 @@ describe('Inline Documents Endpoints', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.filters.project_id).toBe(1);
-      expect(mockQuery).toHaveBeenCalledWith(
+      expect(mockedDb.query).toHaveBeenCalledWith(
         expect.any(String),
         expect.arrayContaining([1, 1])
       );
     });
 
     it('should filter by type', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Spec Doc', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         type: 'spec',
@@ -347,11 +332,11 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should respect limit', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc 1', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
         { id: 2, name: 'Doc 2', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
         { id: 3, name: 'Doc 3', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         limit: 3,
@@ -363,7 +348,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should return empty array when none found', async () => {
-      mockQuery.mockResolvedValueOnce([[], undefined] as any);
+      mockedDb.query.mockResolvedValueOnce([]);
 
       const result = await listInlineDocuments.execute({
         project_id: 999,
@@ -376,9 +361,9 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should return human format when requested', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc 1', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         format: 'human',
@@ -396,7 +381,7 @@ describe('Inline Documents Endpoints', () => {
   describe('updateInlineDocument', () => {
     it('should update content and create new version', async () => {
       // Get existing
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         project_id: 1,
         name: 'Original Name',
@@ -404,13 +389,13 @@ describe('Inline Documents Endpoints', () => {
         content_md: '# Original',
         version: 1,
         is_active: true,
-      }], undefined] as any);
+      }]);
       // Archive old
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      mockedDb.execute.mockResolvedValueOnce({ affectedRows: 1 });
       // Insert new
-      mockExecute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
+      mockedDb.execute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
       // Get updated
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 2,
         project_id: 1,
         name: 'Original Name',
@@ -419,7 +404,7 @@ describe('Inline Documents Endpoints', () => {
         version: 2,
         is_active: true,
         parent_version_id: 1,
-      }], undefined] as any);
+      }]);
 
       const result = await updateInlineDocument.execute({
         document_id: 1,
@@ -433,24 +418,24 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should update name only', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Old Name',
         type: 'spec',
         content_md: '# Content',
         version: 1,
-      }], undefined] as any);
+      }]);
       // Check no duplicate
-      mockQuery.mockResolvedValueOnce([[{ count: 0 }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
-      mockExecute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{ count: 0 }]);
+      mockedDb.execute.mockResolvedValueOnce({ affectedRows: 1 });
+      mockedDb.execute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
+      mockedDb.query.mockResolvedValueOnce([{
         id: 2,
         name: 'New Name',
         type: 'spec',
         content_md: '# Content',
         version: 2,
-      }], undefined] as any);
+      }]);
 
       const result = await updateInlineDocument.execute({
         document_id: 1,
@@ -463,22 +448,22 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should update type only', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Doc',
         type: 'spec',
         content_md: '# Content',
         version: 1,
-      }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
-      mockExecute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
-      mockQuery.mockResolvedValueOnce([[{
+      }]);
+      mockedDb.execute.mockResolvedValueOnce({ affectedRows: 1 });
+      mockedDb.execute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
+      mockedDb.query.mockResolvedValueOnce([{
         id: 2,
         name: 'Doc',
         type: 'report',
         content_md: '# Content',
         version: 2,
-      }], undefined] as any);
+      }]);
 
       const result = await updateInlineDocument.execute({
         document_id: 1,
@@ -491,23 +476,23 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should include change_summary', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Doc',
         type: 'spec',
         content_md: '# Content',
         version: 1,
-      }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
-      mockExecute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
-      mockQuery.mockResolvedValueOnce([[{
+      }]);
+      mockedDb.execute.mockResolvedValueOnce({ affectedRows: 1 });
+      mockedDb.execute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
+      mockedDb.query.mockResolvedValueOnce([{
         id: 2,
         name: 'Doc',
         type: 'spec',
         content_md: '# Updated',
         version: 2,
         change_summary: 'Updated content',
-      }], undefined] as any);
+      }]);
 
       const result = await updateInlineDocument.execute({
         document_id: 1,
@@ -517,14 +502,14 @@ describe('Inline Documents Endpoints', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(mockExecute).toHaveBeenCalledWith(
+      expect(mockedDb.execute).toHaveBeenCalledWith(
         expect.any(String),
         expect.arrayContaining(['Updated content'])
       );
     });
 
     it('should reject update on non-existent document', async () => {
-      mockQuery.mockResolvedValueOnce([[], undefined] as any);
+      mockedDb.query.mockResolvedValueOnce([]);
 
       const result = await updateInlineDocument.execute({
         document_id: 999,
@@ -537,14 +522,14 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should reject duplicate name on update', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Old Name',
         type: 'spec',
         content_md: '# Content',
         version: 1,
-      }], undefined] as any);
-      mockQuery.mockResolvedValueOnce([[{ count: 1 }], undefined] as any); // duplicate exists
+      }]);
+      mockedDb.query.mockResolvedValueOnce([{ count: 1 }]); // duplicate exists
 
       const result = await updateInlineDocument.execute({
         document_id: 1,
@@ -563,14 +548,14 @@ describe('Inline Documents Endpoints', () => {
 
   describe('deleteInlineDocument', () => {
     it('should soft delete marks inactive', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Doc to Delete',
         type: 'spec',
         version: 1,
         is_active: true,
-      }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      }]);
+      mockedDb.execute.mockResolvedValueOnce({ affectedRows: 1 });
 
       const result = await deleteInlineDocument.execute({
         document_id: 1,
@@ -580,14 +565,14 @@ describe('Inline Documents Endpoints', () => {
       expect(result.success).toBe(true);
       expect(result.data.deleted).toBe(true);
       expect(result.data.name).toBe('Doc to Delete');
-      expect(mockExecute).toHaveBeenCalledWith(
+      expect(mockedDb.execute).toHaveBeenCalledWith(
         expect.stringContaining('is_active = 0'),
         [1]
       );
     });
 
     it('should return 404 for non-existent document', async () => {
-      mockQuery.mockResolvedValueOnce([[], undefined] as any);
+      mockedDb.query.mockResolvedValueOnce([]);
 
       const result = await deleteInlineDocument.execute({
         document_id: 999,
@@ -599,7 +584,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should return 404 for already deleted document', async () => {
-      mockQuery.mockResolvedValueOnce([[], undefined] as any); // is_active = 0 means not found
+      mockedDb.query.mockResolvedValueOnce([]); // is_active = 0 means not found
 
       const result = await deleteInlineDocument.execute({
         document_id: 1,
@@ -611,13 +596,13 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should return human format when requested', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Doc to Delete',
         type: 'spec',
         version: 1,
-      }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      }]);
+      mockedDb.execute.mockResolvedValueOnce({ affectedRows: 1 });
 
       const result = await deleteInlineDocument.execute({
         document_id: 1,
@@ -636,9 +621,9 @@ describe('Inline Documents Endpoints', () => {
 
   describe('searchDocuments', () => {
     it('should find by exact name', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'API Specification', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await searchDocuments.execute({
         query: 'API Specification',
@@ -651,10 +636,10 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should find by content keyword', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc 1', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
         { id: 2, name: 'Doc 2', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await searchDocuments.execute({
         query: 'authentication',
@@ -666,9 +651,9 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should perform case insensitive search', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'API Doc', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await searchDocuments.execute({
         query: 'api',
@@ -676,16 +661,16 @@ describe('Inline Documents Endpoints', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(mockQuery).toHaveBeenCalledWith(
+      expect(mockedDb.query).toHaveBeenCalledWith(
         expect.any(String),
         expect.arrayContaining(['%api%', '%api%'])
       );
     });
 
     it('should respect project filter', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc', project_id: 1, type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await searchDocuments.execute({
         query: 'test',
@@ -698,9 +683,9 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should respect type filter', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Report', type: 'report', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await searchDocuments.execute({
         query: 'monthly',
@@ -713,7 +698,7 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should return empty for no matches', async () => {
-      mockQuery.mockResolvedValueOnce([[], undefined] as any);
+      mockedDb.query.mockResolvedValueOnce([]);
 
       const result = await searchDocuments.execute({
         query: 'nonexistent',
@@ -725,23 +710,18 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should reject query too short', async () => {
-      try {
-        const result = await searchDocuments.execute({
-          query: 'a', // less than 2 chars
-        } as any);
+      const result = await searchDocuments.execute({
+        query: 'a', // less than 2 chars
+      } as any);
 
-        // If validation passed unexpectedly
-        expect(result.success).toBe(false);
-      } catch (error: any) {
-        // Zod validation should throw before execute
-        expect(error.message || error.toString()).toContain('at least 2 character');
-      }
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('VALIDATION_ERROR');
     });
 
     it('should return human format when requested', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Found Doc', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await searchDocuments.execute({
         query: 'test',
@@ -759,7 +739,7 @@ describe('Inline Documents Endpoints', () => {
 
   describe('Human Format Output', () => {
     it('should include correct icons in output', async () => {
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Test Doc',
         type: 'spec',
@@ -767,7 +747,7 @@ describe('Inline Documents Endpoints', () => {
         version: 1,
         created_at: '2025-12-27T00:00:00Z',
         updated_at: '2025-12-27T00:00:00Z',
-      }], undefined] as any);
+      }]);
 
       const result = await getInlineDocument.execute({
         document_id: 1,
@@ -779,7 +759,7 @@ describe('Inline Documents Endpoints', () => {
 
     it('should truncate long content in preview', async () => {
       const longContent = 'A'.repeat(1000);
-      mockQuery.mockResolvedValueOnce([[{
+      mockedDb.query.mockResolvedValueOnce([{
         id: 1,
         name: 'Long Doc',
         type: 'spec',
@@ -787,7 +767,7 @@ describe('Inline Documents Endpoints', () => {
         version: 1,
         created_at: '2025-12-27T00:00:00Z',
         updated_at: '2025-12-27T00:00:00Z',
-      }], undefined] as any);
+      }]);
 
       const result = await getInlineDocument.execute({
         document_id: 1,
@@ -804,9 +784,9 @@ describe('Inline Documents Endpoints', () => {
 
   describe('Response Metadata', () => {
     it('should include version in metadata', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         format: 'json',
@@ -816,9 +796,9 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should include timestamp in metadata', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         format: 'json',
@@ -828,9 +808,9 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should include request_id in metadata', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         format: 'json',
@@ -840,9 +820,9 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should include execution_time_ms in metadata', async () => {
-      mockQuery.mockResolvedValueOnce([[
+      mockedDb.query.mockResolvedValueOnce([
         { id: 1, name: 'Doc', type: 'spec', version: 1, updated_at: '2025-12-27T00:00:00Z' },
-      ], undefined] as any);
+      ]);
 
       const result = await listInlineDocuments.execute({
         format: 'json',
@@ -858,7 +838,7 @@ describe('Inline Documents Endpoints', () => {
 
   describe('Error Handling', () => {
     it('should handle database error gracefully', async () => {
-      mockQuery.mockRejectedValueOnce(new Error('Database connection failed'));
+      mockedDb.query.mockRejectedValueOnce(new Error('Database connection failed'));
 
       const result = await listInlineDocuments.execute({
         format: 'json',
@@ -869,18 +849,13 @@ describe('Inline Documents Endpoints', () => {
     });
 
     it('should handle validation error with details', async () => {
-      try {
-        const result = await createInlineDocument.execute({
-          name: 'AB', // too short
-          content_md: 'Content',
-        } as any);
+      const result = await createInlineDocument.execute({
+        name: 'AB', // too short
+        content_md: 'Content',
+      } as any);
 
-        // If validation passed unexpectedly
-        expect(result.success).toBe(false);
-      } catch (error: any) {
-        // Zod validation should throw before execute
-        expect(error.message || error.toString()).toContain('at least 3 character');
-      }
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('VALIDATION_ERROR');
     });
   });
 });
