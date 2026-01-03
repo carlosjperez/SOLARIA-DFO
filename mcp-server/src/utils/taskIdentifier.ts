@@ -13,7 +13,7 @@
  * - task_code: Display format (e.g., DFO-158-EPIC15)
  */
 
-import { db } from '../database.js'
+import { db, type Database } from '../database.js'
 
 /**
  * Resolved task identifier with full metadata
@@ -62,12 +62,13 @@ export interface TaskIdentifier {
  */
 export async function resolveTaskIdentifier(
     identifier: string | number,
-    project_id?: number
+    project_id?: number,
+    dbInstance: Database = db
 ): Promise<TaskIdentifier> {
 
     // Case 1: Numeric identifier (task_id or task_number)
     if (typeof identifier === 'number') {
-        return await resolveNumericIdentifier(identifier, project_id);
+        return await resolveNumericIdentifier(identifier, project_id, dbInstance);
     }
 
     // Case 2: String identifier
@@ -75,13 +76,13 @@ export async function resolveTaskIdentifier(
         // Try parsing as task_code (DFO-158-EPIC15 or DFO-158)
         const codeMatch = identifier.match(/^([A-Z]{2,4})-(\d+)(?:-EPIC(\d+))?$/);
         if (codeMatch) {
-            return await resolveTaskCode(identifier);
+            return await resolveTaskCode(identifier, dbInstance);
         }
 
         // Try parsing as task_number string ("158")
         const numberMatch = identifier.match(/^\d+$/);
         if (numberMatch) {
-            return await resolveNumericIdentifier(parseInt(identifier, 10), project_id);
+            return await resolveNumericIdentifier(parseInt(identifier, 10), project_id, dbInstance);
         }
 
         throw new InvalidIdentifierError(
@@ -99,11 +100,12 @@ export async function resolveTaskIdentifier(
  */
 async function resolveNumericIdentifier(
     num: number,
-    project_id?: number
+    project_id?: number,
+    dbInstance: Database = db
 ): Promise<TaskIdentifier> {
 
     // Strategy 1: Try as task_id first (most common case)
-    const byId = await db.query(`
+    const byId = await dbInstance.query(`
         SELECT
             t.id as task_id,
             t.task_number,
@@ -148,7 +150,7 @@ async function resolveNumericIdentifier(
            WHERE t.task_number = ?`;
 
     const params = project_id ? [num, project_id] : [num];
-    const byNumber = await db.query(query, params);
+    const byNumber = await dbInstance.query(query, params);
 
     if (byNumber.length > 0) {
         if (byNumber.length > 1) {
@@ -175,7 +177,7 @@ async function resolveNumericIdentifier(
  * Resolves task_code (DFO-158-EPIC15 or DFO-158)
  * @internal
  */
-async function resolveTaskCode(code: string): Promise<TaskIdentifier> {
+async function resolveTaskCode(code: string, dbInstance: Database = db): Promise<TaskIdentifier> {
     const match = code.match(/^([A-Z]{2,4})-(\d+)(?:-EPIC(\d+))?$/);
     if (!match) {
         throw new InvalidIdentifierError(
@@ -203,7 +205,7 @@ async function resolveTaskCode(code: string): Promise<TaskIdentifier> {
         ? [code, projectCode, parseInt(taskNumber, 10), parseInt(epicNumber, 10)]
         : [code, projectCode, parseInt(taskNumber, 10)];
 
-    const result = await db.query(query, params);
+    const result = await dbInstance.query(query, params);
 
     if (result.length === 0) {
         throw new TaskNotFoundError(

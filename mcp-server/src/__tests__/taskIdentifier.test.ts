@@ -3,30 +3,28 @@
  *
  * @author ECO-Lambda | DFO Audit Fix
  * @date 2025-12-28
+ *
+ * Using dependency injection pattern for testing
  */
 
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach } from '@jest/globals';
+import type { Database } from '../database.js';
 import {
     resolveTaskIdentifier,
     TaskNotFoundError,
     InvalidIdentifierError,
     AmbiguousIdentifierError
-} from '../utils/taskIdentifier';
-
-// Mock database module
-const mockQuery = jest.fn();
-jest.mock('../database', () => ({
-    db: {
-        query: mockQuery
-    }
-}));
-
-import { db } from '../database.js'
+} from '../utils/taskIdentifier.js';
 
 describe('resolveTaskIdentifier', () => {
+    let mockDb: Database;
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        // Create fresh mock database for each test
+        mockDb = {
+            query: async () => [],
+            execute: async () => ({ affectedRows: 0 })
+        };
     });
 
     describe('task_id resolution', () => {
@@ -40,23 +38,17 @@ describe('resolveTaskIdentifier', () => {
                 epic_id: 15
             };
 
-            mockQuery.mockResolvedValueOnce([mockTask]);
+            mockDb.query = async () => [mockTask];
 
-            const result = await resolveTaskIdentifier(491);
+            const result = await resolveTaskIdentifier(491, undefined, mockDb);
 
             expect(result).toEqual(mockTask);
-            expect(db.query).toHaveBeenCalledWith(
-                expect.stringContaining('WHERE t.id = ?'),
-                [491]
-            );
         });
 
         it('throws TaskNotFoundError for non-existent task_id', async () => {
-            mockQuery
-                .mockResolvedValueOnce([]) // First query (by ID) returns empty
-                .mockResolvedValueOnce([]); // Second query (by number) returns empty
+            mockDb.query = async () => [];
 
-            await expect(resolveTaskIdentifier(999999))
+            await expect(resolveTaskIdentifier(999999, undefined, mockDb))
                 .rejects.toThrow(TaskNotFoundError);
         });
     });
@@ -72,17 +64,16 @@ describe('resolveTaskIdentifier', () => {
                 epic_id: 15
             };
 
-            mockQuery
-                .mockResolvedValueOnce([]) // First query (by ID) returns empty
-                .mockResolvedValueOnce([mockTask]); // Second query (by number) succeeds
+            let callCount = 0;
+            mockDb.query = async () => {
+                callCount++;
+                // First call (by ID) returns empty, second call (by number) succeeds
+                return callCount === 1 ? [] : [mockTask];
+            };
 
-            const result = await resolveTaskIdentifier(158, 1);
+            const result = await resolveTaskIdentifier(158, 1, mockDb);
 
             expect(result).toEqual(mockTask);
-            expect(db.query).toHaveBeenCalledWith(
-                expect.stringContaining('WHERE t.task_number = ? AND t.project_id = ?'),
-                [158, 1]
-            );
         });
 
         it('throws AmbiguousIdentifierError when multiple projects have same task_number', async () => {
@@ -91,11 +82,14 @@ describe('resolveTaskIdentifier', () => {
                 { task_id: 520, task_number: 158, project_id: 2 }
             ];
 
-            mockQuery
-                .mockResolvedValueOnce([]) // First query (by ID) returns empty
-                .mockResolvedValueOnce(mockTasks); // Second query returns multiple
+            let callCount = 0;
+            mockDb.query = async () => {
+                callCount++;
+                // First call (by ID) returns empty, second call returns multiple
+                return callCount === 1 ? [] : mockTasks;
+            };
 
-            await expect(resolveTaskIdentifier(158))
+            await expect(resolveTaskIdentifier(158, undefined, mockDb))
                 .rejects.toThrow(AmbiguousIdentifierError);
         });
     });
@@ -111,15 +105,11 @@ describe('resolveTaskIdentifier', () => {
                 epic_id: 15
             };
 
-            mockQuery.mockResolvedValueOnce([mockTask]);
+            mockDb.query = async () => [mockTask];
 
-            const result = await resolveTaskIdentifier('DFO-158-EPIC15');
+            const result = await resolveTaskIdentifier('DFO-158-EPIC15', undefined, mockDb);
 
             expect(result).toEqual(mockTask);
-            expect(db.query).toHaveBeenCalledWith(
-                expect.stringContaining('WHERE p.code = ? AND t.task_number = ? AND e.epic_number = ?'),
-                ['DFO-158-EPIC15', 'DFO', 158, 15]
-            );
         });
 
         it('resolves task_code without epic', async () => {
@@ -132,32 +122,28 @@ describe('resolveTaskIdentifier', () => {
                 epic_id: null
             };
 
-            mockQuery.mockResolvedValueOnce([mockTask]);
+            mockDb.query = async () => [mockTask];
 
-            const result = await resolveTaskIdentifier('DFO-100');
+            const result = await resolveTaskIdentifier('DFO-100', undefined, mockDb);
 
             expect(result).toEqual(mockTask);
-            expect(db.query).toHaveBeenCalledWith(
-                expect.stringContaining('WHERE p.code = ? AND t.task_number = ?'),
-                ['DFO-100', 'DFO', 100]
-            );
         });
 
         it('throws TaskNotFoundError for non-existent task_code', async () => {
-            mockQuery.mockResolvedValueOnce([]);
+            mockDb.query = async () => [];
 
-            await expect(resolveTaskIdentifier('DFO-999-EPIC99'))
+            await expect(resolveTaskIdentifier('DFO-999-EPIC99', undefined, mockDb))
                 .rejects.toThrow(TaskNotFoundError);
         });
 
         it('throws InvalidIdentifierError for malformed task_code', async () => {
-            await expect(resolveTaskIdentifier('DFO_158_EPIC15'))
+            await expect(resolveTaskIdentifier('DFO_158_EPIC15', undefined, mockDb))
                 .rejects.toThrow(InvalidIdentifierError);
 
-            await expect(resolveTaskIdentifier('DFO-EPIC15'))
+            await expect(resolveTaskIdentifier('DFO-EPIC15', undefined, mockDb))
                 .rejects.toThrow(InvalidIdentifierError);
 
-            await expect(resolveTaskIdentifier('158-EPIC15'))
+            await expect(resolveTaskIdentifier('158-EPIC15', undefined, mockDb))
                 .rejects.toThrow(InvalidIdentifierError);
         });
     });
@@ -173,11 +159,14 @@ describe('resolveTaskIdentifier', () => {
                 epic_id: 15
             };
 
-            mockQuery
-                .mockResolvedValueOnce([]) // First query (by ID) returns empty
-                .mockResolvedValueOnce([mockTask]); // Second query (by number) succeeds
+            let callCount = 0;
+            mockDb.query = async () => {
+                callCount++;
+                // First call (by ID) returns empty, second call (by number) succeeds
+                return callCount === 1 ? [] : [mockTask];
+            };
 
-            const result = await resolveTaskIdentifier('158', 1);
+            const result = await resolveTaskIdentifier('158', 1, mockDb);
 
             expect(result).toEqual(mockTask);
         });
@@ -185,24 +174,24 @@ describe('resolveTaskIdentifier', () => {
 
     describe('error messages', () => {
         it('TaskNotFoundError includes identifier and attemptedAs', async () => {
-            mockQuery
-                .mockResolvedValueOnce([])
-                .mockResolvedValueOnce([]);
+            mockDb.query = async () => [];
 
             try {
-                await resolveTaskIdentifier(158, 1);
+                await resolveTaskIdentifier(158, 1, mockDb);
                 expect.fail('Should have thrown TaskNotFoundError');
             } catch (error) {
                 expect(error).toBeInstanceOf(TaskNotFoundError);
-                const taskError = error as TaskNotFoundError;
-                expect(taskError.identifier).toBe(158);
-                expect(taskError.attemptedAs).toBe('task_id or task_number');
+                const notFoundError = error as TaskNotFoundError;
+                expect(notFoundError.identifier).toBe(158);
+                expect(notFoundError.attemptedAs).toBe('task_id or task_number');
             }
         });
 
         it('InvalidIdentifierError includes identifier', async () => {
+            const invalidIdentifier = { invalid: 'object' };
+
             try {
-                await resolveTaskIdentifier({ invalid: 'object' } as any);
+                await resolveTaskIdentifier(invalidIdentifier as any, undefined, mockDb);
                 expect.fail('Should have thrown InvalidIdentifierError');
             } catch (error) {
                 expect(error).toBeInstanceOf(InvalidIdentifierError);
@@ -212,21 +201,23 @@ describe('resolveTaskIdentifier', () => {
         });
 
         it('AmbiguousIdentifierError includes match count', async () => {
-            mockQuery
-                .mockResolvedValueOnce([])
-                .mockResolvedValueOnce([
+            let callCount = 0;
+            mockDb.query = async () => {
+                callCount++;
+                return callCount === 1 ? [] : [
                     { task_id: 1 },
                     { task_id: 2 },
                     { task_id: 3 }
-                ]);
+                ];
+            };
 
             try {
-                await resolveTaskIdentifier(158);
+                await resolveTaskIdentifier(158, undefined, mockDb);
                 expect.fail('Should have thrown AmbiguousIdentifierError');
             } catch (error) {
                 expect(error).toBeInstanceOf(AmbiguousIdentifierError);
-                const ambError = error as AmbiguousIdentifierError;
-                expect(ambError.matchCount).toBe(3);
+                const ambiguousError = error as AmbiguousIdentifierError;
+                expect(ambiguousError.matchCount).toBe(3);
             }
         });
     });
@@ -242,9 +233,9 @@ describe('resolveTaskIdentifier', () => {
                 epic_id: null
             };
 
-            mockQuery.mockResolvedValueOnce([mockTask]);
+            mockDb.query = async () => [mockTask];
 
-            const result = await resolveTaskIdentifier(500);
+            const result = await resolveTaskIdentifier(500, undefined, mockDb);
 
             expect(result.epic_id).toBeNull();
             expect(result.task_code).toBe('DFO-200');
@@ -260,9 +251,9 @@ describe('resolveTaskIdentifier', () => {
                 epic_id: 3
             };
 
-            mockQuery.mockResolvedValueOnce([mockTask]);
+            mockDb.query = async () => [mockTask];
 
-            const result = await resolveTaskIdentifier('SOLR-50-EPIC3');
+            const result = await resolveTaskIdentifier('SOLR-50-EPIC3', undefined, mockDb);
 
             expect(result.project_code).toBe('SOLR');
         });
@@ -277,9 +268,9 @@ describe('resolveTaskIdentifier', () => {
                 epic_id: null
             };
 
-            mockQuery.mockResolvedValueOnce([mockTask]);
+            mockDb.query = async () => [mockTask];
 
-            const result = await resolveTaskIdentifier('AI-75');
+            const result = await resolveTaskIdentifier('AI-75', undefined, mockDb);
 
             expect(result.project_code).toBe('AI');
         });

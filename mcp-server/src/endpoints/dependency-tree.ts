@@ -10,7 +10,7 @@
 
 import { z } from 'zod';
 import { ResponseBuilder, CommonErrors } from '../utils/response-builder.js'
-import { db } from '../database.js'
+import { db, type Database } from '../database.js'
 import { Tool } from '../types/mcp.js'
 
 const VERSION = '2.0.0';
@@ -79,16 +79,16 @@ const RESET_COLOR = '\x1b[0m';
 /**
  * Check if a task exists
  */
-async function taskExists(taskId: number): Promise<boolean> {
-  const result = await db.query('SELECT id FROM tasks WHERE id = ?', [taskId]);
+async function taskExists(taskId: number, dbInstance: Database = db): Promise<boolean> {
+  const result = await dbInstance.query('SELECT id FROM tasks WHERE id = ?', [taskId]);
   return result.length > 0;
 }
 
 /**
  * Get task info by ID
  */
-async function getTaskInfo(taskId: number): Promise<TreeNode | null> {
-  const result = await db.query(
+async function getTaskInfo(taskId: number, dbInstance: Database = db): Promise<TreeNode | null> {
+  const result = await dbInstance.query(
     `SELECT
       t.id as task_id,
       CONCAT(p.code, '-', t.task_number) as task_code,
@@ -118,7 +118,8 @@ async function buildTree(
   direction: 'upstream' | 'downstream',
   maxDepth: number,
   currentDepth: number = 0,
-  visited: Set<number> = new Set()
+  visited: Set<number> = new Set(),
+  dbInstance: Database = db
 ): Promise<TreeNode | null> {
   // Prevent infinite loops
   if (visited.has(taskId) || currentDepth > maxDepth) {
@@ -127,7 +128,7 @@ async function buildTree(
 
   visited.add(taskId);
 
-  const taskInfo = await getTaskInfo(taskId);
+  const taskInfo = await getTaskInfo(taskId, dbInstance);
   if (!taskInfo) return null;
 
   taskInfo.depth = currentDepth;
@@ -150,7 +151,7 @@ async function buildTree(
         JOIN tasks t ON td.depends_on_task_id = t.id
         WHERE td.task_id = ?`;
 
-  const children = await db.query(query, [taskId]);
+  const children = await dbInstance.query(query, [taskId]);
 
   // Recursively build children
   for (const child of children) {
@@ -159,7 +160,8 @@ async function buildTree(
       direction,
       maxDepth,
       currentDepth + 1,
-      visited
+      visited,
+      dbInstance
     );
     if (childNode) {
       childNode.dependency_type = child.dependency_type;
@@ -290,25 +292,29 @@ export const getDependencyTree: Tool = {
   description: 'Generate ASCII tree visualization of task dependencies with status indicators',
   inputSchema: GetDependencyTreeInputSchema,
 
-  async execute(params: z.infer<typeof GetDependencyTreeInputSchema>) {
+  async execute(params: z.infer<typeof GetDependencyTreeInputSchema>, _testDb?: Database) {
     const builder = new ResponseBuilder({ version: VERSION });
+    const dbInstance = _testDb || db;
 
     try {
+      // Validate and apply schema defaults
+      const validatedParams = GetDependencyTreeInputSchema.parse(params);
+
       // Check task exists
-      if (!(await taskExists(params.task_id))) {
-        return builder.error(CommonErrors.notFound('task', params.task_id));
+      if (!(await taskExists(validatedParams.task_id, dbInstance))) {
+        return builder.error(CommonErrors.notFound('task', validatedParams.task_id));
       }
 
       // Build tree(s) based on direction
       let trees: { upstream?: TreeNode; downstream?: TreeNode } = {};
 
-      if (params.direction === 'upstream' || params.direction === 'both') {
-        const upstream = await buildTree(params.task_id, 'upstream', params.max_depth);
+      if (validatedParams.direction === 'upstream' || validatedParams.direction === 'both') {
+        const upstream = await buildTree(validatedParams.task_id, 'upstream', validatedParams.max_depth, 0, new Set(), dbInstance);
         if (upstream) trees.upstream = upstream;
       }
 
-      if (params.direction === 'downstream' || params.direction === 'both') {
-        const downstream = await buildTree(params.task_id, 'downstream', params.max_depth);
+      if (validatedParams.direction === 'downstream' || validatedParams.direction === 'both') {
+        const downstream = await buildTree(validatedParams.task_id, 'downstream', validatedParams.max_depth, 0, new Set(), dbInstance);
         if (downstream) trees.downstream = downstream;
       }
 
@@ -329,28 +335,28 @@ export const getDependencyTree: Tool = {
         upstream: trees.upstream,
         downstream: trees.downstream,
         stats,
-        direction: params.direction,
+        direction: validatedParams.direction,
       };
 
       // Generate formatted output based on format
       let formatted: string | undefined;
 
-      if (params.format === 'ascii') {
+      if (validatedParams.format === 'ascii') {
         formatted = buildAsciiTree(
           primaryTree,
           '',
           true,
           true,
-          params.show_status,
-          params.show_progress,
+          validatedParams.show_status,
+          validatedParams.show_progress,
           false
         );
-      } else if (params.format === 'human') {
-        formatted = formatHumanSummary(primaryTree, stats, params.direction);
+      } else if (validatedParams.format === 'human') {
+        formatted = formatHumanSummary(primaryTree, stats, validatedParams.direction);
       }
 
       return builder.success(data, {
-        format: params.format === 'json' ? 'json' : 'human',
+        format: validatedParams.format === 'json' ? 'json' : 'human',
         formatted,
       });
     } catch (error: any) {
