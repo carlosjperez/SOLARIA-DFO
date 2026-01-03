@@ -639,6 +639,13 @@ class SolariaDashboardServer {
         this.app.get('/api/agent-execution/workers', this.authenticateToken.bind(this), this.getWorkerStatus.bind(this));
 
         // ========================================================================
+        // CodeRabbit Code Review API - JWT Protected
+        // ========================================================================
+
+        this.app.get('/api/code-review/:owner/:repo/:pullNumber', this.authenticateToken.bind(this), this.getCodeRabbitComments.bind(this));
+        this.app.post('/api/code-review/:owner/:repo/comments/:commentId/resolve', this.authenticateToken.bind(this), this.resolveCodeRabbitComment.bind(this));
+
+        // ========================================================================
         // Office CRM API - RBAC Protected
         // ========================================================================
 
@@ -7001,6 +7008,360 @@ class SolariaDashboardServer {
             res.status(500).json({
                 error: 'Failed to retrieve worker status',
                 details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+            });
+        }
+    }
+
+    // ========================================================================
+    // CodeRabbit Code Review API Handlers
+    // ========================================================================
+
+    /**
+     * Get CodeRabbit review comments for a pull request
+     * GET /api/code-review/:owner/:repo/:pullNumber
+     */
+    private async getCodeRabbitComments(req: Request, res: Response): Promise<void> {
+        try {
+            const { owner, repo, pullNumber } = req.params;
+
+            // Validate parameters
+            if (!owner || !repo || !pullNumber) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'MISSING_PARAMETERS',
+                        message: 'Missing required parameters: owner, repo, or pullNumber',
+                    },
+                });
+                return;
+            }
+
+            const prNumber = parseInt(pullNumber, 10);
+            if (isNaN(prNumber) || prNumber <= 0) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_PULL_NUMBER',
+                        message: 'Pull number must be a positive integer',
+                    },
+                });
+                return;
+            }
+
+            // Check Redis cache first (5 min TTL)
+            const cacheKey = `coderabbit:${owner}:${repo}:${prNumber}`;
+            let cachedData: string | null = null;
+            let cacheHit = false;
+
+            if (this.redis) {
+                try {
+                    cachedData = await this.redis.get(cacheKey);
+                    if (cachedData) {
+                        cacheHit = true;
+                        console.log(`[CodeRabbit] Cache HIT for ${cacheKey}`);
+                        const parsedCache = JSON.parse(cachedData);
+                        res.json({
+                            success: true,
+                            data: {
+                                comments: parsedCache.comments || [],
+                            },
+                            metadata: {
+                                cached: true,
+                                timestamp: parsedCache.timestamp,
+                            },
+                        });
+                        return;
+                    } else {
+                        console.log(`[CodeRabbit] Cache MISS for ${cacheKey}`);
+                    }
+                } catch (cacheError) {
+                    console.warn('[CodeRabbit] Redis cache read error, falling back to MCP:', cacheError);
+                }
+            }
+
+            // Call MCP server to proxy CodeRabbit tool
+            const mcpEndpoint = process.env.MCP_SERVER_URL || 'http://localhost:3031';
+            const mcpResponse = await fetch(mcpEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer default',
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: Date.now(),
+                    method: 'tools/call',
+                    params: {
+                        name: 'proxy_external_tool',
+                        arguments: {
+                            server_name: 'coderabbit',
+                            tool_name: 'get_review_comments',
+                            params: {
+                                owner,
+                                repo,
+                                pullNumber: prNumber,
+                            },
+                            format: 'json',
+                        },
+                    },
+                }),
+            });
+
+            if (!mcpResponse.ok) {
+                throw new Error(`MCP server returned ${mcpResponse.status}: ${mcpResponse.statusText}`);
+            }
+
+            const mcpData = await mcpResponse.json();
+
+            // Check for MCP-level errors
+            if (mcpData.error) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'MCP_ERROR',
+                        message: mcpData.error.message || 'MCP server error',
+                        details: mcpData.error,
+                    },
+                });
+                return;
+            }
+
+            // Extract result from MCP response
+            const result = mcpData.result?.content?.[0]?.text;
+            if (!result) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_MCP_RESPONSE',
+                        message: 'Invalid response structure from MCP server',
+                    },
+                });
+                return;
+            }
+
+            // Parse the JSON result
+            let parsedResult;
+            try {
+                parsedResult = JSON.parse(result);
+            } catch (parseError) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_JSON',
+                        message: 'Failed to parse MCP response as JSON',
+                    },
+                });
+                return;
+            }
+
+            // Store in Redis cache (5 min TTL = 300 seconds)
+            const commentsData = parsedResult.data?.result || [];
+            if (this.redis && !cacheHit) {
+                try {
+                    const cachePayload = {
+                        comments: commentsData,
+                        timestamp: new Date().toISOString(),
+                    };
+                    await this.redis.setex(cacheKey, 300, JSON.stringify(cachePayload));
+                    console.log(`[CodeRabbit] Cached ${commentsData.length} comments for ${cacheKey} (TTL: 5 min)`);
+                } catch (cacheError) {
+                    console.warn('[CodeRabbit] Redis cache write error:', cacheError);
+                    // Don't fail the request if caching fails
+                }
+            }
+
+            // Return success response
+            res.json({
+                success: true,
+                data: {
+                    comments: commentsData,
+                },
+                metadata: {
+                    cached: false,
+                    timestamp: new Date().toISOString(),
+                },
+            });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[CodeRabbit] Get comments error:', {
+                error: errorMessage,
+                owner: req.params.owner,
+                repo: req.params.repo,
+                pullNumber: req.params.pullNumber,
+            });
+            res.status(500).json({
+                success: false,
+                error: {
+                    code: 'INTERNAL_ERROR',
+                    message: 'Failed to fetch CodeRabbit comments',
+                    details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+                },
+            });
+        }
+    }
+
+    /**
+     * Resolve or dismiss a CodeRabbit comment
+     * POST /api/code-review/:owner/:repo/comments/:commentId/resolve
+     */
+    private async resolveCodeRabbitComment(req: Request, res: Response): Promise<void> {
+        try {
+            const { owner, repo, commentId } = req.params;
+            const { resolution, note } = req.body;
+
+            // Validate parameters
+            if (!owner || !repo || !commentId) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'MISSING_PARAMETERS',
+                        message: 'Missing required parameters: owner, repo, or commentId',
+                    },
+                });
+                return;
+            }
+
+            const commentIdNum = parseInt(commentId, 10);
+            if (isNaN(commentIdNum) || commentIdNum <= 0) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_COMMENT_ID',
+                        message: 'Comment ID must be a positive integer',
+                    },
+                });
+                return;
+            }
+
+            // Validate resolution type
+            const validResolutions = ['addressed', 'wont_fix', 'not_applicable'];
+            if (resolution && !validResolutions.includes(resolution)) {
+                res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_RESOLUTION',
+                        message: `Resolution must be one of: ${validResolutions.join(', ')}`,
+                    },
+                });
+                return;
+            }
+
+            // Call MCP server to proxy CodeRabbit resolve_comment tool
+            const mcpEndpoint = process.env.MCP_SERVER_URL || 'http://localhost:3031';
+            const mcpResponse = await fetch(mcpEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer default',
+                },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: Date.now(),
+                    method: 'tools/call',
+                    params: {
+                        name: 'proxy_external_tool',
+                        arguments: {
+                            server_name: 'coderabbit',
+                            tool_name: 'resolve_comment',
+                            params: {
+                                owner,
+                                repo,
+                                commentId: commentIdNum,
+                                resolution: resolution || 'addressed',
+                                note: note || '',
+                            },
+                            format: 'json',
+                        },
+                    },
+                }),
+            });
+
+            if (!mcpResponse.ok) {
+                throw new Error(`MCP server returned ${mcpResponse.status}: ${mcpResponse.statusText}`);
+            }
+
+            const mcpData = await mcpResponse.json();
+
+            // Check for MCP-level errors
+            if (mcpData.error) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'MCP_ERROR',
+                        message: mcpData.error.message || 'MCP server error',
+                        details: mcpData.error,
+                    },
+                });
+                return;
+            }
+
+            // Extract result from MCP response
+            const result = mcpData.result?.content?.[0]?.text;
+            if (!result) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_MCP_RESPONSE',
+                        message: 'Invalid response structure from MCP server',
+                    },
+                });
+                return;
+            }
+
+            // Parse the JSON result
+            let parsedResult;
+            try {
+                parsedResult = JSON.parse(result);
+            } catch (parseError) {
+                res.status(500).json({
+                    success: false,
+                    error: {
+                        code: 'INVALID_JSON',
+                        message: 'Failed to parse MCP response as JSON',
+                    },
+                });
+                return;
+            }
+
+            // Invalidate cache for this repository (all PRs)
+            // We don't have the PR number here, so we invalidate all cached comments for this repo
+            if (this.redis) {
+                try {
+                    const cachePattern = `coderabbit:${owner}:${repo}:*`;
+                    const keys = await this.redis.keys(cachePattern);
+                    if (keys.length > 0) {
+                        await this.redis.del(...keys);
+                        console.log(`[CodeRabbit] Invalidated ${keys.length} cache entries for ${owner}/${repo}`);
+                    }
+                } catch (cacheError) {
+                    console.warn('[CodeRabbit] Redis cache invalidation error:', cacheError);
+                    // Don't fail the request if cache invalidation fails
+                }
+            }
+
+            // Return success response
+            res.json({
+                success: true,
+                data: parsedResult.data,
+                message: 'CodeRabbit comment resolved successfully',
+            });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[CodeRabbit] Resolve comment error:', {
+                error: errorMessage,
+                owner: req.params.owner,
+                repo: req.params.repo,
+                commentId: req.params.commentId,
+            });
+            res.status(500).json({
+                success: false,
+                error: {
+                    code: 'INTERNAL_ERROR',
+                    message: 'Failed to resolve CodeRabbit comment',
+                    details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+                },
             });
         }
     }
