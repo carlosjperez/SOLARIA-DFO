@@ -44,8 +44,12 @@ process.env.GITHUB_TOKEN = 'test-github-token';
 process.env.GITHUB_API_URL = 'https://api.github.com';
 
 // Import after mocking
-const { triggerWorkflow, getWorkflowStatus, createIssueFromTask, createPRFromTask } =
-  await import('../endpoints/github-actions.js');
+const {
+  githubTriggerWorkflowTool: triggerWorkflow,
+  githubGetWorkflowStatusTool: getWorkflowStatus,
+  githubCreateIssueTool: createIssueFromTask,
+  githubCreatePRFromTaskTool: createPRFromTask,
+} = await import('../endpoints/github-actions.js');
 
 describe('GitHub Actions Integration MCP Tools', () => {
   beforeEach(() => {
@@ -355,11 +359,13 @@ describe('GitHub Actions Integration MCP Tools', () => {
       mockQuery.mockResolvedValueOnce([
         {
           id: 42,
-          code: 'DFO-042',
           title: 'Add dark mode support',
           description: 'Implement theme switcher with dark mode',
-          status: 'in_progress',
           project_id: 1,
+          task_number: 42,
+          project_code: 'DFO',
+          epic_id: 21,
+          epic_number: 21,
         },
       ]);
 
@@ -392,11 +398,13 @@ describe('GitHub Actions Integration MCP Tools', () => {
       mockQuery.mockResolvedValueOnce([
         {
           id: 42,
-          code: 'DFO-042',
           title: 'WIP: New feature',
           description: 'Work in progress',
-          status: 'in_progress',
           project_id: 1,
+          task_number: 42,
+          project_code: 'DFO',
+          epic_id: 21,
+          epic_number: 21,
         },
       ]);
 
@@ -427,11 +435,13 @@ describe('GitHub Actions Integration MCP Tools', () => {
       mockQuery.mockResolvedValueOnce([
         {
           id: 42,
-          code: 'DFO-042',
           title: 'Test PR',
           description: 'Test',
-          status: 'pending',
           project_id: 1,
+          task_number: 42,
+          project_code: 'DFO',
+          epic_id: 21,
+          epic_number: 21,
         },
       ]);
 

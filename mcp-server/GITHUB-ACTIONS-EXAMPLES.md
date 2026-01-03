@@ -285,12 +285,21 @@ console.log(result);
 // Output:
 // {
 //   "success": true,
-//   "task_id": 42,
-//   "task_code": "DFO-042",
-//   "pr_number": 456,
-//   "pr_url": "https://github.com/solaria-agency/my-project/pull/456",
-//   "task_link_id": 2,
-//   "draft": false
+//   "data": {
+//     "prNumber": 456,
+//     "prUrl": "https://github.com/solaria-agency/my-project/pull/456",
+//     "taskLinkId": 2,
+//     "taskCode": "DFO-042",
+//     "headBranch": "feature/dark-mode",
+//     "draft": false
+//   },
+//   "metadata": {
+//     "timestamp": "2026-01-02T15:00:00Z",
+//     "request_id": "uuid-xxx",
+//     "execution_time_ms": 234,
+//     "version": "4.0.0"
+//   },
+//   "format": "json"
 // }
 ```
 
@@ -314,21 +323,22 @@ const result = await executeTool("github_create_pr_from_task", {
 The tool creates a PR with structured template:
 
 ```markdown
-# [DFO-042] Add dark mode support
+## Task: DFO-042 - Add dark mode support
 
-## Description
 Implement theme switcher with dark mode
 
 ## Changes
-- [ ] Implementation complete
-- [ ] Tests added/updated
-- [ ] Documentation updated
+<!-- Auto-populated from commits when PR is created -->
 
 ---
-**DFO Task:** DFO-042
-**Status:** in_progress
-**Created from:** SOLARIA DFO
+🤖 Generated from [SOLARIA DFO](https://dfo.solaria.agency)
+Linked to Task: DFO-042
 ```
+
+**Note:**
+- If `head_branch` is not provided, it auto-generates: `feature/${taskCode.toLowerCase()}`
+- Task code includes epic number if present: `DFO-042-EPIC21`
+- PR title is automatically set to the task title
 
 ---
 

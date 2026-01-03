@@ -98,6 +98,7 @@ import {
   githubGetWorkflowStatusTool,
   githubCreateIssueTool,
   githubCreatePRTool,
+  githubCreatePRFromTaskTool,
 } from './src/endpoints/github-actions.js';
 
 // ============================================================================
@@ -1517,6 +1518,25 @@ export const toolDefinitions: MCPToolDefinition[] = [
       required: ["owner", "repo", "title", "body", "head", "base", "task_id", "project_id"],
     },
   },
+  {
+    name: "github_create_pr_from_task",
+    description: "Automatically create a GitHub pull request from a DFO task. Fetches task details, auto-generates PR title, body, and branch name. Requires the branch to already exist and be pushed to GitHub. Useful for streamlined PR creation workflows.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task_id: { type: "number", description: "DFO task ID to create PR from" },
+        owner: { type: "string", description: "Repository owner (username or organization)" },
+        repo: { type: "string", description: "Repository name" },
+        head_branch: { type: "string", description: "Head branch (optional, auto-generated from task code if not provided)" },
+        base_branch: { type: "string", description: "Base branch (default: main)" },
+        draft: { type: "boolean", description: "Create as draft PR (default: false)" },
+        labels: { type: "array", items: { type: "string" }, description: "Labels to apply (optional)" },
+        assignees: { type: "array", items: { type: "string" }, description: "GitHub usernames to assign (optional)" },
+        format: { type: "string", enum: ["json", "human"], description: "Output format (default: json)" },
+      },
+      required: ["task_id", "owner", "repo"],
+    },
+  },
 ];
 
 // ============================================================================
@@ -2497,6 +2517,9 @@ export async function executeTool(
 
     case "github_create_pr":
       return githubCreatePRTool.execute(args);
+
+    case "github_create_pr_from_task":
+      return githubCreatePRFromTaskTool.execute(args);
 
     case "proxy_external_tool":
       return proxyExternalTool((args as unknown) as { server_name: string; tool_name: string; parameters?: Record<string, unknown> });

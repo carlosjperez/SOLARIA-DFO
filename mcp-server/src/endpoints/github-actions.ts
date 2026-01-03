@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { ResponseBuilder, CommonErrors } from '../utils/response-builder.js';
 import { getDFOApiClient } from '../utils/dfo-api-client.js';
 import { Tool } from '../types/mcp.js';
+import { db } from '../database.js';
 
 const VERSION = '4.0.0';
 
@@ -60,6 +61,18 @@ const CreatePRInputSchema = z.object({
     assignees: z.array(z.string()).optional(),
     task_id: z.number().int().positive('Task ID must be a positive integer'),
     project_id: z.number().int().positive('Project ID must be a positive integer'),
+    format: z.enum(['json', 'human']).default('json'),
+});
+
+const CreatePRFromTaskInputSchema = z.object({
+    task_id: z.number().int().positive('Task ID must be a positive integer'),
+    owner: z.string().min(1, 'Repository owner is required'),
+    repo: z.string().min(1, 'Repository name is required'),
+    head_branch: z.string().optional(),
+    base_branch: z.string().default('main'),
+    draft: z.boolean().default(false),
+    labels: z.array(z.string()).optional(),
+    assignees: z.array(z.string()).optional(),
     format: z.enum(['json', 'human']).default('json'),
 });
 
@@ -358,6 +371,134 @@ async function createPR(args: z.infer<typeof CreatePRInputSchema>) {
     }
 }
 
+/**
+ * Create a GitHub pull request automatically from a DFO task
+ * Fetches task details and auto-generates PR title, body, and branch name
+ */
+async function createPRFromTask(args: z.infer<typeof CreatePRFromTaskInputSchema>) {
+    const builder = new ResponseBuilder({ version: VERSION });
+    const apiClient = getDFOApiClient();
+
+    try {
+        // Fetch task details from database
+        const taskQuery = `
+            SELECT
+                t.id,
+                t.title,
+                t.description,
+                t.project_id,
+                t.task_number,
+                p.code as project_code,
+                t.epic_id,
+                COALESCE(e.epic_number, 0) as epic_number
+            FROM tasks t
+            JOIN projects p ON t.project_id = p.id
+            LEFT JOIN epics e ON t.epic_id = e.id
+            WHERE t.id = ?
+        `;
+
+        const [taskRows] = await db.query(taskQuery, [args.task_id]);
+        const tasks = taskRows as any[];
+
+        if (tasks.length === 0) {
+            return builder.error({
+                code: 'TASK_NOT_FOUND',
+                message: `Task with ID ${args.task_id} not found`,
+                details: { task_id: args.task_id },
+                suggestion: 'Verify the task ID exists in the database',
+            });
+        }
+
+        const task = tasks[0];
+        const taskCode = `${task.project_code}-${task.task_number}${task.epic_number > 0 ? `-EPIC${task.epic_number}` : ''}`;
+
+        // Auto-generate head branch if not provided
+        const headBranch = args.head_branch || `feature/${taskCode.toLowerCase()}`;
+
+        // Generate PR title from task title
+        const prTitle = task.title;
+
+        // Generate PR body from template
+        const prBody = `## Task: ${taskCode} - ${task.title}
+
+${task.description || '_No description provided_'}
+
+## Changes
+<!-- Auto-populated from commits when PR is created -->
+
+---
+🤖 Generated from [SOLARIA DFO](https://dfo.solaria.agency)
+Linked to Task: ${taskCode}`;
+
+        // Call Dashboard API to create PR
+        const apiResponse = await apiClient.createPR({
+            owner: args.owner,
+            repo: args.repo,
+            title: prTitle,
+            body: prBody,
+            head: headBranch,
+            base: args.base_branch,
+            labels: args.labels,
+            assignees: args.assignees,
+            taskId: args.task_id,
+            projectId: task.project_id,
+        });
+
+        // Handle API errors
+        if (!apiResponse.success) {
+            return builder.error(apiResponse.error!);
+        }
+
+        const response = apiResponse.data!;
+
+        // Add task code to response for reference
+        const enrichedResponse = {
+            ...response,
+            taskCode,
+            headBranch,
+            draft: args.draft,
+        };
+
+        if (args.format === 'human') {
+            let output = `GitHub Pull Request Created from Task\n`;
+            output += `════════════════════════════════════════\n`;
+            output += `✅ PR #${response.prNumber}\n`;
+            output += `📋 Task: ${taskCode}\n`;
+            output += `🔗 URL: ${response.prUrl}\n`;
+            output += `🌿 ${headBranch} → ${args.base_branch}\n`;
+            output += `🔗 Task Link ID: ${response.taskLinkId}\n`;
+            if (args.draft) {
+                output += `📝 Draft PR (ready for review when you're ready)\n`;
+            }
+            output += `\n💡 The PR has been linked to task ${taskCode} for tracking.\n`;
+
+            return builder.success(enrichedResponse, {
+                format: 'human',
+                formatted: output,
+            });
+        }
+
+        return builder.success(enrichedResponse);
+    } catch (error: any) {
+        // Check if it's a database error
+        if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+            return builder.error({
+                code: 'DATABASE_CONNECTION_FAILED',
+                message: 'Failed to connect to database',
+                details: { originalError: error.message },
+                suggestion: 'Check that the database is running and accessible',
+            });
+        }
+
+        return builder.error({
+            code: 'PR_CREATION_FAILED',
+            message: 'Failed to create PR from task',
+            details: { originalError: error.message },
+            suggestion: 'Check task ID, repository details, and ensure the branch exists',
+        });
+    }
+}
+
 // ============================================================================
 // Tool Definitions
 // ============================================================================
@@ -403,6 +544,16 @@ export const githubActionsTools: Tool[] = [
             return createPR(validated);
         },
     },
+    {
+        name: 'github_create_pr_from_task',
+        description:
+            'Automatically create a GitHub pull request from a DFO task. Fetches task details, auto-generates PR title, body, and branch name. Requires the branch to already exist and be pushed to GitHub. Useful for streamlined PR creation workflows.',
+        inputSchema: CreatePRFromTaskInputSchema,
+        async execute(args: any) {
+            const validated = CreatePRFromTaskInputSchema.parse(args);
+            return createPRFromTask(validated);
+        },
+    },
 ];
 
 // Individual tool exports for handlers.ts registration
@@ -443,5 +594,15 @@ export const githubCreatePRTool: Tool = {
     async execute(args: any) {
         const validated = CreatePRInputSchema.parse(args);
         return createPR(validated);
+    },
+};
+
+export const githubCreatePRFromTaskTool: Tool = {
+    name: 'github_create_pr_from_task',
+    description: githubActionsTools[4].description,
+    inputSchema: CreatePRFromTaskInputSchema,
+    async execute(args: any) {
+        const validated = CreatePRFromTaskInputSchema.parse(args);
+        return createPRFromTask(validated);
     },
 };
