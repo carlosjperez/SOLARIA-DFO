@@ -18,9 +18,9 @@ const mockDb: Database = {
   execute: mockExecute,
 };
 
-// Mock GitHubActionsService
+// Mock DFOApiClient methods
 const mockTriggerWorkflow = jest.fn();
-const mockGetRunStatus = jest.fn();
+const mockGetWorkflowStatus = jest.fn();
 const mockCreateIssue = jest.fn();
 const mockCreatePR = jest.fn();
 
@@ -29,11 +29,11 @@ jest.unstable_mockModule('../database.js', () => ({
   db: mockDb,
 }));
 
-// Mock the GitHubActionsService
-jest.unstable_mockModule('../../../dashboard/services/githubActionsService.js', () => ({
-  GitHubActionsService: jest.fn().mockImplementation(() => ({
+// Mock the DFOApiClient
+jest.unstable_mockModule('../utils/dfo-api-client.js', () => ({
+  getDFOApiClient: jest.fn(() => ({
     triggerWorkflow: mockTriggerWorkflow,
-    getRunStatus: mockGetRunStatus,
+    getWorkflowStatus: mockGetWorkflowStatus,
     createIssue: mockCreateIssue,
     createPR: mockCreatePR,
   })),
@@ -62,23 +62,19 @@ describe('GitHub Actions Integration MCP Tools', () => {
 
   describe('github_trigger_workflow', () => {
     it('should trigger workflow successfully', async () => {
-      // Mock workflow trigger success
+      // Mock Dashboard API response
       mockTriggerWorkflow.mockResolvedValueOnce({
         success: true,
-        workflowId: 1,
-        runId: 100,
-        githubRunId: 123456789,
-      });
-
-      // Mock workflow run details query
-      mockQuery.mockResolvedValueOnce([
-        {
-          workflow_name: 'Deploy Production',
-          github_run_number: 42,
-          run_url: 'https://github.com/org/repo/actions/runs/123456789',
-          status: 'queued',
+        data: {
+          workflowId: 1,
+          runId: 100,
+          githubRunId: 123456789,
+          owner: 'solaria-agency',
+          repo: 'test-repo',
+          ref: 'main',
+          triggeredAt: '2026-01-03T10:00:00Z',
         },
-      ]);
+      });
 
       const result = await triggerWorkflow.execute({
         owner: 'solaria-agency',
@@ -91,17 +87,22 @@ describe('GitHub Actions Integration MCP Tools', () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.success).toBe(true);
-        expect(result.data.workflow_name).toBe('Deploy Production');
-        expect(result.data.run_number).toBe(42);
-        expect(result.data.status).toBe('queued');
+        expect(result.data.workflowId).toBe(1);
+        expect(result.data.runId).toBe(100);
+        expect(result.data.githubRunId).toBe(123456789);
+        expect(result.data.owner).toBe('solaria-agency');
+        expect(result.data.repo).toBe('test-repo');
       }
     });
 
     it('should handle workflow trigger failure', async () => {
+      // Mock Dashboard API error response
       mockTriggerWorkflow.mockResolvedValueOnce({
         success: false,
-        error: 'Workflow not found',
+        error: {
+          code: 'WORKFLOW_TRIGGER_FAILED',
+          message: 'Workflow not found',
+        },
       });
 
       const result = await triggerWorkflow.execute({
@@ -123,19 +124,16 @@ describe('GitHub Actions Integration MCP Tools', () => {
     it('should include task_id when provided', async () => {
       mockTriggerWorkflow.mockResolvedValueOnce({
         success: true,
-        workflowId: 1,
-        runId: 100,
-        githubRunId: 123456789,
-      });
-
-      mockQuery.mockResolvedValueOnce([
-        {
-          workflow_name: 'CI Tests',
-          github_run_number: 15,
-          run_url: 'https://github.com/org/repo/actions/runs/123456789',
-          status: 'queued',
+        data: {
+          workflowId: 2,
+          runId: 101,
+          githubRunId: 987654321,
+          owner: 'solaria-agency',
+          repo: 'test-repo',
+          ref: 'develop',
+          triggeredAt: '2026-01-03T11:00:00Z',
         },
-      ]);
+      });
 
       const result = await triggerWorkflow.execute({
         owner: 'solaria-agency',
@@ -183,21 +181,23 @@ describe('GitHub Actions Integration MCP Tools', () => {
 
   describe('github_get_workflow_status', () => {
     it('should get workflow status successfully', async () => {
-      mockGetRunStatus.mockResolvedValueOnce({
-        id: 123456789,
-        runNumber: 42,
-        status: 'completed',
-        conclusion: 'success',
-        startedAt: '2025-12-31T10:00:00Z',
-        completedAt: '2025-12-31T10:15:00Z',
-        durationSeconds: 900,
-        htmlUrl: 'https://github.com/org/repo/actions/runs/123456789',
+      mockGetWorkflowStatus.mockResolvedValueOnce({
+        success: true,
+        data: {
+          runId: 100,
+          githubRunId: 123456789,
+          runNumber: 42,
+          status: 'completed',
+          conclusion: 'success',
+          startedAt: '2025-12-31T10:00:00Z',
+          completedAt: '2025-12-31T10:15:00Z',
+          durationSeconds: 900,
+          htmlUrl: 'https://github.com/org/repo/actions/runs/123456789',
+        },
       });
 
       const result = await getWorkflowStatus.execute({
-        owner: 'solaria-agency',
-        repo: 'test-repo',
-        github_run_id: 123456789,
+        run_id: 100,
         format: 'json',
       });
 
@@ -205,26 +205,26 @@ describe('GitHub Actions Integration MCP Tools', () => {
       if (result.success) {
         expect(result.data.status).toBe('completed');
         expect(result.data.conclusion).toBe('success');
-        expect(result.data.duration_seconds).toBe(900);
+        expect(result.data.durationSeconds).toBe(900);
       }
     });
 
     it('should handle in-progress workflow', async () => {
-      mockGetRunStatus.mockResolvedValueOnce({
-        id: 123456789,
-        runNumber: 43,
-        status: 'in_progress',
-        conclusion: null,
-        startedAt: '2025-12-31T11:00:00Z',
-        completedAt: null,
-        durationSeconds: null,
-        htmlUrl: 'https://github.com/org/repo/actions/runs/123456789',
+      mockGetWorkflowStatus.mockResolvedValueOnce({
+        success: true,
+        data: {
+          runId: 101,
+          githubRunId: 123456789,
+          runNumber: 43,
+          status: 'in_progress',
+          conclusion: null,
+          startedAt: '2025-12-31T11:00:00Z',
+          htmlUrl: 'https://github.com/org/repo/actions/runs/123456789',
+        },
       });
 
       const result = await getWorkflowStatus.execute({
-        owner: 'solaria-agency',
-        repo: 'test-repo',
-        github_run_id: 123456789,
+        run_id: 101,
         format: 'json',
       });
 
@@ -232,26 +232,28 @@ describe('GitHub Actions Integration MCP Tools', () => {
       if (result.success) {
         expect(result.data.status).toBe('in_progress');
         expect(result.data.conclusion).toBeNull();
-        expect(result.data.completed_at).toBeNull();
+        expect(result.data.completedAt).toBeUndefined();
       }
     });
 
     it('should handle failed workflow', async () => {
-      mockGetRunStatus.mockResolvedValueOnce({
-        id: 123456789,
-        runNumber: 44,
-        status: 'completed',
-        conclusion: 'failure',
-        startedAt: '2025-12-31T12:00:00Z',
-        completedAt: '2025-12-31T12:05:00Z',
-        durationSeconds: 300,
-        htmlUrl: 'https://github.com/org/repo/actions/runs/123456789',
+      mockGetWorkflowStatus.mockResolvedValueOnce({
+        success: true,
+        data: {
+          runId: 102,
+          githubRunId: 123456789,
+          runNumber: 44,
+          status: 'completed',
+          conclusion: 'failure',
+          startedAt: '2025-12-31T12:00:00Z',
+          completedAt: '2025-12-31T12:05:00Z',
+          durationSeconds: 300,
+          htmlUrl: 'https://github.com/org/repo/actions/runs/123456789',
+        },
       });
 
       const result = await getWorkflowStatus.execute({
-        owner: 'solaria-agency',
-        repo: 'test-repo',
-        github_run_id: 123456789,
+        run_id: 102,
         format: 'json',
       });
 
@@ -266,86 +268,70 @@ describe('GitHub Actions Integration MCP Tools', () => {
   // github_create_issue_from_task Tests
   // ============================================================================
 
-  describe('github_create_issue_from_task', () => {
-    it('should create issue from task successfully', async () => {
-      // Mock task details query
-      mockQuery.mockResolvedValueOnce([
-        {
-          id: 42,
-          code: 'DFO-042',
-          title: 'Implement user authentication',
-          description: 'Add JWT-based authentication system',
-          status: 'in_progress',
-          project_id: 1,
-        },
-      ]);
-
+  describe('github_create_issue', () => {
+    it('should create issue successfully', async () => {
       mockCreateIssue.mockResolvedValueOnce({
         success: true,
-        issueNumber: 123,
-        issueUrl: 'https://github.com/org/repo/issues/123',
-        taskLinkId: 1,
+        data: {
+          issueNumber: 123,
+          issueUrl: 'https://github.com/org/repo/issues/123',
+          taskLinkId: 1,
+        },
       });
 
       const result = await createIssueFromTask.execute({
-        task_id: 42,
         owner: 'solaria-agency',
         repo: 'test-repo',
+        title: 'Implement user authentication',
+        body: 'Add JWT-based authentication system',
         labels: ['enhancement', 'backend'],
+        task_id: 42,
+        project_id: 1,
         format: 'json',
       });
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.task_code).toBe('DFO-042');
-        expect(result.data.issue_number).toBe(123);
-        expect(result.data.issue_url).toContain('issues/123');
+        expect(result.data.issueNumber).toBe(123);
+        expect(result.data.issueUrl).toContain('issues/123');
+        expect(result.data.taskLinkId).toBe(1);
       }
     });
 
-    it('should handle non-existent task', async () => {
-      mockQuery.mockResolvedValueOnce([]); // Task not found
+    it('should handle missing required fields', async () => {
+      try {
+        const result = await createIssueFromTask.execute({
+          owner: 'solaria-agency',
+          repo: 'test-repo',
+          // Missing title, body, task_id, project_id
+          format: 'json',
+        });
 
-      const result = await createIssueFromTask.execute({
-        task_id: 999,
-        owner: 'solaria-agency',
-        repo: 'test-repo',
-        format: 'json',
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.code).toBe('TASK_NOT_FOUND');
+        // If validation passed unexpectedly
+        expect(result.success).toBe(false);
+      } catch (error: any) {
+        // Zod validation should throw before execute
+        expect(error.message || error.toString()).toContain('Required');
       }
     });
 
     it('should handle GitHub API failure', async () => {
-      mockQuery.mockResolvedValueOnce([
-        {
-          id: 42,
-          code: 'DFO-042',
-          title: 'Test task',
-          description: 'Test description',
-          status: 'pending',
-          project_id: 1,
-        },
-      ]);
-
-      mockCreateIssue.mockResolvedValueOnce({
-        success: false,
-        error: 'API rate limit exceeded',
-      });
+      // Mock API throwing error (simulates GitHub API failure)
+      mockCreateIssue.mockRejectedValueOnce(new Error('API rate limit exceeded'));
 
       const result = await createIssueFromTask.execute({
-        task_id: 42,
         owner: 'solaria-agency',
         repo: 'test-repo',
+        title: 'Test issue',
+        body: 'Test description',
+        task_id: 42,
+        project_id: 1,
         format: 'json',
       });
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.code).toBe('ISSUE_CREATION_FAILED');
+        expect(result.error.code).toBe('API_REQUEST_FAILED');
       }
     });
   });
@@ -356,24 +342,32 @@ describe('GitHub Actions Integration MCP Tools', () => {
 
   describe('github_create_pr_from_task', () => {
     it('should create PR from task successfully', async () => {
+      // db.query returns [rows, fields] tuple like mysql2
       mockQuery.mockResolvedValueOnce([
-        {
-          id: 42,
-          title: 'Add dark mode support',
-          description: 'Implement theme switcher with dark mode',
-          project_id: 1,
-          task_number: 42,
-          project_code: 'DFO',
-          epic_id: 21,
-          epic_number: 21,
-        },
-      ]);
+        [
+          {
+            id: 42,
+            title: 'Add dark mode support',
+            description: 'Implement theme switcher with dark mode',
+            project_id: 1,
+            task_number: 42,
+            project_code: 'DFO',
+            epic_id: 21,
+            epic_number: 21,
+          },
+        ],
+        undefined,
+      ] as any);
 
       mockCreatePR.mockResolvedValueOnce({
         success: true,
-        prNumber: 456,
-        prUrl: 'https://github.com/org/repo/pull/456',
-        taskLinkId: 2,
+        data: {
+          prNumber: 456,
+          prUrl: 'https://github.com/org/repo/pull/456',
+          taskLinkId: 2,
+          head: 'feature/dark-mode',
+          base: 'main',
+        },
       });
 
       const result = await createPRFromTask.execute({
@@ -388,31 +382,39 @@ describe('GitHub Actions Integration MCP Tools', () => {
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.task_code).toBe('DFO-042');
-        expect(result.data.pr_number).toBe(456);
-        // draft field is explicitly set in params
+        expect(result.data.taskCode).toBe('DFO-42-EPIC21');
+        expect(result.data.prNumber).toBe(456);
+        expect(result.data.draft).toBe(false);
       }
     });
 
     it('should create draft PR when requested', async () => {
+      // db.query returns [rows, fields] tuple like mysql2
       mockQuery.mockResolvedValueOnce([
-        {
-          id: 42,
-          title: 'WIP: New feature',
-          description: 'Work in progress',
-          project_id: 1,
-          task_number: 42,
-          project_code: 'DFO',
-          epic_id: 21,
-          epic_number: 21,
-        },
-      ]);
+        [
+          {
+            id: 42,
+            title: 'WIP: New feature',
+            description: 'Work in progress',
+            project_id: 1,
+            task_number: 42,
+            project_code: 'DFO',
+            epic_id: 21,
+            epic_number: 21,
+          },
+        ],
+        undefined,
+      ] as any);
 
       mockCreatePR.mockResolvedValueOnce({
         success: true,
-        prNumber: 457,
-        prUrl: 'https://github.com/org/repo/pull/457',
-        taskLinkId: 3,
+        data: {
+          prNumber: 457,
+          prUrl: 'https://github.com/org/repo/pull/457',
+          taskLinkId: 3,
+          head: 'feature/wip',
+          base: 'develop',
+        },
       });
 
       const result = await createPRFromTask.execute({
@@ -432,22 +434,30 @@ describe('GitHub Actions Integration MCP Tools', () => {
     });
 
     it('should handle branch conflict error', async () => {
+      // db.query returns [rows, fields] tuple like mysql2
       mockQuery.mockResolvedValueOnce([
-        {
-          id: 42,
-          title: 'Test PR',
-          description: 'Test',
-          project_id: 1,
-          task_number: 42,
-          project_code: 'DFO',
-          epic_id: 21,
-          epic_number: 21,
-        },
-      ]);
+        [
+          {
+            id: 42,
+            title: 'Test PR',
+            description: 'Test',
+            project_id: 1,
+            task_number: 42,
+            project_code: 'DFO',
+            epic_id: 21,
+            epic_number: 21,
+          },
+        ],
+        undefined,
+      ] as any);
 
+      // Mock API error response (simulates GitHub API failure)
       mockCreatePR.mockResolvedValueOnce({
         success: false,
-        error: 'Head branch has no commits',
+        error: {
+          code: 'PR_CREATION_FAILED',
+          message: 'Head branch has no commits',
+        },
       });
 
       const result = await createPRFromTask.execute({
@@ -462,7 +472,7 @@ describe('GitHub Actions Integration MCP Tools', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.code).toBe('PR_CREATION_FAILED');
-        expect(result.error.suggestion).toContain('ensure head branch has commits');
+        expect(result.error.message).toContain('Head branch has no commits');
       }
     });
   });
@@ -475,19 +485,16 @@ describe('GitHub Actions Integration MCP Tools', () => {
     it('should format workflow trigger in human-readable format', async () => {
       mockTriggerWorkflow.mockResolvedValueOnce({
         success: true,
-        workflowId: 1,
-        runId: 100,
-        githubRunId: 123456789,
-      });
-
-      mockQuery.mockResolvedValueOnce([
-        {
-          workflow_name: 'Deploy Production',
-          github_run_number: 42,
-          run_url: 'https://github.com/org/repo/actions/runs/123456789',
-          status: 'queued',
+        data: {
+          workflowId: 1,
+          runId: 100,
+          githubRunId: 123456789,
+          owner: 'solaria-agency',
+          repo: 'test-repo',
+          ref: 'main',
+          triggeredAt: '2026-01-03T10:00:00Z',
         },
-      ]);
+      });
 
       const result = await triggerWorkflow.execute({
         owner: 'solaria-agency',
@@ -500,36 +507,42 @@ describe('GitHub Actions Integration MCP Tools', () => {
 
       expect(result.success).toBe(true);
       if (result.success && result.formatted) {
-        expect(result.formatted).toContain('✅ Workflow Triggered Successfully');
-        expect(result.formatted).toContain('Deploy Production');
-        expect(result.formatted).toContain('Run #: 42');
-        expect(result.formatted).toContain('Status: queued');
+        expect(result.formatted).toContain('GitHub Workflow Triggered Successfully');
+        expect(result.formatted).toContain('Workflow ID: 1');
+        expect(result.formatted).toContain('GitHub Run ID: 123456789');
+        expect(result.formatted).toContain('Repository: solaria-agency/test-repo');
+        expect(result.formatted).toContain('Ref: main');
+        expect(result.formatted).toContain('run_id=100');
       }
     });
 
     it('should format workflow status in human-readable format', async () => {
-      mockGetRunStatus.mockResolvedValueOnce({
-        id: 123456789,
-        runNumber: 42,
-        status: 'completed',
-        conclusion: 'success',
-        startedAt: '2025-12-31T10:00:00Z',
-        completedAt: '2025-12-31T10:15:00Z',
-        durationSeconds: 900,
-        htmlUrl: 'https://github.com/org/repo/actions/runs/123456789',
+      mockGetWorkflowStatus.mockResolvedValueOnce({
+        success: true,
+        data: {
+          runId: 103,
+          githubRunId: 123456789,
+          runNumber: 42,
+          status: 'completed',
+          conclusion: 'success',
+          startedAt: '2025-12-31T10:00:00Z',
+          completedAt: '2025-12-31T10:15:00Z',
+          durationSeconds: 900,
+          htmlUrl: 'https://github.com/org/repo/actions/runs/123456789',
+        },
       });
 
       const result = await getWorkflowStatus.execute({
-        owner: 'solaria-agency',
-        repo: 'test-repo',
-        github_run_id: 123456789,
+        run_id: 103,
         format: 'human',
       });
 
       expect(result.success).toBe(true);
       if (result.success && result.formatted) {
-        expect(result.formatted).toContain('🔄 Workflow Run #42');
-        expect(result.formatted).toContain('Conclusion: ✅ success');
+        expect(result.formatted).toContain('GitHub Workflow Status');
+        expect(result.formatted).toContain('Status: COMPLETED');
+        expect(result.formatted).toContain('Conclusion: SUCCESS');
+        expect(result.formatted).toContain('Run #42');
         expect(result.formatted).toContain('Duration: 15m 0s');
       }
     });
