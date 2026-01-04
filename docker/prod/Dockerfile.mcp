@@ -18,7 +18,7 @@ RUN npm ci
 COPY mcp-server/. .
 
 # Build TypeScript (outputs to dist/)
-RUN npm run build
+RUN npm run build:ts
 
 # ============================================================================
 # STAGE 2: Runner - Minimal production image
