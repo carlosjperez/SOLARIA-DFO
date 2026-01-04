@@ -95,6 +95,17 @@ interface WorkerStatusResponse {
     };
 }
 
+interface ListJobsResponse {
+    jobs: JobStatusResponse[];
+    count: number;
+    filters: {
+        projectId?: number;
+        agentId?: number;
+        statuses: string[];
+        limit: number;
+    };
+}
+
 // ============================================================================
 // GitHub Actions Types
 // ============================================================================
@@ -324,6 +335,40 @@ export class DFOApiClient {
     }
 
     /**
+     * List jobs with optional filtering
+     * GET /api/agent-execution/jobs?projectId=X&agentId=Y&limit=100&statuses=waiting,active
+     */
+    async listJobs(options: {
+        projectId?: number;
+        agentId?: number;
+        limit?: number;
+        statuses?: string[];
+    } = {}): Promise<ApiResponse<ListJobsResponse>> {
+        const params = new URLSearchParams();
+
+        if (options.projectId !== undefined) {
+            params.append('projectId', options.projectId.toString());
+        }
+
+        if (options.agentId !== undefined) {
+            params.append('agentId', options.agentId.toString());
+        }
+
+        if (options.limit !== undefined) {
+            params.append('limit', options.limit.toString());
+        }
+
+        if (options.statuses && options.statuses.length > 0) {
+            params.append('statuses', options.statuses.join(','));
+        }
+
+        const queryString = params.toString();
+        const endpoint = queryString ? `/api/agent-execution/jobs?${queryString}` : '/api/agent-execution/jobs';
+
+        return this.request('GET', endpoint);
+    }
+
+    /**
      * Get worker status
      * GET /api/agent-execution/workers
      */
@@ -430,6 +475,7 @@ export type {
     JobStatusResponse,
     CancelJobResponse,
     WorkerStatusResponse,
+    ListJobsResponse,
     TriggerWorkflowPayload,
     TriggerWorkflowResponse,
     WorkflowStatusResponse,

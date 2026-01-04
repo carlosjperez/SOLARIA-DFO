@@ -634,6 +634,7 @@ class SolariaDashboardServer {
         // ========================================================================
 
         this.app.post('/api/agent-execution/queue', this.authenticateToken.bind(this), this.queueAgentJob.bind(this));
+        this.app.get('/api/agent-execution/jobs', this.authenticateToken.bind(this), this.listAgentJobs.bind(this));
         this.app.get('/api/agent-execution/jobs/:id', this.authenticateToken.bind(this), this.getAgentJobStatus.bind(this));
         this.app.post('/api/agent-execution/jobs/:id/cancel', this.authenticateToken.bind(this), this.cancelAgentJob.bind(this));
         this.app.get('/api/agent-execution/workers', this.authenticateToken.bind(this), this.getWorkerStatus.bind(this));
@@ -1239,16 +1240,21 @@ class SolariaDashboardServer {
                 ORDER BY t.created_at DESC
             `);
 
-            // Flatten all alerts into single array with type field for test compatibility
-            const alerts = [
-                ...overdueTasks.map((t: any) => ({ ...t, type: 'overdue', severity: 'high' })),
-                ...blockedTasks.map((t: any) => ({ ...t, type: 'blocked', severity: 'high' })),
-                ...staleTasks.map((t: any) => ({ ...t, type: 'stale', severity: 'medium' })),
-                ...upcomingDeadlines.map((p: any) => ({ ...p, type: 'deadline', severity: 'medium' })),
-                ...criticalTasks.map((t: any) => ({ ...t, type: 'critical', severity: 'critical' }))
-            ];
-
-            res.json(alerts);
+            // Return structured object with categorized alerts and summary
+            res.json({
+                overdueTasks,
+                blockedTasks,
+                staleTasks,
+                upcomingDeadlines,
+                criticalTasks,
+                summary: {
+                    overdue_count: overdueTasks.length,
+                    blocked_count: blockedTasks.length,
+                    stale_count: staleTasks.length,
+                    critical_count: criticalTasks.length
+                },
+                generated_at: new Date().toISOString()
+            });
         } catch (error) {
             console.error('Error in getDashboardAlerts:', error);
             res.status(500).json({ error: 'Failed to fetch dashboard alerts' });
@@ -1410,7 +1416,7 @@ class SolariaDashboardServer {
             // Get project stats
             const [projectStats] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT
-                    COUNT(*) as total_projects,
+                    COUNT(*) as total,
                     SUM(budget) as total_budget,
                     SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
                     SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -1424,7 +1430,7 @@ class SolariaDashboardServer {
             // Get task stats
             const [taskStats] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT
-                    COUNT(*) as total_tasks,
+                    COUNT(*) as total,
                     SUM(CASE WHEN t.status = 'pending' THEN 1 ELSE 0 END) as pending,
                     SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
                     SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -7007,6 +7013,87 @@ class SolariaDashboardServer {
             });
             res.status(500).json({
                 error: 'Failed to retrieve worker status',
+                details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+            });
+        }
+    }
+
+    /**
+     * List agent jobs with optional filtering
+     * GET /api/agent-execution/jobs?projectId=X&limit=100
+     */
+    private async listAgentJobs(req: Request, res: Response): Promise<void> {
+        try {
+            if (!this.agentExecutionService) {
+                res.status(503).json({ error: 'Agent execution service not initialized' });
+                return;
+            }
+
+            // Parse query parameters
+            const projectId = req.query.projectId ? parseInt(req.query.projectId as string, 10) : undefined;
+            const agentId = req.query.agentId ? parseInt(req.query.agentId as string, 10) : undefined;
+            const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 100;
+            const statusesParam = req.query.statuses as string | undefined;
+            const statuses = statusesParam ? statusesParam.split(',') : ['waiting', 'active', 'delayed'];
+
+            // Validate parameters
+            if (limit < 1 || limit > 500) {
+                res.status(400).json({
+                    error: 'Invalid limit parameter',
+                    details: 'Limit must be between 1 and 500'
+                });
+                return;
+            }
+
+            if (projectId !== undefined && (isNaN(projectId) || projectId <= 0)) {
+                res.status(400).json({
+                    error: 'Invalid projectId parameter',
+                    details: 'projectId must be a positive integer'
+                });
+                return;
+            }
+
+            if (agentId !== undefined && (isNaN(agentId) || agentId <= 0)) {
+                res.status(400).json({
+                    error: 'Invalid agentId parameter',
+                    details: 'agentId must be a positive integer'
+                });
+                return;
+            }
+
+            // List jobs with filters
+            const jobs = await this.agentExecutionService.listJobs({
+                projectId,
+                agentId,
+                statuses,
+                limit
+            });
+
+            console.log(`[AgentExecution] Listed ${jobs.length} jobs | Filters: projectId=${projectId}, agentId=${agentId}, statuses=${statuses.join(',')}`);
+
+            res.json({
+                success: true,
+                data: {
+                    jobs,
+                    count: jobs.length,
+                    filters: {
+                        projectId,
+                        agentId,
+                        statuses,
+                        limit
+                    }
+                }
+            });
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            console.error('[AgentExecution] List jobs error:', {
+                error: errorMessage,
+                stack: errorStack
+            });
+            res.status(500).json({
+                error: 'Failed to list jobs',
                 details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
             });
         }

@@ -666,6 +666,89 @@ export class AgentExecutionService {
     }
 
     /**
+     * List jobs with flexible filtering
+     *
+     * @param options - Filter options
+     * @param options.projectId - Filter by project ID
+     * @param options.statuses - Filter by status array (default: active statuses)
+     * @param options.agentId - Filter by agent ID
+     * @param options.limit - Maximum number of jobs to return (default: 100)
+     * @returns Array of job status objects with full details
+     */
+    async listJobs(options: {
+        projectId?: number;
+        statuses?: string[];
+        agentId?: number;
+        limit?: number;
+    } = {}): Promise<AgentJobStatus[]> {
+        try {
+            const {
+                projectId,
+                statuses = ['waiting', 'active', 'delayed'],
+                agentId,
+                limit = 100
+            } = options;
+
+            // Build dynamic query
+            let query = `
+                SELECT
+                    aj.bullmq_job_id,
+                    aj.task_id,
+                    aj.agent_id,
+                    aj.project_id,
+                    aj.status,
+                    aj.progress,
+                    aj.queued_at,
+                    aj.started_at,
+                    aj.completed_at,
+                    aj.last_error,
+                    aj.attempts_made,
+                    aj.max_attempts,
+                    aj.execution_time_ms,
+                    aj.priority
+                FROM agent_jobs aj
+                WHERE 1=1
+            `;
+
+            const params: (number | string)[] = [];
+
+            if (projectId !== undefined) {
+                query += ` AND aj.project_id = ?`;
+                params.push(projectId);
+            }
+
+            if (statuses.length > 0) {
+                query += ` AND aj.status IN (${statuses.map(() => '?').join(',')})`;
+                params.push(...statuses);
+            }
+
+            if (agentId !== undefined) {
+                query += ` AND aj.agent_id = ?`;
+                params.push(agentId);
+            }
+
+            query += ` ORDER BY aj.priority ASC, aj.queued_at ASC LIMIT ?`;
+            params.push(limit);
+
+            const [rows] = await this.db.execute<RowDataPacket[]>(query, params);
+
+            // Fetch full status for each job (includes BullMQ data)
+            const jobs: AgentJobStatus[] = [];
+            for (const row of rows) {
+                const status = await this.getJobStatus(row.bullmq_job_id);
+                if (status) {
+                    jobs.push(status);
+                }
+            }
+
+            return jobs;
+        } catch (error) {
+            console.error('[AgentExecution] List jobs error:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Get queue metrics and statistics
      *
      * @returns Queue metrics including counts, average times, success rate

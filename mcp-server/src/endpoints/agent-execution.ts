@@ -361,36 +361,41 @@ async function cancelJob(args: z.infer<typeof CancelJobInputSchema>) {
  */
 async function listActiveJobs(args: z.infer<typeof ListActiveJobsInputSchema>) {
     const builder = new ResponseBuilder({ version: VERSION });
+    const apiClient = getDFOApiClient();
 
     try {
-        const [rows] = (await db.execute(
-            `SELECT
-                aj.bullmq_job_id as jobId,
-                aj.task_id as taskId,
-                t.code as taskCode,
-                aj.agent_id as agentId,
-                a.name as agentName,
-                aj.status,
-                aj.progress,
-                aj.queued_at as queuedAt,
-                aj.started_at as startedAt,
-                aj.completed_at as completedAt,
-                aj.attempts_made as attemptsMade,
-                aj.max_attempts as maxAttempts,
-                aj.last_error as lastError
-            FROM agent_jobs aj
-            JOIN tasks t ON aj.task_id = t.id
-            JOIN agents a ON aj.agent_id = a.id
-            WHERE aj.status IN ('waiting', 'active', 'delayed')
-            ORDER BY aj.queued_at DESC
-            LIMIT ?`,
-            [args.limit]
-        )) as unknown as [RowDataPacket[], any];
+        // Call Dashboard API to list jobs
+        const apiResponse = await apiClient.listJobs({
+            statuses: ['waiting', 'active', 'delayed'],
+            limit: args.limit
+        });
 
-        const jobs = rows as JobStatus[];
+        // Handle API errors
+        if (!apiResponse.success) {
+            return builder.error(apiResponse.error!);
+        }
+
+        const data = apiResponse.data!;
+
+        // Map API response to JobStatus format for formatters
+        const jobs: JobStatus[] = data.jobs.map((job: any) => ({
+            jobId: job.id || job.jobId,
+            taskId: job.dbRecord?.taskId || job.taskId,
+            taskCode: job.dbRecord?.taskCode || job.taskCode || 'N/A',
+            agentId: job.dbRecord?.agentId || job.agentId,
+            agentName: job.dbRecord?.agentName || job.agentName || 'Unknown',
+            status: job.status || job.dbRecord?.status || 'unknown',
+            progress: job.progress || job.dbRecord?.progress || 0,
+            queuedAt: job.dbRecord?.queuedAt || job.queuedAt || new Date().toISOString(),
+            startedAt: job.dbRecord?.startedAt || job.startedAt,
+            completedAt: job.dbRecord?.completedAt || job.completedAt || job.finishedOn,
+            attemptsMade: job.attemptsMade || 0,
+            maxAttempts: job.maxAttempts || 3,
+            lastError: job.failedReason || job.dbRecord?.lastError
+        }));
 
         if (args.format === 'human') {
-            return builder.success(jobs, {
+            return builder.success({ jobs, count: jobs.length }, {
                 format: 'human',
                 formatted: formatActiveJobs(jobs)
             });
@@ -398,7 +403,12 @@ async function listActiveJobs(args: z.infer<typeof ListActiveJobsInputSchema>) {
 
         return builder.success({ jobs, count: jobs.length });
     } catch (error: any) {
-        return builder.error(CommonErrors.databaseError(error));
+        return builder.error({
+            code: 'API_REQUEST_FAILED',
+            message: 'Failed to list jobs via Dashboard API',
+            details: { originalError: error.message },
+            suggestion: 'Ensure DFO Dashboard API is accessible and DFO_API_TOKEN is configured correctly'
+        });
     }
 }
 
