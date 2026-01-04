@@ -296,16 +296,33 @@ async function getJobStatus(args: z.infer<typeof GetJobStatusInputSchema>) {
             return builder.error(apiResponse.error!);
         }
 
-        const jobStatus = apiResponse.data!;
+        const apiJobStatus = apiResponse.data!;
+
+        // Transform API response to JobStatus format for formatter
+        const jobStatus: JobStatus = {
+            jobId: apiJobStatus.jobId || '',
+            taskId: apiJobStatus.taskId || 0,
+            taskCode: apiJobStatus.taskCode || 'N/A',
+            agentId: apiJobStatus.agentId || 0,
+            agentName: apiJobStatus.agentName || 'Unknown',
+            status: apiJobStatus.status || 'waiting',
+            progress: apiJobStatus.progress || 0,
+            queuedAt: new Date().toISOString(), // API doesn't return this for single job
+            attemptsMade: 0, // API doesn't return this for single job
+            maxAttempts: 3,
+            startedAt: apiJobStatus.startedAt,
+            completedAt: apiJobStatus.completedAt,
+            lastError: apiJobStatus.error as string | undefined
+        };
 
         if (args.format === 'human') {
-            return builder.success(jobStatus, {
+            return builder.success(apiJobStatus, {
                 format: 'human',
                 formatted: formatJobStatus(jobStatus)
             });
         }
 
-        return builder.success(jobStatus);
+        return builder.success(apiJobStatus);
     } catch (error: any) {
         return builder.error({
             code: 'API_REQUEST_FAILED',
