@@ -39,6 +39,7 @@ import { MiniTrello } from '@/components/common/MiniTrello';
 import { EpicDetailModal } from '@/components/epics/EpicDetailModal';
 import { SprintDetailModal } from '@/components/sprints/SprintDetailModal';
 import { RoadmapCard } from '@/components/roadmap/RoadmapCard';
+import { DocumentsCard } from '@/components/documents/DocumentsCard';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import type { Task, Project, Epic, Sprint } from '@/types';
 
@@ -1213,6 +1214,9 @@ export function ProjectDetailPage() {
                         onEpicClick={setSelectedEpicId}
                         onSprintClick={setSelectedSprintId}
                     />
+
+                    {/* Documents Card */}
+                    <DocumentsCard projectId={projectId} />
                 </div>
             </div>
 

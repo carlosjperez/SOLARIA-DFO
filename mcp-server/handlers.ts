@@ -719,7 +719,8 @@ export const toolDefinitions: MCPToolDefinition[] = [
       type: "object",
       properties: {
         project_id: { type: "number", description: "Project ID" },
-        name: { type: "string", description: "Sprint name (min 3 chars, e.g., 'Sprint 1 - MVP')" },
+        title: { type: "string", description: "Sprint title (min 3 chars, e.g., 'Sprint 1 - MVP'). Preferred parameter for consistency with create_task." },
+        name: { type: "string", description: "Sprint name (min 3 chars). Alternative to 'title' for backward compatibility." },
         goal: { type: "string", description: "Sprint goal - what success looks like" },
         status: {
           type: "string",
@@ -731,7 +732,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
         velocity: { type: "number", description: "Planned velocity in story points" },
         capacity: { type: "number", description: "Team capacity in hours" },
       },
-      required: ["project_id", "name"],
+      required: ["project_id"],
     },
   },
   {
@@ -2264,7 +2265,8 @@ export async function executeTool(
     case "create_sprint": {
       const params = args as {
         project_id?: number;
-        name: string;
+        title?: string;
+        name?: string;
         goal?: string;
         status?: string;
         start_date?: string;
@@ -2274,11 +2276,15 @@ export async function executeTool(
       };
       const projectId = isIsolated ? context.project_id : params.project_id;
       if (!projectId) return { error: "project_id required" };
-      if (!params.name) return { error: "name required" };
+
+      // Accept either 'title' or 'name' parameter, prefer 'title' for consistency with create_task
+      const sprintName = params.title || params.name;
+      if (!sprintName) return { error: "Either 'title' or 'name' parameter is required" };
+
       return apiCall(`/projects/${projectId}/sprints`, {
         method: "POST",
         body: JSON.stringify({
-          name: params.name,
+          name: sprintName,
           goal: params.goal,
           status: params.status || 'planned',
           start_date: params.start_date,

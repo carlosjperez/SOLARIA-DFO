@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/auth';
 import { useAuthVerification } from '@/hooks/useAuthVerification';
 import { Layout } from '@/components/layout/Layout';
 import { LoginPage } from '@/pages/LoginPage';
+import { KeyboardShortcutsProvider } from '@/contexts/KeyboardShortcutsContext';
 
 // Lazy load all pages except Login (critical for UX)
 // Note: Using named exports, so we need to destructure in the import
@@ -66,6 +67,9 @@ const MemoriesPage = lazy(() =>
 const OfficePage = lazy(() =>
     import('@/pages/OfficePage').then((module) => ({ default: module.OfficePage }))
 );
+const ProjectDocumentsPage = lazy(() =>
+    import('@/pages/ProjectDocumentsPage').then((module) => ({ default: module.ProjectDocumentsPage }))
+);
 
 function LoadingScreen() {
     return (
@@ -97,16 +101,17 @@ function App() {
     }
 
     return (
-        <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route
-                path="/"
-                element={
-                    <PrivateRoute>
-                        <Layout />
-                    </PrivateRoute>
-                }
-            >
+        <KeyboardShortcutsProvider>
+            <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route
+                    path="/"
+                    element={
+                        <PrivateRoute>
+                            <Layout />
+                        </PrivateRoute>
+                    }
+                >
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route
                     path="dashboard"
@@ -169,6 +174,14 @@ function App() {
                     element={
                         <Suspense fallback={<LoadingScreen />}>
                             <RoadmapPage />
+                        </Suspense>
+                    }
+                />
+                <Route
+                    path="projects/:id/docs"
+                    element={
+                        <Suspense fallback={<LoadingScreen />}>
+                            <ProjectDocumentsPage />
                         </Suspense>
                     }
                 />
@@ -254,6 +267,7 @@ function App() {
                 />
             </Route>
         </Routes>
+        </KeyboardShortcutsProvider>
     );
 }
 

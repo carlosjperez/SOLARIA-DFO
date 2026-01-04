@@ -2620,18 +2620,24 @@ class SolariaDashboardServer {
         try {
             const { id } = req.params;  // project_id
             const projectId = parseInt(id, 10);
-            const { name, goal, status, start_date, end_date, velocity, capacity } = req.body;
+            const { title, name, goal, status, start_date, end_date, velocity, capacity } = req.body;
 
-            // Validation: name is required
-            if (!name) {
-                res.status(400).json({ error: 'Sprint name is required' });
+            // Accept either 'title' or 'name' parameter, prefer 'title' for consistency with create_task
+            const sprintName = title || name;
+
+            // Validation: title or name is required
+            if (!sprintName) {
+                res.status(400).json({
+                    error: 'Sprint title or name is required',
+                    hint: 'Use either "title" or "name" parameter. Prefer "title" for consistency with tasks.'
+                });
                 return;
             }
 
             // Validation: name format for agents (must be descriptive, not random)
-            if (name.length < 3) {
+            if (sprintName.length < 3) {
                 res.status(400).json({
-                    error: 'Sprint name must be at least 3 characters',
+                    error: 'Sprint title/name must be at least 3 characters',
                     hint: 'Use descriptive names like "MVP Release" or "Security Hardening"'
                 });
                 return;
@@ -2670,7 +2676,7 @@ class SolariaDashboardServer {
             `, [
                 id,
                 sprintNumber,
-                name,
+                sprintName,
                 goal || null,
                 status || 'planned',
                 start_date || null,
@@ -2683,18 +2689,18 @@ class SolariaDashboardServer {
             // Log activity and emit Socket.IO event
             await this.logActivity({
                 action: 'sprint_created',
-                message: `Sprint ${sprintCode} creado: ${name}`,
+                message: `Sprint ${sprintCode} creado: ${sprintName}`,
                 category: 'sprint',
                 level: 'info',
                 project_id: projectId,
-                metadata: { sprintId: result.insertId, sprintNumber, sprintCode, name, goal }
+                metadata: { sprintId: result.insertId, sprintNumber, sprintCode, name: sprintName, goal }
             });
 
             // Emit sprint_created event for real-time updates
             this.io.to('notifications').emit('sprint_created', {
                 id: result.insertId,
                 sprintNumber,
-                name,
+                name: sprintName,
                 projectId
             });
 
