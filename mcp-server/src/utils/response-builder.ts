@@ -21,20 +21,20 @@ export interface ResponseMetadata {
   version?: string;
 }
 
-export interface StandardSuccessResponse<T = any> {
-  success: true;
-  data: T;
-  metadata?: ResponseMetadata;
-  format?: 'json' | 'human';
-  formatted?: string;
-}
-
 export interface ErrorObject {
   code: string;
   message: string;
   details?: any;
   field?: string;
   suggestion?: string;
+}
+
+export interface StandardSuccessResponse<T = any> {
+  success: true;
+  data: T;
+  metadata?: ResponseMetadata;
+  format?: 'json' | 'human';
+  formatted?: string;
 }
 
 export interface StandardErrorResponse {
@@ -60,9 +60,6 @@ export class ResponseBuilder {
     this.version = options.version || '1.0.0';
   }
 
-  /**
-   * Build a successful response
-   */
   success<T>(data: T, options: {
     format?: 'json' | 'human';
     formatted?: string;
@@ -92,9 +89,6 @@ export class ResponseBuilder {
     return response;
   }
 
-  /**
-   * Build an error response
-   */
   error(error: ErrorObject | string, options: {
     includeMetadata?: boolean;
   } = {}): StandardErrorResponse {
@@ -119,11 +113,7 @@ export class ResponseBuilder {
     return response;
   }
 
-  /**
-   * Build error from exception
-   */
   errorFromException(error: any, defaultCode: string = 'INTERNAL_ERROR'): StandardErrorResponse {
-    // Handle custom errors with code property
     if (error.code && error.message) {
       return this.error({
         code: error.code,
@@ -132,17 +122,15 @@ export class ResponseBuilder {
       });
     }
 
-    // Handle Zod validation errors
     if (error.name === 'ZodError') {
       return this.error({
         code: 'VALIDATION_ERROR',
         message: 'Input validation failed',
         details: error.errors,
-        suggestion: 'Check the input parameters and try again',
+        suggestion: 'Check input parameters and try again',
       });
     }
 
-    // Handle database errors
     if (error.code?.startsWith('ER_')) {
       return this.error({
         code: 'DATABASE_ERROR',
@@ -152,7 +140,6 @@ export class ResponseBuilder {
       });
     }
 
-    // Generic error
     return this.error({
       code: defaultCode,
       message: error.message || 'An unexpected error occurred',
@@ -160,9 +147,6 @@ export class ResponseBuilder {
     });
   }
 
-  /**
-   * Generate unique request ID
-   */
   private generateRequestId(): string {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
@@ -172,9 +156,6 @@ export class ResponseBuilder {
 // Helper Functions
 // ============================================================================
 
-/**
- * Quick success response builder
- */
 export function successResponse<T>(
   data: T,
   options?: { format?: 'json' | 'human'; formatted?: string }
@@ -183,9 +164,6 @@ export function successResponse<T>(
   return builder.success(data, options);
 }
 
-/**
- * Quick error response builder
- */
 export function errorResponse(
   code: string,
   message: string,
@@ -195,9 +173,6 @@ export function errorResponse(
   return builder.error({ code, message, details });
 }
 
-/**
- * Wrap async endpoint execution with standard error handling
- */
 export async function wrapEndpoint<T>(
   executor: () => Promise<T>,
   options: {
@@ -233,7 +208,7 @@ export const CommonErrors = {
     code: `${entity.toUpperCase()}_NOT_FOUND`,
     message: `${entity} with ID ${id} not found`,
     details: { entity, id },
-    suggestion: `Verify the ${entity} ID exists and try again`,
+    suggestion: `Verify ${entity} ID exists and try again`,
   }),
 
   duplicate: (entity: string, field: string, value: any): ErrorObject => ({
@@ -247,7 +222,7 @@ export const CommonErrors = {
     code: 'INVALID_INPUT',
     message: `Invalid ${field}: ${reason}`,
     field,
-    suggestion: 'Check the input format and try again',
+    suggestion: 'Check input format and try again',
   }),
 
   permissionDenied: (action: string, resource: string): ErrorObject => ({
@@ -297,9 +272,6 @@ const StandardResponseSchema = z.discriminatedUnion('success', [
   }),
 ]);
 
-/**
- * Validate a response against the standard schema
- */
 export function validateResponse(response: unknown): {
   valid: boolean;
   errors?: z.ZodError;
@@ -315,34 +287,31 @@ export function validateResponse(response: unknown): {
   }
 }
 
-  /**
-   * Assert response is valid (throws if not)
-   */
-  export function assertValidResponse(response: unknown): asserts response is StandardResponse {
-    const result = validateResponse(response);
-    if (!result.valid) {
-      throw new Error(`Invalid response format: ${JSON.stringify(result.errors)}`);
-    }
+export function assertValidResponse(response: unknown): asserts response is StandardResponse {
+  const result = validateResponse(response);
+  if (!result.valid) {
+    throw new Error(`Invalid response format: ${JSON.stringify(result.errors)}`);
   }
+}
 
-  /**
-   * Append local memory installation guide to response
-   * Used when agent needs memory system but doesn't have it installed
-   */
-  export function appendLocalMemoryGuide(
-    response: StandardResponse<any>,
-    guideContent: string
-  ): StandardResponse<any> {
-    if (response.content) {
-      response.content = `
+export function appendLocalMemoryGuide(
+  response: StandardResponse<any>,
+  guideContent: string
+): StandardResponse<any> {
+  if (response.success === true && 'data' in response) {
+    const content = response.data;
+    return {
+      ...response,
+      data: `
 ${guideContent}
 
 ---
 
 [Respuesta original del DFO]
-${response.content || response.data || ''}
-      `;
-    }
-
-    return response;
+${content}
+      `,
+    };
   }
+
+  return response;
+}
