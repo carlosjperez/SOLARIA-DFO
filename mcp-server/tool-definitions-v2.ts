@@ -9,8 +9,8 @@
  * @task MCP-SKETCH-018
  */
 
-import { get_context_tool } from './src/endpoints/get-context.js';
-import { run_code_tool } from './src/endpoints/run-code.js';
+import { get_context_tool } from 'src/endpoints/get-context.js';
+import { run_code_tool } from 'src/endpoints/run-code.js';
 
 export const toolDefinitions = [
   // SKETCH PATTERN CORE TOOL 1: get_context
@@ -22,6 +22,33 @@ export const toolDefinitions = [
   // Executes arbitrary JavaScript/TypeScript code in secure sandbox with DFO API access
   // Replaces: All 70+ old tools - users write custom scripts instead
   run_code_tool,
+];
+
+export const resourceDefinitions = [
+  {
+    uri: 'solaria://dashboard/overview',
+    name: 'Dashboard Overview',
+    description: 'Dashboard overview data',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'solaria://projects/list',
+    name: 'Projects List',
+    description: 'All projects',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'solaria://tasks/list',
+    name: 'Tasks List',
+    description: 'All tasks',
+    mimeType: 'application/json',
+  },
+  {
+    uri: 'solaria://agents/list',
+    name: 'Agents List',
+    description: 'All agents',
+    mimeType: 'application/json',
+  },
 ];
 
 console.log(`[tool-definitions-v2] Loaded ${toolDefinitions.length} tools (Sketch Pattern)`);

@@ -1,15 +1,17 @@
-# SOLARIA DFO MCP v2.0 Script Library
-# Pre-defined examples for common operations using run_code
-#
-# Usage:
-#   await run_code({
-#     code: getScriptTemplate('projects-list'),
-#     timeout: 5000
-#   })
-#
-# @author ECO-Lambda | SOLARIA DFO
-# @date 2026-01-06
-# @task MCP-SKETCH-016
+/**
+ * SOLARIA DFO MCP v2.0 Script Library
+ * Pre-defined examples for common operations using run_code
+ *
+ * Usage:
+ *   await run_code({
+ *     code: getScriptTemplate('projects-list'),
+ *     timeout: 5000
+ *   })
+ *
+ * @author ECO-Lambda | SOLARIA DFO
+ * @date 2026-01-06
+ * @task MCP-SKETCH-016
+ */
 
 export async function getScriptTemplate(name: string): Promise<string> {
   const templates: Record<string, string> = {

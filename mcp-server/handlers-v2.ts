@@ -10,7 +10,6 @@
  */
 
 import type {
-  SessionContext,
   ApiCallFunction,
   SetProjectContextResult,
   Project,
@@ -18,61 +17,20 @@ import type {
   Agent,
   Sprint,
   Epic,
-} from './types-v2.js';
+  SessionContext,
+  SetProjectContextParams,
+} from './types-v2.ts';
 
-import { toolDefinitions, resourceDefinitions } from './tool-definitions-v2.js';
+import { toolDefinitions } from './tool-definitions-v2.js';
 
-import { handleGetContext } from './src/endpoints/get-context.js';
-import { handleRunCode } from './src/endpoints/run-code.js';
+import { handleGetContext } from 'src/endpoints/get-context.js';
+import { handleRunCode } from 'src/endpoints/run-code.js';
 
-import { protocolEnforcer } from './src/utils/protocol-enforcement.js';
+import { protocolEnforcer } from 'src/utils/protocol-enforcement.js';
 
-export async function createApiClient(
-  dashboardUrl: string,
-  credentials: { user: string; password: string }
-): Promise<ApiCallFunction> {
-  let authToken: string | null = null;
-  const { user, password } = credentials;
-
-  async function authenticate(): Promise<{ token: string }> {
-    const response = await fetch(`${dashboardUrl}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: user, password }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error('Authentication failed');
-    }
-
-    const data = await response.json() as { token: string };
-    authToken = data.token;
-    return data;
-  }
-
-  async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    if (!authToken) {
-      await authenticate();
-    }
-
-    const response = await fetch(`${dashboardUrl}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`,
-        ...options.headers,
-      },
-    });
-
-    if (response.status === 401) {
-      await authenticate();
-      return apiCall<T>(endpoint, options);
-    }
-
-    return response.json() as Promise<T>;
-  }
-}
+// ============================================================================
+// Tool Executor
+// ============================================================================
 
 export async function executeTool(
   name: string,
@@ -93,13 +51,13 @@ export async function executeTool(
 
   switch (name) {
     case 'get_context': {
-      const handler = await import('./src/endpoints/get-context.js');
-      result = await handler.default.handler(args, apiCall);
+      const handler = await import('src/endpoints/get-context.js');
+      result = await handler.default.handler(args, apiCall as any);
       break;
     }
 
     case 'run_code': {
-      const handler = await import('./src/endpoints/run-code.js');
+      const handler = await import('src/endpoints/run-code.js');
       result = await handler.default.handler(args, {
         user: credentials.user,
         password: credentials.password,
@@ -115,7 +73,7 @@ export async function executeTool(
         targetProject = await apiCall<Project>(`/projects/${params.project_id}`);
       } else if (params.project_name) {
         const allProjects = await apiCall<Project[]>('/projects');
-        const projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
+        const projects = Array.isArray(allProjects) ? allProjects : (allProjects as any).projects || [];
 
         targetProject = projects.find((p: Project) =>
           p.name.toLowerCase() === params.project_name!.toLowerCase()
@@ -130,7 +88,7 @@ export async function executeTool(
       } else if (params.working_directory) {
         const dirName = params.working_directory.split('/').pop()?.toLowerCase() || '';
         const allProjects = await apiCall<Project[]>('/projects');
-        const projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
+        const projects = Array.isArray(allProjects) ? allProjects : (allProjects as any).projects || [];
 
         targetProject = projects.find((p: Project) =>
           p.name.toLowerCase().includes(dirName) ||
@@ -140,7 +98,7 @@ export async function executeTool(
 
       if (!targetProject) {
         const allProjects = await apiCall<Project[]>('/projects');
-        const projects = Array.isArray(allProjects) ? allProjects : (allProjects.projects || []);
+        const projects = Array.isArray(allProjects) ? allProjects : (allProjects as any).projects || [];
         return {
           success: false,
           error: 'Project not found',
@@ -216,6 +174,10 @@ export async function executeTool(
   return result;
 }
 
+// ============================================================================
+// Resource Reader
+// ============================================================================
+
 export async function readResource(
   uri: string,
   apiCall: ApiCallFunction,
@@ -261,10 +223,10 @@ export async function readResource(
   }
 }
 
+// ============================================================================
+// Exports
+// ============================================================================
+
 export {
   toolDefinitions,
-  resourceDefinitions,
-  createApiClient,
-  executeTool,
-  readResource,
 };
