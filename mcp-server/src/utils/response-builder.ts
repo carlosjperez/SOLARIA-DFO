@@ -315,12 +315,34 @@ export function validateResponse(response: unknown): {
   }
 }
 
-/**
- * Assert response is valid (throws if not)
- */
-export function assertValidResponse(response: unknown): asserts response is StandardResponse {
-  const result = validateResponse(response);
-  if (!result.valid) {
-    throw new Error(`Invalid response format: ${JSON.stringify(result.errors)}`);
+  /**
+   * Assert response is valid (throws if not)
+   */
+  export function assertValidResponse(response: unknown): asserts response is StandardResponse {
+    const result = validateResponse(response);
+    if (!result.valid) {
+      throw new Error(`Invalid response format: ${JSON.stringify(result.errors)}`);
+    }
   }
-}
+
+  /**
+   * Append local memory installation guide to response
+   * Used when agent needs memory system but doesn't have it installed
+   */
+  export function appendLocalMemoryGuide(
+    response: StandardResponse<any>,
+    guideContent: string
+  ): StandardResponse<any> {
+    if (response.content) {
+      response.content = `
+${guideContent}
+
+---
+
+[Respuesta original del DFO]
+${response.content || response.data || ''}
+      `;
+    }
+
+    return response;
+  }

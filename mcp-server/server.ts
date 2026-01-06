@@ -20,6 +20,8 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
+import { check_local_memory } from "./src/endpoints/local-memory-check.js";
+
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -548,6 +550,77 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         });
         break;
 
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+  const typedArgs = args as ToolCallArgs | undefined;
+
+  try {
+    let result: unknown;
+
+    switch (name) {
+      // Dashboard
+      case "get_dashboard_overview":
+        result = await apiCall("/dashboard/overview");
+        break;
+
+      case "get_dashboard_alerts":
+        result = await apiCall(`/dashboard/alerts${typedArgs?.severity ? `?severity=${typedArgs.severity}` : ""}`);
+        break;
+
+      // Projects
+      case "list_projects":
+        result = await apiCall("/projects");
+        break;
+
+      case "get_project":
+        result = await apiCall(`/projects/${typedArgs?.project_id || 2}`);
+        break;
+
+      case "update_project":
+        result = await apiCall(`/projects/${typedArgs!.project_id}`, {
+          method: "PUT",
+          body: JSON.stringify(typedArgs),
+        });
+        break;
+
+      // Tasks
+      case "list_tasks":
+        let endpoint = "/tasks";
+        const params: string[] = [];
+        if (typedArgs?.status) params.push(`status=${typedArgs.status}`);
+        if (typedArgs?.priority) params.push(`priority=${typedArgs.priority}`);
+        if (typedArgs?.agent_id) params.push(`agent_id=${typedArgs.agent_id}`);
+        if (params.length) endpoint += `?${params.join("&")}`;
+        result = await apiCall(endpoint);
+        break;
+
+      case "get_task":
+        result = await apiCall(`/tasks/${typedArgs!.task_id}`);
+        break;
+
+      case "create_task":
+        result = await apiCall("/tasks", {
+          method: "POST",
+          body: JSON.stringify({
+            ...typedArgs,
+            project_id: typedArgs?.project_id || 2,
+            status: typedArgs?.status || "pending",
+            priority: typedArgs?.priority || "medium",
+          }),
+        });
+        break;
+
+      case "update_task":
+        result = await apiCall(`/tasks/${typedArgs!.task_id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            status: typedArgs?.status || "completed",
+            progress: typedArgs?.progress || 100,
+            completion_notes: typedArgs?.completion_notes,
+          }),
+        });
+        break;
+
       case "complete_task":
         result = await apiCall(`/tasks/${typedArgs!.task_id}`, {
           method: "PUT",
@@ -557,6 +630,58 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             completion_notes: typedArgs?.completion_notes,
           }),
         });
+        break;
+
+      // Agents
+      case "list_agents":
+        let agents = await apiCall("/agents") as Array<{ status: string; role: string }>;
+        if (typedArgs?.status) {
+          agents = agents.filter((a) => a.status === typedArgs.status);
+        }
+        if (typedArgs?.role) {
+          agents = agents.filter((a) => a.role === typedArgs.role);
+        }
+        result = agents;
+        break;
+
+      case "get_agent":
+        result = await apiCall(`/agents/${typedArgs!.agent_id}`);
+        break;
+
+      case "get_agent_tasks":
+        const tasks = await apiCall("/tasks") as Array<{ assigned_agent_id: number }>;
+        result = tasks.filter((t) => t.assigned_agent_id === typedArgs!.agent_id);
+        break;
+
+      case "update_agent_status":
+        result = await apiCall(`/agents/${typedArgs!.agent_id}/status`, {
+          method: "PUT",
+          body: JSON.stringify({ status: typedArgs!.status }),
+        });
+        break;
+
+      // Logs
+      case "get_activity_logs":
+        const limit = typedArgs?.limit || 50;
+        const level = typedArgs?.level ? `&level=${typedArgs.level}` : "";
+        result = await apiCall(`/logs?limit=${limit}${level}`);
+        break;
+
+      case "log_activity":
+        result = await apiCall("/logs", {
+          method: "POST",
+          body: JSON.stringify(typedArgs),
+        });
+        break;
+
+      // Docs
+      case "list_docs":
+        result = await apiCall("/docs/list");
+        break;
+
+      // Check Local Memory
+      case "check_local_memory":
+        result = await handleCheckLocalMemory(params);
         break;
 
       // Agents
