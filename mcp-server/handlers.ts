@@ -6,42 +6,15 @@
  */
 
 import type {
-  MCPToolDefinition,
-  MCPResource,
-  MCPContext,
-  ApiCallFunction,
-  ApiCredentials,
-  ApiClient,
-  SetProjectContextParams,
-  GetDashboardAlertsParams,
-  GetProjectParams,
-  CreateProjectParams,
-  UpdateProjectParams,
-  ListTasksParams,
-  GetTaskParams,
-  CreateTaskParams,
-  UpdateTaskParams,
-  CompleteTaskParams,
-  DeleteTaskParams,
-  ListTaskItemsParams,
-  CreateTaskItemsParams,
-  CompleteTaskItemParams,
-  UpdateTaskItemParams,
-  DeleteTaskItemParams,
-  ListAgentsParams,
-  GetAgentParams,
-  GetAgentTasksParams,
-  UpdateAgentStatusParams,
-  GetActivityLogsParams,
-  LogActivityParams,
-  ListDocsParams,
-  GetProjectClientParams,
-  UpdateProjectClientParams,
-  GetProjectDocumentsParams,
-  CreateProjectDocumentParams,
-  GetProjectRequestsParams,
-  CreateProjectRequestParams,
-  UpdateProjectRequestParams,
+  Project,
+  Task,
+  TaskItem,
+  Agent,
+  Alert,
+  Document,
+  DocumentMetadata,
+  SessionContext,
+  CreateTaskCompletionMemory,
   MemoryCreateParams,
   MemoryListParams,
   MemoryGetParams,
@@ -52,11 +25,9 @@ import type {
   MemoryBoostParams,
   MemoryRelatedParams,
   MemoryLinkParams,
-  SetProjectContextResult,
-} from './types.js';
+  SetProjectContextResult
+} from './types/params.js';
 
-import { check_local_memory_tool } from '../src/handlers/check-local-memory-handler.js';
-import { handleCheckLocalMemory } from '../endpoints/local-memory-check.js';
 
 import type {
   Project,
@@ -90,7 +61,31 @@ import type {
   MemoryLinkParams,
   SetProjectContextResult,
   CheckLocalMemoryParams,
-} from './types/database.js';
+} from './types/params.js';
+
+import type {
+  Project,
+  Task,
+  TaskItem,
+  Agent,
+  Alert,
+  Document,
+  DocumentMetadata,
+  SessionContext,
+  CreateTaskCompletionMemory,
+  MemoryCreateParams,
+  MemoryListParams,
+  MemoryGetParams,
+  MemoryUpdateParams,
+  MemoryDeleteParams,
+  MemorySearchParams,
+  MemorySemanticSearchParams,
+  MemoryBoostParams,
+  MemoryRelatedParams,
+  MemoryLinkParams,
+  SetProjectContextResult,
+  CheckLocalMemoryParams,
+} from './types/params.js';
 
 import { check_local_memory_tool } from './src/handlers/check-local-memory-handler.js';
 import { handleCheckLocalMemory } from '../endpoints/local-memory-check.js';
