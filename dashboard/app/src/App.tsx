@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/auth';
 import { useAuthVerification } from '@/hooks/useAuthVerification';
 import { Layout } from '@/components/layout/Layout';
 import { LoginPage } from '@/pages/LoginPage';
-import { KeyboardShortcutsProvider } from '@/contexts/KeyboardShortcutsContext';
+// import { KeyboardShortcutsProvider } from '@/contexts/KeyboardShortcutsContext';
 
 // Lazy load all pages except Login (critical for UX)
 // Note: Using named exports, so we need to destructure in the import
@@ -101,17 +101,16 @@ function App() {
     }
 
     return (
-        <KeyboardShortcutsProvider>
-            <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route
-                    path="/"
-                    element={
-                        <PrivateRoute>
-                            <Layout />
-                        </PrivateRoute>
-                    }
-                >
+        <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route
+                path="/"
+                element={
+                    <PrivateRoute>
+                        <Layout />
+                    </PrivateRoute>
+                }
+            >
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route
                     path="dashboard"
@@ -267,7 +266,6 @@ function App() {
                 />
             </Route>
         </Routes>
-        </KeyboardShortcutsProvider>
     );
 }
 
