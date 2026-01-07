@@ -68,9 +68,9 @@ services:
   mcp-http-v2:
     build:
       context: ./mcp-server
-      image: node:22-alpine
-      container_name: solaria-dfo-mcp-v2
-      ports:
+      dockerfile: Dockerfile.http-v2
+    container_name: solaria-dfo-mcp-v2
+    ports:
       - "3032:3032"
     environment:
       - DASHBOARD_API_URL=http://office:3030/api
@@ -86,11 +86,9 @@ services:
       test: ["CMD", "curl", "-sf", "http://localhost:3032/health"]
       interval: 30s
       timeout: 10s
- retries: 3
+      retries: 3
       start_period: 15s
     restart: always
-    networks:
-      - solaria-dfo-network
 
   # ===========================================
   # REDIS: Cache and job queues
@@ -120,7 +118,7 @@ services:
       dockerfile: worker.Dockerfile
     container_name: solaria-dfo-worker
     ports:
-      - "3032:3032"
+      - "3034:3034"
     environment:
       - REDIS_URL=redis://redis:6379
       - DASHBOARD_URL=http://office:3030
@@ -129,7 +127,7 @@ services:
       - DB_USER=solaria_user
       - DB_PASSWORD=${DB_PASSWORD:-solaria2024}
       - DB_NAME=solaria_construction
-      - EMBEDDING_HTTP_PORT=3032
+      - EMBEDDING_HTTP_PORT=3034
       - NODE_ENV=production
     volumes:
       - worker_models:/app/models

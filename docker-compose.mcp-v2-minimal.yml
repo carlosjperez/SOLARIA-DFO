@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  mcp-v2-minimal:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile.minimal
+    container_name: solaria-dfo-mcp-v2-minimal
+    ports:
+      - "3032:3032"
+    environment:
+      - NODE_ENV=production
+      - MCP_PORT=3032
+      - DASHBOARD_API_URL=http://office:3030/api
+    networks:
+      - solaria-network
+    restart: unless-stopped
+
+networks:
+  solaria-network:
+    external: true
