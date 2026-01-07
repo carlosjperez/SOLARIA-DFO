@@ -37,7 +37,6 @@ services:
 
   # ===========================================
   # MCP-HTTP: HTTP Transport for remote agents
-  # ===========================================
   mcp-http:
     build:
       context: ./mcp-server
@@ -49,14 +48,42 @@ services:
       - DASHBOARD_API_URL=http://office:3030/api
       - DASHBOARD_USER=${DASHBOARD_USER:-carlosjperez}
       - DASHBOARD_PASS=${DASHBOARD_PASS:-bypass}
-      - MCP_PORT=3031
       - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
+      - MCP_PORT=3031
+      - NODE_ENV=production
+      - MCP_VERSION=1.0
+    depends_on:
+      - office
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3031/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: always
+    networks:
+      - solaria-dfo-network
+
+  # MCP-HTTP v2.0: HTTP Transport for remote agents (Sketch Pattern)
+  mcp-http-v2:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile.http
+    container_name: solaria-dfo-mcp-v2
+    ports:
+      - "3032:3032"
+    environment:
+      - DASHBOARD_API_URL=http://office:3030/api
+      - DASHBOARD_USER=${DASHBOARD_USER:-carlosjperez}
+      - DASHBOARD_PASS=${DASHBOARD_PASS:-bypass}
+      - JWT_SECRET=${JWT_SECRET:-solaria_jwt_secret_2024_min32chars_secure}
+      - MCP_PORT=3032
+      - MCP_VERSION=2.0
       - NODE_ENV=production
     depends_on:
-      office:
-        condition: service_healthy
+      - office
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:3031/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:3032/health"]
       interval: 30s
       timeout: 10s
       retries: 3
