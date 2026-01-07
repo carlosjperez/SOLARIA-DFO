@@ -1,0 +1,41 @@
+# SOLARIA MCP HTTP Server v2.0
+# Dockerfile for HTTP transport MCP server (Sketch Pattern)
+# Detects MCP_VERSION environment variable to use appropriate server file
+
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm install --omit=dev
+
+# Copy all compiled source from dist/ (including src/ subdirectory)
+COPY dist/ ./
+
+# Environment
+ENV NODE_ENV=production
+ENV MCP_PORT=3032
+
+# Use version-specific server file based on MCP_VERSION
+ARG MCP_VERSION=2.0
+
+# If v2.0, use server-v2.js with Sketch Pattern implementation
+# If v1.0 or not specified, use original server.js
+RUN if [ "$MCP_VERSION" = "2.0" ]; then \
+    echo "Starting MCP v${MCP_VERSION}.0 (Sketch Pattern)..." && \
+    cp server-v2.js http-server.js; \
+    else \
+    echo "Starting MCP v1.0..." && \
+    cp server.js http-server.js; \
+    fi
+
+# Expose port
+EXPOSE 3032
+
+# Health check (use 127.0.0.1 not localhost to avoid IPv6 issues in Alpine)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3032/health || exit 1
+
+# Start server
+CMD ["node", "http-server.js"]
