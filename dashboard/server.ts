@@ -702,7 +702,7 @@ class SolariaDashboardServer {
             // Socket authentication
             socket.on('authenticate', async (token: string) => {
                 try {
-                    const decoded = jwt.verify(token, process.env.JWT_SECRET || '') as JWTPayload;
+                    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret') as JWTPayload;
                     const user = await this.getUserById(decoded.userId);
 
                     if (user) {
@@ -826,7 +826,7 @@ class SolariaDashboardServer {
         }
 
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || '') as JWTPayload;
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret') as JWTPayload;
             req.user = decoded;
             next();
         } catch (error) {
@@ -935,7 +935,7 @@ class SolariaDashboardServer {
         }
 
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || '') as JWTPayload;
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret') as JWTPayload;
             const user = await this.getUserById(decoded.userId);
 
             if (user) {
