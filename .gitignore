@@ -10,3 +10,5 @@ dashboard/public/office-backup-*/
 
 # TypeScript build cache (auto-generated)
 *.tsbuildinfo
+dist/
+*.js.map
