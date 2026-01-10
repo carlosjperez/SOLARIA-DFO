@@ -1,39 +1,54 @@
 /**
- * SOLARIA DFO MCP Server - Type Definitions
- * Base types for MCP protocol, tools, and handlers
+ * SOLARIA DFO MCP Server Types v2.0 (Sketch Pattern)
+ * Complete type definitions for simplified MCP with 2 core tools
+ *
+ * @module types
+ * @version 2.0.0
+ * @author ECO-Lambda | SOLARIA DFO
+ * @date 2026-01-06
  */
+
+// ============================================================================
+// Standard JSON-RPC Error Codes
+// ============================================================================
+
+export const JSON_RPC_ERRORS = {
+  PARSE_ERROR: -32700,
+  INVALID_REQUEST: -32600,
+  METHOD_NOT_FOUND: -32601,
+  INVALID_PARAMS: -32602,
+  INTERNAL_ERROR: -32603,
+  SERVER_ERROR: -32000,
+} as const;
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+export interface ApiClient {
+  authenticate(): Promise<{ token: string }>;
+  setToken(token: string): void;
+  request<T>(endpoint: string, options?: RequestInit): Promise<T>;
+}
+
+export type ApiCallFunction = <T>(endpoint: string, options?: RequestInit) => Promise<T>;
 
 // ============================================================================
 // MCP Protocol Types
 // ============================================================================
 
-export interface MCPSession {
-  id: string;
-  project_id: number | null;
-  created_at: Date;
-  last_activity: Date;
-}
-
-export interface MCPContext {
-  session_id?: string;
-  project_id?: number | null;
-  adminMode?: boolean;
-}
-
-export interface MCPToolResult {
-  content: MCPContent[];
-  isError?: boolean;
-  _session?: {
-    id: string;
-    project_id: number | null;
+export interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: {
+    type: 'object';
+    properties: Record<string, {
+      type: string;
+      description?: string;
+      enum?: string[];
+      default?: unknown;
+    }>;
   };
-}
-
-export interface MCPContent {
-  type: 'text' | 'image' | 'resource';
-  text?: string;
-  data?: string;
-  mimeType?: string;
 }
 
 export interface MCPResource {
@@ -43,455 +58,172 @@ export interface MCPResource {
   mimeType: string;
 }
 
-export interface MCPResourceContent {
-  uri: string;
-  mimeType: string;
-  text: string;
+export interface MCPToolResult {
+  content: Array<{
+    type: 'text' | 'resource';
+    text?: string;
+    uri?: string;
+    mimeType?: string;
+  }>;
+  _session?: {
+    id: string;
+    project_id?: number;
+  };
+  isError?: boolean;
 }
 
-// ============================================================================
-// Tool Definition Types
-// ============================================================================
-
-export interface MCPToolInputSchema {
-  type: 'object';
-  properties: Record<string, MCPPropertySchema>;
-  required?: string[];
-}
-
-export interface MCPPropertySchema {
-  type: string;
-  description?: string;
-  enum?: string[];
-  minimum?: number;
-  maximum?: number;
-  default?: unknown;
-  items?: MCPPropertySchema;
-  properties?: Record<string, MCPPropertySchema>;
-  required?: string[];
-}
-
-export interface MCPToolDefinition {
-  name: string;
-  description: string;
-  inputSchema: MCPToolInputSchema;
-}
-
-// ============================================================================
-// API Client Types
-// ============================================================================
-
-export type ApiCallFunction = (
-  endpoint: string,
-  options?: RequestInit
-) => Promise<unknown>;
-
-export interface ApiClient {
-  apiCall: ApiCallFunction;
-  authenticate: () => Promise<AuthResponse>;
-  setToken: (token: string) => void;
-}
-
-export interface AuthResponse {
-  token: string;
-  user?: {
-    id: number;
-    username: string;
-    role: string;
+export interface JSONRPCRequest {
+  jsonrpc: '2.0';
+  id?: number | string;
+  method: string;
+  params?: {
+    name?: string;
+    arguments?: Record<string, unknown>;
+    uri?: string;
   };
 }
 
-export interface ApiCredentials {
-  user: string;
-  password: string;
+export interface JSONRPCResponse {
+  jsonrpc: '2.0';
+  id?: number | string;
+  result?: MCPToolResult;
+  error?: {
+    code: number;
+    message: string;
+    data?: unknown;
+  };
+}
+
+export type JSON_RPC_ERRORS = typeof JSON_RPC_ERRORS;
+
+// ============================================================================
+// Session Management
+// ============================================================================
+
+export interface MCPSession {
+  id: string;
+  project_id?: number;
+  created_at: Date;
+  last_activity: Date;
+}
+
+export interface MCPContext {
+  session_id?: string;
+  project_id?: number;
+  adminMode?: boolean;
+}
+
+export interface SessionContext {
+  session_id?: string;
+  project_id?: number;
+  adminMode?: boolean;
 }
 
 // ============================================================================
-// Tool Parameter Types (by category)
+// Entity Types
 // ============================================================================
 
-// Session Context
-export interface SetProjectContextParams {
-  project_name?: string;
+export interface Project {
+  id: number;
+  name: string;
+  description: string;
+  client: string;
+  status: 'planning' | 'active' | 'on-hold' | 'completed' | 'cancelled';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  budget: number | string;
+  deadline?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Task {
+  id: number;
+  task_code: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'blocked';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  project_id: number;
+  assigned_agent_id?: number;
+  estimated_hours?: number;
+  actual_hours?: number;
+  deadline?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskItem {
+  id: number;
+  task_id: number;
+  title: string;
+  is_completed: boolean;
+  estimated_minutes?: number;
+  actual_minutes?: number;
+  position: number;
+}
+
+export interface Agent {
+  id: number;
+  name: string;
+  role: 'architect' | 'developer' | 'tester' | 'designer' | 'product-manager';
+  status: 'idle' | 'busy' | 'offline';
+  assigned_tasks: number;
+}
+
+export interface Sprint {
+  id: number;
+  project_id: number;
+  name: string;
+  goal?: string;
+  status: 'planned' | 'active' | 'completed' | 'cancelled';
+  start_date?: string;
+  end_date?: string;
+  velocity?: number;
+  capacity?: number;
+}
+
+export interface Epic {
+  id: number;
+  project_id: number;
+  name: string;
+  description?: string;
+  color?: string;
+  status: 'open' | 'in-progress' | 'completed' | 'cancelled';
+  start_date?: string;
+  target_date?: string;
+}
+
+// ============================================================================
+// Tool Input Parameters
+// ============================================================================
+
+export interface GetContextParams {
   project_id?: number;
+  project_name?: string;
+  include?: {
+    projects?: boolean;
+    tasks?: boolean;
+    agents?: boolean;
+    stats?: boolean;
+    health?: boolean;
+    alerts?: boolean;
+    sprints?: boolean;
+    epics?: boolean;
+  };
+}
+
+export interface RunCodeParams {
+  code: string;
+  language?: 'javascript' | 'typescript' | 'sql';
+  timeout?: number;
+  sandbox?: 'strict' | 'permissive';
+}
+
+export interface SetProjectContextParams {
+  project_id?: number;
+  project_name?: string;
   working_directory?: string;
 }
-
-// Dashboard
-export interface GetDashboardAlertsParams {
-  severity?: 'critical' | 'warning' | 'info';
-}
-
-// Projects
-export interface GetProjectParams {
-  project_id?: number;
-}
-
-export interface CreateProjectParams {
-  name: string;
-  client?: string;
-  description?: string;
-  budget?: number;
-  deadline?: string;
-  priority?: Priority;
-}
-
-export interface UpdateProjectParams {
-  project_id: number;
-  name?: string;
-  description?: string;
-  status?: ProjectStatus;
-  budget?: number;
-  deadline?: string;
-}
-
-// Tasks
-export interface ListTasksParams {
-  project_id?: number;
-  status?: TaskStatus;
-  priority?: Priority;
-  agent_id?: number;
-}
-
-export interface GetTaskParams {
-  task_id: number;
-}
-
-export interface CreateTaskParams {
-  project_id: number;
-  title: string;
-  description?: string;
-  priority?: Priority;
-  status?: 'pending' | 'in_progress';
-  estimated_hours?: number;
-  assigned_agent_id?: number;
-}
-
-export interface UpdateTaskParams {
-  task_id: number;
-  title?: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: Priority;
-  progress?: number;
-  assigned_agent_id?: number;
-}
-
-export interface CompleteTaskParams {
-  task_id: number;
-  completion_notes?: string;
-}
-
-export interface DeleteTaskParams {
-  task_id: number;
-}
-
-// Task Items
-export interface ListTaskItemsParams {
-  task_id: number;
-  include_completed?: boolean;
-}
-
-export interface CreateTaskItemsParams {
-  task_id: number;
-  items: TaskItemInput[];
-}
-
-export interface TaskItemInput {
-  title: string;
-  description?: string;
-  estimated_minutes?: number;
-}
-
-export interface CompleteTaskItemParams {
-  task_id: number;
-  item_id: number;
-  notes?: string;
-  actual_minutes?: number;
-}
-
-export interface UpdateTaskItemParams {
-  task_id: number;
-  item_id: number;
-  title?: string;
-  description?: string;
-  is_completed?: boolean;
-  notes?: string;
-}
-
-export interface DeleteTaskItemParams {
-  task_id: number;
-  item_id: number;
-}
-
-// Agents
-export interface ListAgentsParams {
-  status?: AgentStatus;
-  role?: string;
-}
-
-export interface GetAgentParams {
-  agent_id: number;
-}
-
-export interface GetAgentTasksParams {
-  agent_id: number;
-}
-
-export interface UpdateAgentStatusParams {
-  agent_id: number;
-  status: AgentStatus;
-}
-
-// Logs
-export interface GetActivityLogsParams {
-  limit?: number;
-  level?: LogLevel;
-  project_id?: number;
-}
-
-export interface LogActivityParams {
-  action: string;
-  level?: LogLevel;
-  category?: string;
-  agent_id?: number;
-  project_id?: number;
-}
-
-// Docs
-export interface ListDocsParams {
-  project_id?: number;
-}
-
-// Project Client
-export interface GetProjectClientParams {
-  project_id: number;
-}
-
-export interface UpdateProjectClientParams {
-  project_id: number;
-  name: string;
-  fiscal_name?: string;
-  rfc?: string;
-  website?: string;
-  address?: string;
-  contact_name?: string;
-  contact_email?: string;
-  contact_phone?: string;
-}
-
-// Project Documents
-export interface GetProjectDocumentsParams {
-  project_id: number;
-}
-
-export interface CreateProjectDocumentParams {
-  project_id: number;
-  name: string;
-  type?: DocumentType;
-  url: string;
-  description?: string;
-}
-
-// Project Requests
-export interface GetProjectRequestsParams {
-  project_id: number;
-  status?: RequestStatus;
-  priority?: Priority;
-}
-
-export interface CreateProjectRequestParams {
-  project_id: number;
-  text: string;
-  priority?: Priority;
-  requested_by?: string;
-}
-
-export interface UpdateProjectRequestParams {
-  project_id: number;
-  request_id: number;
-  status?: RequestStatus;
-  priority?: Priority;
-  notes?: string;
-}
-
-// Memory
-export interface MemoryCreateParams {
-  content: string;
-  summary?: string;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-  importance?: number;
-  project_id?: number;
-}
-
-export interface MemoryListParams {
-  query?: string;
-  tags?: string[];
-  limit?: number;
-  offset?: number;
-  sort_by?: 'importance' | 'created_at' | 'updated_at' | 'access_count';
-}
-
-export interface MemoryGetParams {
-  memory_id: number;
-}
-
-export interface MemoryUpdateParams {
-  memory_id: number;
-  content?: string;
-  summary?: string;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-  importance?: number;
-}
-
-export interface MemoryDeleteParams {
-  memory_id: number;
-}
-
-export interface MemorySearchParams {
-  query: string;
-  tags?: string[];
-  min_importance?: number;
-  limit?: number;
-}
-
-export interface MemorySemanticSearchParams {
-  query: string;
-  min_similarity?: number;
-  limit?: number;
-  include_fulltext?: boolean;
-}
-
-export interface MemoryBoostParams {
-  memory_id: number;
-  boost_amount?: number;
-}
-
-export interface MemoryRelatedParams {
-  memory_id: number;
-  relationship_type?: RelationshipType;
-}
-
-export interface MemoryLinkParams {
-  source_id: number;
-  target_id: number;
-  relationship_type?: RelationshipType;
-}
-
-// ============================================================================
-// Enum Types
-// ============================================================================
-
-export type ProjectStatus =
-  | 'planning'
-  | 'development'
-  | 'testing'
-  | 'deployment'
-  | 'completed'
-  | 'on_hold'
-  | 'cancelled';
-
-export type TaskStatus =
-  | 'pending'
-  | 'in_progress'
-  | 'review'
-  | 'completed'
-  | 'blocked';
-
-export type Priority =
-  | 'critical'
-  | 'high'
-  | 'medium'
-  | 'low';
-
-export type AgentStatus =
-  | 'active'
-  | 'busy'
-  | 'inactive'
-  | 'error'
-  | 'maintenance';
-
-export type LogLevel =
-  | 'info'
-  | 'warning'
-  | 'error'
-  | 'critical';
-
-export type DocumentType =
-  | 'spec'
-  | 'contract'
-  | 'manual'
-  | 'design'
-  | 'report'
-  | 'other';
-
-export type RequestStatus =
-  | 'pending'
-  | 'approved'
-  | 'in_review'
-  | 'in_progress'
-  | 'completed'
-  | 'rejected';
-
-export type RelationshipType =
-  | 'related'
-  | 'depends_on'
-  | 'contradicts'
-  | 'supersedes'
-  | 'child_of';
-
-// ============================================================================
-// Tool Handler Union Type
-// ============================================================================
-
-export type ToolParams =
-  | SetProjectContextParams
-  | GetDashboardAlertsParams
-  | GetProjectParams
-  | CreateProjectParams
-  | UpdateProjectParams
-  | ListTasksParams
-  | GetTaskParams
-  | CreateTaskParams
-  | UpdateTaskParams
-  | CompleteTaskParams
-  | DeleteTaskParams
-  | ListTaskItemsParams
-  | CreateTaskItemsParams
-  | CompleteTaskItemParams
-  | UpdateTaskItemParams
-  | DeleteTaskItemParams
-  | ListAgentsParams
-  | GetAgentParams
-  | GetAgentTasksParams
-  | UpdateAgentStatusParams
-  | GetActivityLogsParams
-  | LogActivityParams
-  | ListDocsParams
-  | GetProjectClientParams
-  | UpdateProjectClientParams
-  | GetProjectDocumentsParams
-  | CreateProjectDocumentParams
-  | GetProjectRequestsParams
-  | CreateProjectRequestParams
-  | UpdateProjectRequestParams
-  | MemoryCreateParams
-  | MemoryListParams
-  | MemoryGetParams
-  | MemoryUpdateParams
-  | MemoryDeleteParams
-  | MemorySearchParams
-  | MemorySemanticSearchParams
-  | MemoryBoostParams
-  | MemoryRelatedParams
-  | MemoryLinkParams
-  | Record<string, unknown>;
-
-// ============================================================================
-// Special Result Types
-// ============================================================================
 
 export interface SetProjectContextResult {
   __action: 'SET_PROJECT_CONTEXT';
@@ -499,60 +231,42 @@ export interface SetProjectContextResult {
   project_id: number;
   project_name: string;
   message: string;
-}
-
-export interface TaskItemsResult {
-  success: boolean;
-  task_id: number;
-  items_created?: number;
-  items: TaskItemResponse[];
-  task_progress: number;
-  message: string;
-}
-
-export interface TaskItemResponse {
-  id: number;
-  task_id: number;
-  title: string;
-  sort_order: number;
-  is_completed?: boolean;
-  estimated_minutes?: number;
-  actual_minutes?: number;
-  notes?: string;
-  completed_at?: string;
-  created_at?: string;
+  session_id?: string;
 }
 
 // ============================================================================
-// JSON-RPC Types
+// Response Types
 // ============================================================================
 
-export interface JSONRPCRequest {
-  jsonrpc: '2.0';
-  id: string | number;
-  method: string;
-  params?: Record<string, unknown>;
+export interface ResponseMetadata {
+  timestamp?: string;
+  request_id?: string;
+  execution_time_ms?: number;
+  version?: string;
 }
 
-export interface JSONRPCResponse {
-  jsonrpc: '2.0';
-  id: string | number;
-  result?: unknown;
-  error?: JSONRPCError;
-}
-
-export interface JSONRPCError {
-  code: number;
+export interface ErrorObject {
+  code: string;
   message: string;
-  data?: unknown;
+  details?: any;
+  field?: string;
+  suggestion?: string;
 }
 
-// Standard JSON-RPC error codes
-export const JSON_RPC_ERRORS = {
-  PARSE_ERROR: -32700,
-  INVALID_REQUEST: -32600,
-  METHOD_NOT_FOUND: -32601,
-  INVALID_PARAMS: -32602,
-  INTERNAL_ERROR: -32603,
-  SERVER_ERROR: -32000,
-} as const;
+export interface StandardSuccessResponse<T = any> {
+  success: true;
+  data: T;
+  metadata?: ResponseMetadata;
+  format?: 'json' | 'human';
+  formatted?: string;
+}
+
+export interface StandardErrorResponse {
+  success: false;
+  error: ErrorObject;
+  metadata?: ResponseMetadata;
+}
+
+export type StandardResponse<T = any> = StandardSuccessResponse<T> | StandardErrorResponse;
+
+// ============================================================================

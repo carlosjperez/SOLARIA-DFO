@@ -11,7 +11,7 @@
 import { z } from 'zod';
 import { ResponseBuilder } from '../utils/response-builder.js'
 import { db } from '../database.js'
-import { Tool } from '../types/mcp.js'
+import { Tool, MCPToolDefinition } from '../types/mcp.js'
 import { generateEmbedding, handleChromaQuery } from '../services/chroma-client.js'
 
 // ============================================================================
@@ -26,6 +26,7 @@ const MemorySyncInputSchema = z.object({
     tool_output: z.record(z.any()),
     metadata: z.record(z.any()).optional(),
     created_at: z.string().datetime(),
+    local_observation_id: z.number().optional(),
   })).min(1).max(1000),
 
   summaries: z.array(z.object({
@@ -66,7 +67,7 @@ const MemoryGetContextInputSchema = z.object({
 // Tool Export
 // ============================================================================
 
-export const memory_sync_remote: Tool = {
+export const memory_sync_remote: MCPToolDefinition = {
   name: 'memory_sync_remote',
   description: 'Sincronizar memoria local con servidor central DFO',
   inputSchema: {
@@ -102,7 +103,7 @@ export const memory_sync_remote: Tool = {
   },
 };
 
-export const memory_search_remote: Tool = {
+export const memory_search_remote: MCPToolDefinition = {
   name: 'memory_search_remote',
   description: 'Buscar en memoria central (todas las máquinas) con opción de embeddings vectoriales',
   inputSchema: {
@@ -142,7 +143,7 @@ export const memory_search_remote: Tool = {
   },
 };
 
-export const memory_get_context: Tool = {
+export const memory_get_context: MCPToolDefinition = {
   name: 'memory_get_context',
   description: 'Obtener contexto relevante para sesión actual',
   inputSchema: {
@@ -168,7 +169,7 @@ export const memory_get_context: Tool = {
   },
 };
 
-export const memory_restore: Tool = {
+export const memory_restore: MCPToolDefinition = {
   name: 'memory_restore',
   description: 'Restaurar memoria desde servidor central',
   inputSchema: {
@@ -208,10 +209,11 @@ export async function handleMemorySync(params: any) {
 
     try {
       // 1. Register or update machine
-      const [existingMachine] = await db.execute(
+      const machineResult = await db.execute(
         'SELECT id, machine_id FROM memory_machines WHERE machine_id = ?',
         [machine_id]
       );
+      const existingMachine = machineResult.rows;
 
       if (existingMachine.length === 0) {
         await db.execute(`
@@ -327,8 +329,10 @@ export async function handleMemorySync(params: any) {
       console.error('Failed to log sync error:', logError);
     }
 
-    return ResponseBuilder.error('Failed to sync memory', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'MEMORY_SYNC_ERROR',
+      message: 'Failed to sync memory',
+      details: errorMessage
     });
   }
 }
@@ -409,8 +413,10 @@ export async function handleMemorySearch(params: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Memory search error:', errorMessage);
 
-    return ResponseBuilder.error('Failed to search memory', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'MEMORY_SEARCH_ERROR',
+      message: 'Failed to search memory',
+      details: errorMessage
     });
   }
 }
@@ -463,75 +469,7 @@ async function searchFullText(
     LIMIT ?
   `, [...queryParams, limit]);
 
-  return results;
-}
-
-    if (machine_id) {
-      conditions.push(`machine_id = ?`);
-      queryParams.push(machine_id);
-    }
-
-    if (time_range?.from) {
-      conditions.push(`created_at >= ?`);
-      queryParams.push(time_range.from);
-    }
-
-    if (time_range?.to) {
-      conditions.push(`created_at <= ?`);
-      queryParams.push(time_range.to);
-    }
-
-    const whereClause = conditions.join(' AND ');
-
-    // Search in observations
-    const observations = await db.execute(`
-      SELECT
-        id, machine_id, session_id, project, tool_name,
-        tool_input, tool_output, metadata,
-        created_at, synced_at
-      FROM memory_observations_remote
-      WHERE ${whereClause}
-      ORDER BY created_at DESC
-      LIMIT ?
-    `, [...queryParams, limit]);
-
-    // Search in summaries
-    const summaries = await db.execute(`
-      SELECT
-        id, session_id, project, summary,
-        key_points, tags, observations_count, created_at
-      FROM memory_summaries_remote
-      WHERE ${whereClause}
-      ORDER BY created_at DESC
-      LIMIT ?
-    `, [...queryParams, limit]);
-
-    if (format === 'human') {
-      const humanOutput = formatMemorySearchResults(observations, summaries, query);
-      return ResponseBuilder.success({
-        format: 'human',
-        formatted: humanOutput,
-        results: {
-          observations: observations.length,
-          summaries: summaries.length,
-        },
-      });
-    }
-
-    return ResponseBuilder.success({
-      observations,
-      summaries,
-      query,
-      total_results: observations.length + summaries.length,
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Memory search error:', errorMessage);
-
-    return ResponseBuilder.error('Failed to search memory', {
-      details: errorMessage,
-    });
-  }
+  return results.rows;
 }
 
 export async function handleMemoryGetContext(params: any) {
@@ -576,20 +514,22 @@ export async function handleMemoryGetContext(params: any) {
       LIMIT 5
     `, queryParams);
 
-    const context = formatMemoryContext(observations, summaries);
+    const context = formatMemoryContext(observations.rows, summaries.rows);
 
     return ResponseBuilder.success({
       context,
-      observations_count: observations.length,
-      summaries_count: summaries.length,
+      observations_count: observations.rows.length,
+      summaries_count: summaries.rows.length,
       message: '✅ Contexto recuperado exitosamente',
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Memory get context error:', errorMessage);
 
-    return ResponseBuilder.error('Failed to get memory context', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'MEMORY_CONTEXT_ERROR',
+      message: 'Failed to get memory context',
+      details: errorMessage
     });
   }
 }
@@ -639,19 +579,21 @@ export async function handleMemoryRestore(params: any) {
     `, queryParams);
 
     return ResponseBuilder.success({
-      observations,
-      summaries,
+      observations: observations.rows,
+      summaries: summaries.rows,
       machine_id,
-      total_observations: observations.length,
-      total_summaries: summaries.length,
-      message: `✅ Memoria restaurada: ${observations.length} observaciones, ${summaries.length} resúmenes`,
+      total_observations: observations.rows.length,
+      total_summaries: summaries.rows.length,
+      message: `✅ Memoria restaurada: ${observations.rows.length} observaciones, ${summaries.rows.length} resúmenes`,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Memory restore error:', errorMessage);
 
-    return ResponseBuilder.error('Failed to restore memory', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'MEMORY_RESTORE_ERROR',
+      message: 'Failed to restore memory',
+      details: errorMessage
     });
   }
 }

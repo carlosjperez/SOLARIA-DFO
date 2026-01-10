@@ -23,7 +23,7 @@ import {
   createApiClient,
   executeTool,
   readResource,
-} from "./handlers-v2.js";
+} from "./handlers.js";
 import type {
   MCPSession,
   MCPContext,

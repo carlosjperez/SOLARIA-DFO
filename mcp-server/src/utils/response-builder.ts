@@ -150,6 +150,23 @@ export class ResponseBuilder {
   private generateRequestId(): string {
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
+
+  // Static convenience methods
+  static success<T>(data: T, options: {
+    format?: 'json' | 'human';
+    formatted?: string;
+    includeMetadata?: boolean;
+  } = {}): StandardSuccessResponse<T> {
+    const builder = new ResponseBuilder();
+    return builder.success(data, options);
+  }
+
+  static error(error: ErrorObject | string, options: {
+    includeMetadata?: boolean;
+  } = {}): StandardErrorResponse {
+    const builder = new ResponseBuilder();
+    return builder.error(error, options);
+  }
 }
 
 // ============================================================================

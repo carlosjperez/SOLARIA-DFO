@@ -24,6 +24,6 @@
     },
     "types": ["node"]
   },
-  "include": ["**/*.ts", "**/*.js"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests", "deprecated", "**/*.js"]
 }

@@ -2,15 +2,15 @@
  * MCP Tool Definitions v2.0 (Sketch Pattern)
  * Only 2 core tools: get_context + run_code
  *
- * @module tool-definitions-v2
+ * @module tool-definitions
  * @version 2.0.0
  * @author ECO-Lambda | SOLARIA DFO
  * @date 2026-01-06
  * @task MCP-SKETCH-018
  */
 
-import { get_context_tool } from 'src/endpoints/get-context.js';
-import { run_code_tool } from 'src/endpoints/run-code.js';
+import { get_context_tool } from './src/endpoints/get-context.js';
+import { run_code_tool } from './src/endpoints/run-code.js';
 
 export const toolDefinitions = [
   // SKETCH PATTERN CORE TOOL 1: get_context
@@ -51,4 +51,4 @@ export const resourceDefinitions = [
   },
 ];
 
-console.log(`[tool-definitions-v2] Loaded ${toolDefinitions.length} tools (Sketch Pattern)`);
+console.log(`[tool-definitions] Loaded ${toolDefinitions.length} tools (Sketch Pattern v2.0)`);

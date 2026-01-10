@@ -25,8 +25,8 @@ let handlers;
 let toolDefinitions;
 
 try {
-  const v2Handlers = require('./handlers-v2.js');
-  const v2Definitions = require('./tool-definitions-v2.js');
+  const v2Handlers = require('./handlers.js');
+  const v2Definitions = require('./tool-definitions.js');
 
   if (process.env.MCP_VERSION === '2.0') {
     // v2.0 Sketch Pattern
