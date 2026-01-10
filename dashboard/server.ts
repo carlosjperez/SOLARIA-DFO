@@ -40,6 +40,7 @@ import * as memoriesRepo from './db/repositories/memories.js';
 import * as alertsRepo from './db/repositories/alerts.js';
 import * as sprintsRepo from './db/repositories/sprints.js';
 import * as epicsRepo from './db/repositories/epics.js';
+import * as businessesRepo from './db/repositories/businesses.js';
 
 // Import local types
 import type {
@@ -2230,36 +2231,43 @@ class SolariaDashboardServer {
 
     private async getProjectEpics(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.findAllEpics()
+            // TODO: Add sprint info and stats to findAllEpics or create findAllEpicsWithStats()
             const { id } = req.params;
             const { status } = req.query;
 
-            let query = `
-                SELECT e.*,
-                    s.name as sprint_name,
-                    s.sprint_number,
-                    s.status as sprint_status,
-                    (SELECT COUNT(*) FROM tasks WHERE epic_id = e.id) as tasks_total,
-                    (SELECT COUNT(*) FROM tasks WHERE epic_id = e.id AND status = 'completed') as tasks_completed
-                FROM epics e
-                LEFT JOIN sprints s ON e.sprint_id = s.id
-                WHERE e.project_id = ?
-            `;
-            const params: any[] = [id];
+            const filters: any = { projectId: parseInt(id) };
+            if (status) filters.status = status as string;
 
-            if (status) {
-                query += ' AND e.status = ?';
-                params.push(status);
-            }
+            const epicsRaw = await epicsRepo.findAllEpics(filters);
 
-            query += ' ORDER BY e.epic_number ASC';
+            // Get stats via raw SQL until repository supports enriched listing
+            const statsPromises = epicsRaw.map(async (epic: any) => {
+                const [stats] = await this.db!.execute<RowDataPacket[]>(`
+                    SELECT
+                        (SELECT COUNT(*) FROM tasks WHERE epic_id = ?) as tasks_total,
+                        (SELECT COUNT(*) FROM tasks WHERE epic_id = ? AND status = 'completed') as tasks_completed,
+                        s.name as sprint_name,
+                        s.sprint_number,
+                        s.status as sprint_status
+                    FROM epics e
+                    LEFT JOIN sprints s ON e.sprint_id = s.id
+                    WHERE e.id = ?
+                `, [epic.id, epic.id, epic.id]);
 
-            const [epicsRaw] = await this.db!.execute<RowDataPacket[]>(query, params);
+                const stat = stats[0] as any;
+                return {
+                    ...epic,
+                    tasks_total: stat?.tasks_total || 0,
+                    tasks_completed: stat?.tasks_completed || 0,
+                    sprint_name: stat?.sprint_name || null,
+                    sprint_number: stat?.sprint_number || null,
+                    sprint_status: stat?.sprint_status || null,
+                    progress: this.calculateProgress(stat?.tasks_completed || 0, stat?.tasks_total || 0),
+                };
+            });
 
-            // Calculate progress for each epic
-            const epics = epicsRaw.map((epic: any) => ({
-                ...epic,
-                progress: this.calculateProgress(epic.tasks_completed, epic.tasks_total),
-            }));
+            const epics = await Promise.all(statsPromises);
 
             res.json({ epics });
 
@@ -2439,45 +2447,49 @@ class SolariaDashboardServer {
 
     private async getProjectSprints(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.findAllSprints()
+            // TODO: Add stats (tasks, epics) to findAllSprints or create findAllSprintsWithStats()
             const { id } = req.params;
             const { status } = req.query;
 
-            let query = `
-                SELECT s.*,
-                    (
-                        SELECT COUNT(DISTINCT t.id)
-                        FROM tasks t
-                        LEFT JOIN epics e ON t.epic_id = e.id
-                        WHERE t.sprint_id = s.id OR e.sprint_id = s.id
-                    ) as tasks_total,
-                    (
-                        SELECT COUNT(DISTINCT t.id)
-                        FROM tasks t
-                        LEFT JOIN epics e ON t.epic_id = e.id
-                        WHERE (t.sprint_id = s.id OR e.sprint_id = s.id)
-                          AND t.status = 'completed'
-                    ) as tasks_completed,
-                    (SELECT COUNT(*) FROM epics WHERE sprint_id = s.id) as epics_total,
-                    (SELECT COUNT(*) FROM epics WHERE sprint_id = s.id AND status = 'completed') as epics_completed
-                FROM sprints s
-                WHERE s.project_id = ?
-            `;
-            const params: any[] = [id];
+            const filters: any = { projectId: parseInt(id) };
+            if (status) filters.status = status as string;
 
-            if (status) {
-                query += ' AND s.status = ?';
-                params.push(status);
-            }
+            const sprintsRaw = await sprintsRepo.findAllSprints(filters);
 
-            query += ' ORDER BY s.sprint_number ASC';
+            // Get stats via raw SQL until repository supports enriched listing
+            const statsPromises = sprintsRaw.map(async (sprint: any) => {
+                const [stats] = await this.db!.execute<RowDataPacket[]>(`
+                    SELECT
+                        (
+                            SELECT COUNT(DISTINCT t.id)
+                            FROM tasks t
+                            LEFT JOIN epics e ON t.epic_id = e.id
+                            WHERE t.sprint_id = ? OR e.sprint_id = ?
+                        ) as tasks_total,
+                        (
+                            SELECT COUNT(DISTINCT t.id)
+                            FROM tasks t
+                            LEFT JOIN epics e ON t.epic_id = e.id
+                            WHERE (t.sprint_id = ? OR e.sprint_id = ?)
+                              AND t.status = 'completed'
+                        ) as tasks_completed,
+                        (SELECT COUNT(*) FROM epics WHERE sprint_id = ?) as epics_total,
+                        (SELECT COUNT(*) FROM epics WHERE sprint_id = ? AND status = 'completed') as epics_completed
+                `, [sprint.id, sprint.id, sprint.id, sprint.id, sprint.id, sprint.id]);
 
-            const [sprintsRaw] = await this.db!.execute<RowDataPacket[]>(query, params);
+                const stat = stats[0] as any;
+                return {
+                    ...sprint,
+                    tasks_total: stat?.tasks_total || 0,
+                    tasks_completed: stat?.tasks_completed || 0,
+                    epics_total: stat?.epics_total || 0,
+                    epics_completed: stat?.epics_completed || 0,
+                    progress: this.calculateProgress(stat?.tasks_completed || 0, stat?.tasks_total || 0),
+                };
+            });
 
-            // Calculate progress for each sprint
-            const sprints = sprintsRaw.map((sprint: any) => ({
-                ...sprint,
-                progress: this.calculateProgress(sprint.tasks_completed, sprint.tasks_total),
-            }));
+            const sprints = await Promise.all(statsPromises);
 
             res.json({ sprints });
 
@@ -4327,22 +4339,19 @@ class SolariaDashboardServer {
 
     private async getBusinesses(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findAllBusinesses()
+            // TODO: Add count aggregation to repository
             const { status, limit = 50, offset = 0 } = req.query;
 
-            let query = 'SELECT b.* FROM businesses b WHERE 1=1';
-            const params: (string | number)[] = [];
+            const filters: any = {
+                limit: Number(limit),
+                offset: Number(offset)
+            };
+            if (status) filters.status = String(status);
 
-            if (status) {
-                query += ' AND b.status = ?';
-                params.push(String(status));
-            }
+            const businesses = await businessesRepo.findAllBusinesses(filters);
 
-            query += ' ORDER BY b.name ASC LIMIT ? OFFSET ?';
-            params.push(Number(limit), Number(offset));
-
-            const [businesses] = await this.db!.execute<RowDataPacket[]>(query, params);
-
-            // Get total count
+            // Get total count (SQL until repository supports COUNT aggregation)
             const [countResult] = await this.db!.execute<RowDataPacket[]>(
                 'SELECT COUNT(*) as total FROM businesses'
             );
@@ -4363,21 +4372,18 @@ class SolariaDashboardServer {
 
     private async getBusiness(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findBusinessById()
+            // TODO: Migrate projects and financials queries to projectsRepo
             const { id } = req.params;
 
-            // Get business details
-            const [businesses] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT * FROM businesses WHERE id = ?
-            `, [id]);
+            const business = await businessesRepo.findBusinessById(parseInt(id));
 
-            if (businesses.length === 0) {
+            if (!business) {
                 res.status(404).json({ error: 'Business not found' });
                 return;
             }
 
-            const business = businesses[0];
-
-            // Get associated projects (using client field)
+            // Get associated projects (SQL until projectsRepo supports client filter)
             const [projects] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT
                     id, name, code, status, description,
@@ -4388,7 +4394,7 @@ class SolariaDashboardServer {
                 ORDER BY created_at DESC
             `, [business.name]);
 
-            // Get financial summary
+            // Get financial summary (SQL until projectsRepo supports aggregations)
             const [financials] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT
                     SUM(budget) as total_budget,
@@ -4412,6 +4418,8 @@ class SolariaDashboardServer {
 
     private async createBusiness(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.createBusiness()
+            // TODO: Migrate activity_logs to repository
             const {
                 name,
                 description,
@@ -4429,19 +4437,25 @@ class SolariaDashboardServer {
 
             const profit = Number(revenue) - Number(expenses);
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO businesses (name, description, website, status, revenue, expenses, profit, logo_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `, [name, description, website, status, revenue, expenses, profit, logo_url]);
+            const business = await businessesRepo.createBusiness({
+                name,
+                description: description || null,
+                website: website || null,
+                status: status || 'inactive',
+                revenue: String(revenue),
+                expenses: String(expenses),
+                profit: String(profit),
+                logoUrl: logo_url || null
+            });
 
-            // Log activity
+            // Log activity (SQL until activity_logs repository exists)
             await this.db!.execute(`
                 INSERT INTO activity_logs (action, details, category, level)
                 VALUES ('business_created', ?, 'management', 'info')
-            `, [JSON.stringify({ business_id: result.insertId, name })]);
+            `, [JSON.stringify({ business_id: business.id, name })]);
 
             res.status(201).json({
-                id: result.insertId,
+                id: business.id,
                 message: 'Business created successfully'
             });
         } catch (error) {
@@ -4452,6 +4466,8 @@ class SolariaDashboardServer {
 
     private async updateBusiness(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.updateBusiness()
+            // TODO: Migrate activity_logs to repository
             const { id } = req.params;
             const {
                 name,
@@ -4465,48 +4481,42 @@ class SolariaDashboardServer {
             } = req.body;
 
             // Check if business exists
-            const [existing] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT id FROM businesses WHERE id = ?', [id]
-            );
+            const existing = await businessesRepo.findBusinessById(parseInt(id));
 
-            if (existing.length === 0) {
+            if (!existing) {
                 res.status(404).json({ error: 'Business not found' });
                 return;
             }
 
-            // Build dynamic update query
-            const updates: string[] = [];
-            const params: (string | number)[] = [];
+            // Build update data object with only provided fields
+            const updateData: any = {};
 
-            if (name !== undefined) { updates.push('name = ?'); params.push(name); }
-            if (description !== undefined) { updates.push('description = ?'); params.push(description); }
-            if (website !== undefined) { updates.push('website = ?'); params.push(website); }
-            if (status !== undefined) { updates.push('status = ?'); params.push(status); }
-            if (revenue !== undefined) { updates.push('revenue = ?'); params.push(Number(revenue)); }
-            if (expenses !== undefined) { updates.push('expenses = ?'); params.push(Number(expenses)); }
-            if (logo_url !== undefined) { updates.push('logo_url = ?'); params.push(logo_url); }
+            if (name !== undefined) updateData.name = name;
+            if (description !== undefined) updateData.description = description;
+            if (website !== undefined) updateData.website = website;
+            if (status !== undefined) updateData.status = status;
+            if (revenue !== undefined) updateData.revenue = String(revenue);
+            if (expenses !== undefined) updateData.expenses = String(expenses);
+            if (logo_url !== undefined) updateData.logoUrl = logo_url;
 
             // Handle profit: allow direct update OR auto-calculate from revenue/expenses
             if (profit !== undefined) {
-                updates.push('profit = ?');
-                params.push(Number(profit));
+                updateData.profit = String(profit);
             } else if (revenue !== undefined || expenses !== undefined) {
                 // Recalculate profit if revenue or expenses changed but profit not provided
-                updates.push('profit = revenue - expenses');
+                const currentRevenue = revenue !== undefined ? Number(revenue) : Number(existing.revenue);
+                const currentExpenses = expenses !== undefined ? Number(expenses) : Number(existing.expenses);
+                updateData.profit = String(currentRevenue - currentExpenses);
             }
 
-            if (updates.length === 0) {
+            if (Object.keys(updateData).length === 0) {
                 res.status(400).json({ error: 'No fields to update' });
                 return;
             }
 
-            params.push(Number(id));
+            await businessesRepo.updateBusiness(parseInt(id), updateData);
 
-            await this.db!.execute(`
-                UPDATE businesses SET ${updates.join(', ')} WHERE id = ?
-            `, params);
-
-            // Log activity
+            // Log activity (SQL until activity_logs repository exists)
             await this.db!.execute(`
                 INSERT INTO activity_logs (action, details, category, level)
                 VALUES ('business_updated', ?, 'management', 'info')
@@ -4521,9 +4531,12 @@ class SolariaDashboardServer {
 
     private async deleteBusiness(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.deleteBusiness()
+            // TODO: Migrate project count validation and nullify to projectsRepo
+            // TODO: Migrate activity_logs to repository
             const { id } = req.params;
 
-            // Check if business exists and has no active projects
+            // Check if business exists and has no active projects (SQL until projectsRepo supports filters)
             const [existing] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT b.id, b.name, COUNT(p.id) as project_count
                 FROM businesses b
@@ -4545,13 +4558,13 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Nullify business_id in related projects
+            // Nullify business_id in related projects (SQL until projectsRepo supports bulk update)
             await this.db!.execute('UPDATE projects SET business_id = NULL WHERE business_id = ?', [id]);
 
             // Delete business
-            await this.db!.execute('DELETE FROM businesses WHERE id = ?', [id]);
+            await businessesRepo.deleteBusiness(parseInt(id));
 
-            // Log activity
+            // Log activity (SQL until activity_logs repository exists)
             await this.db!.execute(`
                 INSERT INTO activity_logs (action, details, category, level)
                 VALUES ('business_deleted', ?, 'management', 'warning')
