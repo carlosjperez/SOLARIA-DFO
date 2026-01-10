@@ -3563,39 +3563,18 @@ class SolariaDashboardServer {
      * Also auto-completes task when all items are done
      */
     private async recalculateTaskProgress(taskId: number): Promise<{ progress: number; completed: number; total: number }> {
-        const [counts] = await this.db!.execute<RowDataPacket[]>(`
-            SELECT
-                COUNT(*) as total,
-                SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) as completed
-            FROM task_items
-            WHERE task_id = ?
-        `, [taskId]);
-
-        const total = counts[0].total || 0;
-        const completed = parseInt(counts[0].completed) || 0;
-        const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-        // Update task progress
-        await this.db!.execute('UPDATE tasks SET progress = ?, updated_at = NOW() WHERE id = ?', [progress, taskId]);
-
-        // Auto-complete task if 100%
-        if (progress === 100 && total > 0) {
-            await this.db!.execute(
-                `UPDATE tasks SET status = 'completed', completed_at = NOW()
-                 WHERE id = ? AND status != 'completed'`,
-                [taskId]
-            );
-        }
+        // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.recalculateTaskProgress()
+        const result = await tasksRepo.recalculateTaskProgress(taskId);
 
         // Emit WebSocket update
         this.io.to('notifications').emit('task_updated', {
             task_id: taskId,
-            progress,
-            items_completed: completed,
-            items_total: total
+            progress: result.progress,
+            items_completed: result.completed,
+            items_total: result.total
         } as any);
 
-        return { progress, completed, total };
+        return result;
     }
 
     private async getTasks(req: Request, res: Response): Promise<void> {
@@ -8217,20 +8196,15 @@ class SolariaDashboardServer {
 
     private async getMyPermissions(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using permissionsRepo.findPermissionsByRole()
             const userRole = req.user?.role;
             if (!userRole) {
                 res.status(401).json({ error: 'Not authenticated' });
                 return;
             }
 
-            const [permissions] = await this.db!.execute<RowDataPacket[]>(
-                `SELECT p.code, p.name, p.description, p.category
-                 FROM permissions p
-                 JOIN role_permissions rp ON p.id = rp.permission_id
-                 WHERE rp.role = ?
-                 ORDER BY p.category, p.code`,
-                [userRole]
-            );
+            const result = await permissionsRepo.findPermissionsByRole(userRole);
+            const permissions = (result[0] as unknown as RowDataPacket[]);
 
             res.json({
                 success: true,

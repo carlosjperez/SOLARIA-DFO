@@ -314,3 +314,38 @@ export async function getKanbanBoard(projectId?: number) {
         ORDER BY FIELD(t.status, 'pending', 'in_progress', 'review', 'completed', 'blocked')
     `);
 }
+
+// ============================================================================
+// Task Progress Calculation
+// ============================================================================
+
+export async function recalculateTaskProgress(taskId: number): Promise<{ progress: number; completed: number; total: number }> {
+    // Get task items counts
+    const result = await db.execute(sql`
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN is_completed = 1 THEN 1 ELSE 0 END) as completed
+        FROM task_items
+        WHERE task_id = ${taskId}
+    `);
+
+    const counts = (result[0] as unknown as any[])[0];
+    const total = counts?.total || 0;
+    const completed = parseInt(counts?.completed) || 0;
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    // Update task progress
+    await db.execute(sql`
+        UPDATE tasks SET progress = ${progress}, updated_at = NOW() WHERE id = ${taskId}
+    `);
+
+    // Auto-complete task if 100%
+    if (progress === 100 && total > 0) {
+        await db.execute(sql`
+            UPDATE tasks SET status = 'completed', completed_at = NOW()
+            WHERE id = ${taskId} AND status != 'completed'
+        `);
+    }
+
+    return { progress, completed, total };
+}

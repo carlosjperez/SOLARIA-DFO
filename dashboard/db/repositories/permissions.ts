@@ -75,6 +75,16 @@ export async function findRolePermissionsByRole(role: string) {
         .where(eq(rolePermissions.role, role));
 }
 
+export async function findPermissionsByRole(role: string) {
+    return db.execute(sql`
+        SELECT p.code, p.name, p.description, p.category
+        FROM permissions p
+        JOIN role_permissions rp ON p.id = rp.permission_id
+        WHERE rp.role = ${role}
+        ORDER BY p.category, p.code
+    `);
+}
+
 export async function addRolePermission(data: NewRolePermission) {
     return db.insert(rolePermissions).values(data);
 }
