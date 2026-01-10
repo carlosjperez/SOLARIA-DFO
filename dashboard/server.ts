@@ -1658,12 +1658,9 @@ class SolariaDashboardServer {
 
     private async getTaskTags(_req: Request, res: Response): Promise<void> {
         try {
-            const [rows] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT id, name, description, color, icon, usage_count, created_at
-                FROM task_tags
-                ORDER BY usage_count DESC, name ASC
-            `);
-            res.json({ tags: rows });
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.findAllTags()
+            const tags = await tasksRepo.findAllTags();
+            res.json({ tags });
         } catch (error) {
             console.error('Error fetching task tags:', error);
             res.status(500).json({ error: 'Failed to fetch task tags' });
@@ -4211,15 +4208,11 @@ class SolariaDashboardServer {
 
     private async reorderTaskItems(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.reorderTaskItems()
             const taskId = parseInt(req.params.id);
             const { order } = req.body; // Array of { id, sort_order }
 
-            for (const item of order) {
-                await this.db!.execute(
-                    'UPDATE task_items SET sort_order = ? WHERE id = ? AND task_id = ?',
-                    [item.sort_order, item.id, taskId]
-                );
-            }
+            await tasksRepo.reorderTaskItems(taskId, order);
 
             res.json({ reordered: true, task_id: taskId });
         } catch (error) {
@@ -4230,17 +4223,11 @@ class SolariaDashboardServer {
 
     private async getTaskTagAssignments(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.findTaskTags()
             const taskId = parseInt(req.params.id);
-            const [rows] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT tt.id, tt.name, tt.description, tt.color, tt.icon,
-                       tta.assigned_at, u.name as assigned_by_name
-                FROM task_tag_assignments tta
-                JOIN task_tags tt ON tta.tag_id = tt.id
-                LEFT JOIN users u ON tta.assigned_by = u.id
-                WHERE tta.task_id = ?
-                ORDER BY tta.assigned_at ASC
-            `, [taskId]);
-            res.json({ task_id: taskId, tags: rows });
+            const result = await tasksRepo.findTaskTags(taskId);
+            const tags = result[0] as unknown as any[];
+            res.json({ task_id: taskId, tags });
         } catch (error) {
             console.error('Error fetching task tag assignments:', error);
             res.status(500).json({ error: 'Failed to fetch task tags' });

@@ -62,6 +62,9 @@ export const projects = mysqlTable('projects', {
     createdBy: int('created_by').references(() => users.id, { onDelete: 'set null' }),
     // Office CRM link
     officeClientId: int('office_client_id'),
+    // Archive support
+    archived: tinyint('archived').default(0),
+    archivedAt: timestamp('archived_at'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
 });

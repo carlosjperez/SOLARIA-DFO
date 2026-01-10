@@ -211,6 +211,22 @@ export async function deleteTaskItem(taskId: number, itemId: number) {
     await updateTaskProgress(taskId);
 }
 
+export async function reorderTaskItems(
+    taskId: number,
+    order: Array<{ id: number; sort_order: number }>
+) {
+    // Batch update sort_order for multiple items
+    for (const item of order) {
+        await db.update(taskItems).set({
+            sortOrder: item.sort_order
+        }).where(and(
+            eq(taskItems.id, item.id),
+            eq(taskItems.taskId, taskId)
+        ));
+    }
+    return findTaskItems(taskId);
+}
+
 // ============================================================================
 // Task Tags
 // ============================================================================
