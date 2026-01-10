@@ -4008,47 +4008,42 @@ class SolariaDashboardServer {
 
     private async deleteTask(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo
+            // TODO: Add cascade delete helpers to repository (task_items, task_tag_assignments)
             const { id } = req.params;
 
-            // Check if task exists first
-            const [existing] = await this.db!.execute<RowDataPacket[]>('SELECT id, title, project_id FROM tasks WHERE id = ?', [id]);
-            if (existing.length === 0) {
+            // Check if task exists and get metadata for events
+            const task = await tasksRepo.findTaskById(parseInt(id));
+            if (!task) {
                 res.status(404).json({ error: 'Task not found' });
                 return;
             }
 
-            const task = existing[0];
-
-            // Delete associated task_items first
+            // Delete associated task_items first (cascade delete)
             await this.db!.execute('DELETE FROM task_items WHERE task_id = ?', [id]);
 
-            // Delete associated task_tag_assignments
+            // Delete associated task_tag_assignments (cascade delete)
             await this.db!.execute('DELETE FROM task_tag_assignments WHERE task_id = ?', [id]);
 
-            // Delete the task
-            const [result] = await this.db!.execute<ResultSetHeader>('DELETE FROM tasks WHERE id = ?', [id]);
-
-            if (result.affectedRows === 0) {
-                res.status(404).json({ error: 'Task not found' });
-                return;
-            }
+            // Delete the task via repository
+            await tasksRepo.deleteTask(parseInt(id));
 
             // Emit task:deleted (colon format for NotificationContext)
             (this.io as any).emit('task:deleted', {
-                taskId: parseInt(id),
-                id: parseInt(id),
+                taskId: task.id,
+                id: task.id,
                 title: task.title,
-                projectId: task.project_id,
-                project_id: task.project_id
+                projectId: task.projectId,
+                project_id: task.projectId
             } as any);
 
             // Dispatch webhook event for n8n integration
             this.dispatchWebhookEvent('task.deleted', {
-                task_id: parseInt(id),
+                task_id: task.id,
                 title: task.title
-            }, task.project_id || undefined);
+            }, task.projectId || undefined);
 
-            res.json({ message: 'Task deleted successfully', deleted_id: parseInt(id) });
+            res.json({ message: 'Task deleted successfully', deleted_id: task.id });
 
         } catch (error) {
             console.error('Delete task error:', error);
