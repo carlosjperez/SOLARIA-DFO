@@ -6105,11 +6105,8 @@ class SolariaDashboardServer {
 
     private async getMemoryTags(_req: Request, res: Response): Promise<void> {
         try {
-            const [tags] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT id, name, description, usage_count, parent_tag_id
-                FROM memory_tags
-                ORDER BY usage_count DESC, name ASC
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.findAllMemoryTags()
+            const tags = await memoriesRepo.findAllMemoryTags();
 
             res.json({ tags });
         } catch (error) {
@@ -6120,29 +6117,36 @@ class SolariaDashboardServer {
 
     private async getMemoryStats(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using memoriesRepo
+            // TODO: Add project_id filter support to getMemoryStats() in repository
             const { project_id } = req.query;
 
-            let whereClause = '';
-            const params: number[] = [];
+            let stats: any;
             if (project_id) {
-                whereClause = 'WHERE project_id = ?';
-                params.push(parseInt(project_id as string));
+                // Custom query with project filter (SQL until repository supports it)
+                const [countResult] = await this.db!.execute<RowDataPacket[]>(
+                    `SELECT COUNT(*) as total_memories, AVG(importance) as avg_importance, SUM(access_count) as total_accesses FROM memories WHERE project_id = ?`,
+                    [parseInt(project_id as string)]
+                );
+                stats = countResult[0];
+            } else {
+                // Use repository for global stats
+                const result = await memoriesRepo.getMemoryStats();
+                stats = result[0][0];
             }
 
-            const [countResult] = await this.db!.execute<RowDataPacket[]>(
-                `SELECT COUNT(*) as total, AVG(importance) as avg_importance, SUM(access_count) as total_accesses FROM memories ${whereClause}`,
-                params
-            );
-
-            const [tagStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT name, usage_count FROM memory_tags ORDER BY usage_count DESC LIMIT 10
-            `);
+            // Get top tags via repository
+            const allTags = await memoriesRepo.findAllMemoryTags();
+            const top_tags = allTags.slice(0, 10).map((tag: any) => ({
+                name: tag.name,
+                usage_count: tag.usageCount
+            }));
 
             res.json({
-                total_memories: countResult[0].total || 0,
-                avg_importance: parseFloat(countResult[0].avg_importance) || 0,
-                total_accesses: countResult[0].total_accesses || 0,
-                top_tags: tagStats
+                total_memories: stats.total_memories || 0,
+                avg_importance: parseFloat(stats.avg_importance) || 0,
+                total_accesses: stats.total_accesses || 0,
+                top_tags
             });
         } catch (error) {
             console.error('Get memory stats error:', error);
@@ -6152,18 +6156,15 @@ class SolariaDashboardServer {
 
     private async boostMemory(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.boostImportance()
             const { id } = req.params;
             const { boost_amount = 0.1 } = req.body;
 
             const safeBoost = Math.min(Math.max(parseFloat(boost_amount), 0), 0.5);
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                UPDATE memories
-                SET importance = LEAST(importance + ?, 1.0), updated_at = NOW()
-                WHERE id = ?
-            `, [safeBoost, id]);
+            const updatedMemory = await memoriesRepo.boostImportance(parseInt(id), safeBoost);
 
-            if (result.affectedRows === 0) {
+            if (!updatedMemory) {
                 res.status(404).json({ error: 'Memory not found' });
                 return;
             }
