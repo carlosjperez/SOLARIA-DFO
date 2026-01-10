@@ -14,3 +14,4 @@ export * as businessesRepo from './businesses.js';
 export * as agentMcpConfigsRepo from './agentMcpConfigs.js';
 export * as usersRepo from './users.js';
 export * as permissionsRepo from './permissions.js';
+export * as inlineDocumentsRepo from './inlineDocuments.js';

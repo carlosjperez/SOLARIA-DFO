@@ -2893,25 +2893,16 @@ class SolariaDashboardServer {
 
     private async getProjectInlineDocuments(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using inlineDocumentsRepo.findInlineDocumentsByProject()
             const { id } = req.params;
             const { type } = req.query;
 
-            let query = `
-                SELECT id, project_id, name, type, version, is_active,
-                       created_at, updated_at, created_by_agent_id
-                FROM inline_documents
-                WHERE project_id = ? AND is_active = 1
-            `;
-            const params: any[] = [id];
+            const result = await inlineDocumentsRepo.findInlineDocumentsByProject(
+                parseInt(id),
+                type as string | undefined
+            );
+            const rows = (result[0] as unknown as RowDataPacket[]);
 
-            if (type) {
-                query += ' AND type = ?';
-                params.push(type);
-            }
-
-            query += ' ORDER BY updated_at DESC';
-
-            const [rows] = await this.db!.execute<RowDataPacket[]>(query, params);
             res.json({ documents: rows });
 
         } catch (error) {
@@ -2923,6 +2914,7 @@ class SolariaDashboardServer {
 
     private async createInlineDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using inlineDocumentsRepo.createInlineDocument()
             const { id } = req.params;
             const { name, type, content_md } = req.body;
             const created_by_agent_id = req.user?.userId || null;
@@ -2932,17 +2924,16 @@ class SolariaDashboardServer {
                 return;
             }
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO inline_documents (project_id, name, type, content_md, version, is_active, created_by_agent_id)
-                VALUES (?, ?, ?, ?, 1, 1, ?)
-            `, [id, name, type || 'plan', content_md, created_by_agent_id]);
-
-            const [newDoc] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT * FROM inline_documents WHERE id = ?
-            `, [result.insertId]);
+            const newDoc = await inlineDocumentsRepo.createInlineDocument({
+                projectId: parseInt(id),
+                name,
+                type: type || 'plan',
+                contentMd: content_md,
+                createdByAgentId: created_by_agent_id
+            });
 
             res.status(201).json({
-                document: newDoc[0],
+                document: newDoc,
                 message: 'Inline document created successfully'
             });
 
@@ -2955,11 +2946,11 @@ class SolariaDashboardServer {
 
     private async getInlineDocument(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using inlineDocumentsRepo.findInlineDocumentById()
             const { id } = req.params;
 
-            const [rows] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT * FROM inline_documents WHERE id = ? AND is_active = 1
-            `, [id]);
+            const result = await inlineDocumentsRepo.findInlineDocumentById(parseInt(id));
+            const rows = (result[0] as unknown as RowDataPacket[]);
 
             if (rows.length === 0) {
                 res.status(404).json({ error: 'Document not found' });
@@ -3033,13 +3024,13 @@ class SolariaDashboardServer {
 
     private async deleteInlineDocument(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using inlineDocumentsRepo.deleteInlineDocument()
             const { id } = req.params;
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                UPDATE inline_documents SET is_active = 0, archived_at = NOW() WHERE id = ?
-            `, [id]);
+            const result = await inlineDocumentsRepo.deleteInlineDocument(parseInt(id));
+            const affectedRows = (result[0] as any).affectedRows;
 
-            if (result.affectedRows === 0) {
+            if (affectedRows === 0) {
                 res.status(404).json({ error: 'Document not found' });
                 return;
             }
@@ -3055,6 +3046,7 @@ class SolariaDashboardServer {
 
     private async searchInlineDocuments(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using inlineDocumentsRepo.searchInlineDocuments()
             const { query, project_id, type, limit } = req.query;
 
             if (!query) {
@@ -3062,34 +3054,12 @@ class SolariaDashboardServer {
                 return;
             }
 
-            const searchPattern = `%${query}%`;
-            let sql = `
-                SELECT id, project_id, name, type, version, created_at, updated_at
-                FROM inline_documents
-                WHERE is_active = 1 AND (name LIKE ? OR content_md LIKE ?)
-            `;
-            const params: any[] = [searchPattern, searchPattern];
+            const result = await inlineDocumentsRepo.searchInlineDocuments(
+                query as string,
+                project_id ? parseInt(project_id as string) : undefined
+            );
+            const rows = (result[0] as unknown as RowDataPacket[]);
 
-            if (project_id) {
-                sql += ' AND project_id = ?';
-                params.push(project_id);
-            }
-
-            if (type) {
-                sql += ' AND type = ?';
-                params.push(type);
-            }
-
-            sql += ' ORDER BY updated_at DESC';
-
-            if (limit) {
-                sql += ' LIMIT ?';
-                params.push(parseInt(limit as string));
-            } else {
-                sql += ' LIMIT 20';
-            }
-
-            const [rows] = await this.db!.execute<RowDataPacket[]>(sql, params);
             res.json({ documents: rows, total: rows.length });
 
         } catch (error) {
