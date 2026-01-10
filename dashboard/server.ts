@@ -2104,26 +2104,24 @@ class SolariaDashboardServer {
 
     private async archiveProject(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.findProjectById() and updateProject()
             const { id } = req.params;
 
             // Get project info for notification
-            const [projectRows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT name, code FROM projects WHERE id = ?',
-                [id]
-            );
-            const projectInfo = projectRows[0];
+            const project = await projectsRepo.findProjectById(parseInt(id));
 
-            if (!projectInfo) {
+            if (!project) {
                 res.status(404).json({ error: 'Project not found' });
                 return;
             }
 
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                'UPDATE projects SET archived = TRUE, archived_at = NOW() WHERE id = ?',
-                [id]
-            );
+            // Archive project
+            const updated = await projectsRepo.updateProject(parseInt(id), {
+                archived: true,
+                archivedAt: new Date()
+            });
 
-            if (result.affectedRows === 0) {
+            if (!updated) {
                 res.status(404).json({ error: 'Project not found' });
                 return;
             }
@@ -2131,7 +2129,7 @@ class SolariaDashboardServer {
             // Emit socket event for real-time notification
             this.io.emit('project:archived', {
                 projectId: parseInt(id),
-                name: projectInfo.name,
+                name: project.name,
                 archived: true
             });
 
@@ -2146,26 +2144,24 @@ class SolariaDashboardServer {
 
     private async unarchiveProject(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.findProjectById() and updateProject()
             const { id } = req.params;
 
             // Get project info for notification
-            const [projectRows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT name, code FROM projects WHERE id = ?',
-                [id]
-            );
-            const projectInfo = projectRows[0];
+            const project = await projectsRepo.findProjectById(parseInt(id));
 
-            if (!projectInfo) {
+            if (!project) {
                 res.status(404).json({ error: 'Project not found' });
                 return;
             }
 
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                'UPDATE projects SET archived = FALSE, archived_at = NULL WHERE id = ?',
-                [id]
-            );
+            // Unarchive project
+            const updated = await projectsRepo.updateProject(parseInt(id), {
+                archived: false,
+                archivedAt: null
+            });
 
-            if (result.affectedRows === 0) {
+            if (!updated) {
                 res.status(404).json({ error: 'Project not found' });
                 return;
             }
@@ -2173,7 +2169,7 @@ class SolariaDashboardServer {
             // Emit socket event for real-time notification
             this.io.emit('project:archived', {
                 projectId: parseInt(id),
-                name: projectInfo.name,
+                name: project.name,
                 archived: false
             });
 
@@ -2192,6 +2188,8 @@ class SolariaDashboardServer {
 
     private async checkProjectCode(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using projectsRepo.findProjectByCode()
+            // TODO: Add repository for reserved_project_codes table
             const { code } = req.params;
             const upperCode = code.toUpperCase().trim();
 
@@ -2201,7 +2199,7 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Check if reserved
+            // Check if reserved (SQL until repository exists)
             const [reserved] = await this.db!.execute<RowDataPacket[]>(
                 'SELECT code, reason FROM reserved_project_codes WHERE code = ?',
                 [upperCode]
@@ -2211,13 +2209,10 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Check if already in use
-            const [existing] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT id, name FROM projects WHERE code = ?',
-                [upperCode]
-            );
-            if ((existing as any[]).length > 0) {
-                res.json({ available: false, reason: `Code '${upperCode}' is used by project: ${(existing as any[])[0].name}` });
+            // Check if already in use (via repository)
+            const existing = await projectsRepo.findProjectByCode(upperCode);
+            if (existing) {
+                res.json({ available: false, reason: `Code '${upperCode}' is used by project: ${existing.name}` });
                 return;
             }
 
