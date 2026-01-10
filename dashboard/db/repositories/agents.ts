@@ -182,3 +182,19 @@ export async function getAgentTasks(agentId: number, status?: string) {
         LIMIT 50
     `);
 }
+
+export async function getAgentPerformance(agentId: number, days = 7) {
+    return db.execute(sql`
+        SELECT
+            DATE(completed_at) as date,
+            COUNT(*) as tasks_completed,
+            AVG(actual_hours) as avg_hours,
+            AVG(progress) as avg_progress
+        FROM tasks
+        WHERE assigned_agent_id = ${agentId}
+            AND status = 'completed'
+            AND completed_at >= DATE_SUB(NOW(), INTERVAL ${days} DAY)
+        GROUP BY DATE(completed_at)
+        ORDER BY date DESC
+    `);
+}

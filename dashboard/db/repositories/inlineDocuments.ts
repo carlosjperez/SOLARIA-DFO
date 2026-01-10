@@ -56,31 +56,42 @@ export async function createInlineDocument(data: {
 
 export async function updateInlineDocument(id: number, data: {
     name?: string;
+    type?: string;
     contentMd?: string;
+    changeSummary?: string | null;
+    createdByAgentId?: number | null;
 }) {
-    // Mark current version as inactive
-    await db.execute(sql`
-        UPDATE inline_documents SET is_active = 0 WHERE id = ${id}
-    `);
-
-    // Get current document
+    // Get existing document first
     const current = await db.execute(sql`
-        SELECT * FROM inline_documents WHERE id = ${id}
+        SELECT * FROM inline_documents WHERE id = ${id} AND is_active = 1
     `);
 
     const currentDoc = (current[0] as any[])[0];
 
-    // Create new version
+    if (!currentDoc) {
+        return null;
+    }
+
+    // Archive old version
+    await db.execute(sql`
+        UPDATE inline_documents SET is_active = 0, archived_at = NOW() WHERE id = ${id}
+    `);
+
+    // Insert new version
     const result = await db.execute(sql`
-        INSERT INTO inline_documents (project_id, name, type, content_md, version, is_active, created_by_agent_id)
-        VALUES (
+        INSERT INTO inline_documents (
+            project_id, name, type, content_md, version, is_active,
+            parent_version_id, change_summary, created_by_agent_id
+        ) VALUES (
             ${currentDoc.project_id},
             ${data.name || currentDoc.name},
-            ${currentDoc.type},
-            ${data.contentMd || currentDoc.content_md},
+            ${data.type || currentDoc.type},
+            ${data.contentMd !== undefined ? data.contentMd : currentDoc.content_md},
             ${currentDoc.version + 1},
             1,
-            ${currentDoc.created_by_agent_id}
+            ${id},
+            ${data.changeSummary || null},
+            ${data.createdByAgentId !== undefined ? data.createdByAgentId : currentDoc.created_by_agent_id}
         )
     `);
 
@@ -91,7 +102,10 @@ export async function updateInlineDocument(id: number, data: {
         SELECT * FROM inline_documents WHERE id = ${insertId}
     `);
 
-    return (newDoc[0] as any[])[0];
+    return {
+        document: (newDoc[0] as any[])[0],
+        previousVersion: currentDoc.version
+    };
 }
 
 export async function deleteInlineDocument(id: number) {

@@ -181,6 +181,52 @@ export async function completeTaskItem(
     return findTaskItems(taskId);
 }
 
+export async function toggleTaskItemComplete(
+    taskId: number,
+    itemId: number,
+    notes?: string,
+    actualMinutes?: number,
+    agentId?: number
+) {
+    // Toggle completion status with conditional updates
+    await db.execute(sql`
+        UPDATE task_items
+        SET is_completed = NOT is_completed,
+            completed_at = CASE WHEN is_completed = 0 THEN NOW() ELSE NULL END,
+            completed_by_agent_id = CASE WHEN is_completed = 0 THEN ${agentId || null} ELSE NULL END,
+            notes = COALESCE(${notes || null}, notes),
+            actual_minutes = COALESCE(${actualMinutes || null}, actual_minutes)
+        WHERE id = ${itemId} AND task_id = ${taskId}
+    `);
+
+    // Update parent task progress
+    await updateTaskProgress(taskId);
+
+    // Get updated item
+    const result = await db.execute(sql`
+        SELECT * FROM task_items WHERE id = ${itemId}
+    `);
+
+    return {
+        item: (result[0] as any[])[0],
+        progress: await getTaskProgress(taskId)
+    };
+}
+
+async function getTaskProgress(taskId: number) {
+    const items = await findTaskItems(taskId);
+    if (items.length === 0) return { progress: 0, items_total: 0, items_completed: 0 };
+
+    const completedCount = items.filter(i => i.isCompleted).length;
+    const progress = Math.round((completedCount / items.length) * 100);
+
+    return {
+        progress,
+        items_total: items.length,
+        items_completed: completedCount
+    };
+}
+
 export async function updateTaskProgress(taskId: number) {
     const items = await findTaskItems(taskId);
     if (items.length === 0) return;
@@ -348,4 +394,49 @@ export async function recalculateTaskProgress(taskId: number): Promise<{ progres
     }
 
     return { progress, completed, total };
+}
+
+// ============================================================================
+// Task Queries
+// ============================================================================
+
+export async function getRecentCompletedTasks(limit = 20) {
+    return db.execute(sql`
+        SELECT
+            t.id,
+            t.task_number,
+            CONCAT(
+                COALESCE(p.code, 'TSK'), '-',
+                LPAD(COALESCE(t.task_number, t.id), 3, '0'),
+                CASE
+                    WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
+                    WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
+                    WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
+                    WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
+                    ELSE ''
+                END
+            ) as task_code,
+            t.title,
+            t.status,
+            t.priority,
+            t.progress,
+            t.completed_at,
+            t.updated_at,
+            p.id as project_id,
+            p.name as project_name,
+            p.code as project_code,
+            e.epic_number, e.name as epic_name,
+            sp.sprint_number, sp.name as sprint_name,
+            aa.id as agent_id,
+            aa.name as agent_name,
+            aa.role as agent_role
+        FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        LEFT JOIN epics e ON t.epic_id = e.id
+        LEFT JOIN sprints sp ON t.sprint_id = sp.id
+        LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+        WHERE t.status = 'completed'
+        ORDER BY COALESCE(t.completed_at, t.updated_at) DESC
+        LIMIT ${limit}
+    `);
 }

@@ -1501,46 +1501,11 @@ class SolariaDashboardServer {
 
     private async getRecentCompletedTasks(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.getRecentCompletedTasks()
             const limit = parseInt(req.query.limit as string) || 20;
 
-            const [tasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.id,
-                    t.task_number,
-                    CONCAT(
-                        COALESCE(p.code, 'TSK'), '-',
-                        LPAD(COALESCE(t.task_number, t.id), 3, '0'),
-                        CASE
-                            WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
-                            WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
-                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
-                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
-                            ELSE ''
-                        END
-                    ) as task_code,
-                    t.title,
-                    t.status,
-                    t.priority,
-                    t.progress,
-                    t.completed_at,
-                    t.updated_at,
-                    p.id as project_id,
-                    p.name as project_name,
-                    p.code as project_code,
-                    e.epic_number, e.name as epic_name,
-                    sp.sprint_number, sp.name as sprint_name,
-                    aa.id as agent_id,
-                    aa.name as agent_name,
-                    aa.role as agent_role
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                LEFT JOIN epics e ON t.epic_id = e.id
-                LEFT JOIN sprints sp ON t.sprint_id = sp.id
-                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                WHERE t.status = 'completed'
-                ORDER BY COALESCE(t.completed_at, t.updated_at) DESC
-                LIMIT ?
-            `, [limit]);
+            const result = await tasksRepo.getRecentCompletedTasks(limit);
+            const tasks = (result[0] as unknown as RowDataPacket[]);
 
             res.json(tasks);
 
@@ -2968,51 +2933,27 @@ class SolariaDashboardServer {
 
     private async updateInlineDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using inlineDocumentsRepo.updateInlineDocument()
             const { id } = req.params;
             const { name, type, content_md, change_summary } = req.body;
 
-            // Get existing document
-            const [existing] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT * FROM inline_documents WHERE id = ? AND is_active = 1
-            `, [id]);
+            const result = await inlineDocumentsRepo.updateInlineDocument(parseInt(id), {
+                name,
+                type,
+                contentMd: content_md,
+                changeSummary: change_summary,
+                createdByAgentId: req.user?.userId || null
+            });
 
-            if (existing.length === 0) {
+            if (!result) {
                 res.status(404).json({ error: 'Document not found' });
                 return;
             }
 
-            const doc = existing[0];
-
-            // Archive old version
-            await this.db!.execute(`
-                UPDATE inline_documents SET is_active = 0, archived_at = NOW() WHERE id = ?
-            `, [id]);
-
-            // Insert new version
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO inline_documents (
-                    project_id, name, type, content_md, version, is_active,
-                    parent_version_id, change_summary, created_by_agent_id
-                ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)
-            `, [
-                doc.project_id,
-                name || doc.name,
-                type || doc.type,
-                content_md !== undefined ? content_md : doc.content_md,
-                doc.version + 1,
-                id,
-                change_summary || null,
-                req.user?.userId || null
-            ]);
-
-            const [newDoc] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT * FROM inline_documents WHERE id = ?
-            `, [result.insertId]);
-
             res.json({
-                document: newDoc[0],
-                previous_version: doc.version,
-                message: 'Document updated to version ' + (doc.version + 1)
+                document: result.document,
+                previous_version: result.previousVersion,
+                message: 'Document updated to version ' + (result.previousVersion + 1)
             });
 
         } catch (error) {
@@ -3209,23 +3150,12 @@ class SolariaDashboardServer {
 
     private async getAgentPerformance(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using agentsRepo.getAgentPerformance()
             const { id } = req.params;
             // const { period = '7d' } = req.query;
 
-            // Get tasks completed in last 7 days with timing info
-            const [performance] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    DATE(completed_at) as date,
-                    COUNT(*) as tasks_completed,
-                    AVG(actual_hours) as avg_hours,
-                    AVG(progress) as avg_progress
-                FROM tasks
-                WHERE assigned_agent_id = ?
-                    AND status = 'completed'
-                    AND completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                GROUP BY DATE(completed_at)
-                ORDER BY date DESC
-            `, [id]);
+            const result = await agentsRepo.getAgentPerformance(parseInt(id), 7);
+            const performance = (result[0] as unknown as RowDataPacket[]);
 
             res.json(performance);
 
@@ -4078,28 +4008,20 @@ class SolariaDashboardServer {
 
     private async toggleTaskItemComplete(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.toggleTaskItemComplete()
             const taskId = parseInt(req.params.id);
             const itemId = parseInt(req.params.itemId);
             const { notes, actual_minutes, agent_id } = req.body;
 
-            // Toggle completion
-            await this.db!.execute(`
-                UPDATE task_items
-                SET is_completed = NOT is_completed,
-                    completed_at = CASE WHEN is_completed = 1 THEN NOW() ELSE NULL END,
-                    completed_by_agent_id = CASE WHEN is_completed = 1 THEN ? ELSE NULL END,
-                    notes = COALESCE(?, notes),
-                    actual_minutes = COALESCE(?, actual_minutes)
-                WHERE id = ? AND task_id = ?
-            `, [agent_id || null, notes || null, actual_minutes || null, itemId, taskId]);
+            const result = await tasksRepo.toggleTaskItemComplete(
+                taskId,
+                itemId,
+                notes,
+                actual_minutes,
+                agent_id
+            );
 
-            // Recalculate progress
-            const progress = await this.recalculateTaskProgress(taskId);
-
-            // Get updated item
-            const [items] = await this.db!.execute<RowDataPacket[]>('SELECT * FROM task_items WHERE id = ?', [itemId]);
-
-            res.json({ item: items[0], ...progress });
+            res.json(result);
         } catch (error) {
             console.error('Error toggling task item:', error);
             res.status(500).json({ error: 'Failed to toggle task item' });
