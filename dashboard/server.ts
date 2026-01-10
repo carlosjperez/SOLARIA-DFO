@@ -3861,45 +3861,39 @@ class SolariaDashboardServer {
 
     private async updateTask(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo.updateTask()
             const { id } = req.params;
             const updates = req.body;
 
-            const fields: string[] = [];
-            const values: (string | number | null)[] = [];
+            // Build update object with camelCase fields for Drizzle
+            const data: any = {};
 
-            if (updates.title !== undefined) { fields.push('title = ?'); values.push(updates.title); }
-            if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
-            if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
-            if (updates.priority !== undefined) { fields.push('priority = ?'); values.push(updates.priority); }
-            if (updates.progress !== undefined) { fields.push('progress = ?'); values.push(updates.progress); }
-            if (updates.project_id !== undefined) { fields.push('project_id = ?'); values.push(updates.project_id); }
-            // epic_id and sprint_id columns don't exist in test schema - removed
-            // if (updates.epic_id !== undefined) { fields.push('epic_id = ?'); values.push(updates.epic_id); }
-            // if (updates.sprint_id !== undefined) { fields.push('sprint_id = ?'); values.push(updates.sprint_id); }
+            if (updates.title !== undefined) data.title = updates.title;
+            if (updates.description !== undefined) data.description = updates.description;
+            if (updates.status !== undefined) data.status = updates.status;
+            if (updates.priority !== undefined) data.priority = updates.priority;
+            if (updates.progress !== undefined) data.progress = updates.progress;
+            if (updates.project_id !== undefined) data.projectId = updates.project_id;
+            if (updates.epic_id !== undefined) data.epicId = updates.epic_id;
+            if (updates.sprint_id !== undefined) data.sprintId = updates.sprint_id;
+            if (updates.actual_hours !== undefined) data.actualHours = updates.actual_hours;
+            if (updates.notes !== undefined) data.notes = updates.notes;
+            if (updates.assigned_agent_id !== undefined) data.assignedAgentId = updates.assigned_agent_id;
 
             // Auto-set progress to 100% when task is marked as completed
             if (updates.status === 'completed' && updates.progress === undefined) {
-                fields.push('progress = ?');
-                values.push(100);
+                data.progress = 100;
             }
-            if (updates.actual_hours !== undefined) { fields.push('actual_hours = ?'); values.push(updates.actual_hours); }
-            if (updates.notes !== undefined) { fields.push('notes = ?'); values.push(updates.notes); }
-            if (updates.assigned_agent_id !== undefined) { fields.push('assigned_agent_id = ?'); values.push(updates.assigned_agent_id); }
 
-            if (fields.length === 0) {
+            if (Object.keys(data).length === 0) {
                 res.status(400).json({ error: 'No fields to update' });
                 return;
             }
 
-            fields.push('updated_at = NOW()');
-            values.push(parseInt(id));
+            // Update task via repository
+            const updatedTask = await tasksRepo.updateTask(parseInt(id), data);
 
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                `UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`,
-                values
-            );
-
-            if (result.affectedRows === 0) {
+            if (!updatedTask) {
                 res.status(404).json({ error: 'Task not found' });
                 return;
             }
