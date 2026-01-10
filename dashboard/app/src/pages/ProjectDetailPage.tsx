@@ -706,105 +706,6 @@ function SprintsCard({
 }
 
 // ============================================================
-// PROJECT INFO MODAL (Full details)
-// ============================================================
-
-function ProjectInfoModal({
-    project,
-    isOpen,
-    onClose,
-    onEdit,
-}: {
-    project: Project;
-    isOpen: boolean;
-    onClose: () => void;
-    onEdit: () => void;
-}) {
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Informacion del Proyecto" maxWidth="max-w-2xl">
-            <div className="p-6 space-y-6">
-                {/* Header */}
-                <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-solaria to-solaria-dark flex items-center justify-center">
-                        <GraduationCap className="text-white h-8 w-8" />
-                    </div>
-                    <div className="flex-1">
-                        <h2 className="text-xl font-bold text-foreground">{project.name}</h2>
-                        <p className="text-muted-foreground text-sm mt-1">{project.code}</p>
-                    </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Descripcion</h4>
-                    <p className="text-foreground">{project.description || 'Sin descripcion'}</p>
-                </div>
-
-                {/* Details grid */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg bg-secondary/50">
-                        <p className="text-xs text-muted-foreground mb-1">Cliente</p>
-                        <p className="text-foreground font-medium">{project.client?.name || 'Sin cliente'}</p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-secondary/50">
-                        <p className="text-xs text-muted-foreground mb-1">Presupuesto</p>
-                        <p className="text-foreground font-medium">
-                            ${(project.budgetAllocated || 0).toLocaleString()}
-                        </p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-secondary/50">
-                        <p className="text-xs text-muted-foreground mb-1">Fecha Inicio</p>
-                        <p className="text-foreground font-medium">
-                            {project.startDate
-                                ? new Date(project.startDate).toLocaleDateString('es-ES')
-                                : 'No definida'}
-                        </p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-secondary/50">
-                        <p className="text-xs text-muted-foreground mb-1">Deadline</p>
-                        <p className="text-foreground font-medium">
-                            {project.endDate
-                                ? new Date(project.endDate).toLocaleDateString('es-ES')
-                                : 'No definida'}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Tech Stack */}
-                <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Stack Tecnico</h4>
-                    <div className="flex flex-wrap gap-2">
-                        <span className="px-3 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400">React 19</span>
-                        <span className="px-3 py-1 rounded-full text-xs bg-green-500/20 text-green-400">Node.js</span>
-                        <span className="px-3 py-1 rounded-full text-xs bg-purple-500/20 text-purple-400">PostgreSQL</span>
-                        <span className="px-3 py-1 rounded-full text-xs bg-orange-500/20 text-orange-400">TailwindCSS</span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="p-6 border-t border-border flex justify-end gap-3">
-                <button
-                    onClick={onClose}
-                    className="px-4 py-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-                >
-                    Cerrar
-                </button>
-                <button
-                    onClick={() => {
-                        onClose();
-                        onEdit();
-                    }}
-                    className="px-4 py-2 rounded-lg bg-solaria text-white hover:bg-solaria-dark transition-colors flex items-center gap-2"
-                >
-                    <Edit className="h-4 w-4" />
-                    Editar
-                </button>
-            </div>
-        </Modal>
-    );
-}
-
-// ============================================================
 // PROJECT EDIT MODAL
 // ============================================================
 
@@ -992,7 +893,6 @@ export function ProjectDetailPage() {
     const projectId = Number(id);
 
     // State
-    const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [projectNotes, setProjectNotes] = useState<string[]>([]);
     const [selectedEpicId, setSelectedEpicId] = useState<number | null>(null);
@@ -1042,10 +942,6 @@ export function ProjectDetailPage() {
     }, [tasks]);
 
     // Handlers
-    const handleProjectInfoClick = useCallback(() => {
-        setIsInfoModalOpen(true);
-    }, []);
-
     const handleTareasClick = useCallback(() => {
         navigate(`/projects/${projectId}/tasks`);
     }, [navigate, projectId]);
@@ -1128,7 +1024,7 @@ export function ProjectDetailPage() {
 
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={() => setIsInfoModalOpen(true)}
+                        onClick={() => navigate(`/projects/${projectId}/settings`)}
                         className="px-3 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground flex items-center gap-2 transition-colors"
                     >
                         <Info className="h-4 w-4" />
@@ -1152,7 +1048,7 @@ export function ProjectDetailPage() {
                     <ProjectInfoCard
                         project={project}
                         metrics={metrics}
-                        onClick={handleProjectInfoClick}
+                        onClick={() => navigate(`/projects/${projectId}/settings`)}
                     />
 
                     {/* Two cards row */}
@@ -1219,14 +1115,6 @@ export function ProjectDetailPage() {
                     <DocumentsCard projectId={projectId} />
                 </div>
             </div>
-
-            {/* Project Info Modal */}
-            <ProjectInfoModal
-                project={project}
-                isOpen={isInfoModalOpen}
-                onClose={() => setIsInfoModalOpen(false)}
-                onEdit={() => setIsEditModalOpen(true)}
-            />
 
             {/* Project Edit Modal */}
             <ProjectEditModal

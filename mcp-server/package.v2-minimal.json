@@ -1,0 +1,26 @@
+{
+  "name": "solaria-dfo-mcp-v2-minimal",
+  "version": "2.0.0-minimal",
+  "description": "SOLARIA DFO MCP Server v2.0 Minimalista (Sin dependencias del Dashboard)",
+  "main": "src/server-v2-minimal.js",
+  "type": "module",
+  "scripts": {
+    "build:v2-minimal": "tsc --project tsconfig.build.v2.json && find dist -name '*test*' -delete && find dist -type d -name '__tests__' -exec rm -rf {} + && find dist -name '*.map' -delete",
+    "start": "node dist/server-v2-minimal.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.1"
+  },
+  "keywords": [
+    "mcp",
+    "solaria",
+    "dashboard",
+    "field-operations",
+    "project-management"
+  ],
+  "author": "SOLARIA Agency",
+  "license": "MIT",
+  "devDependencies": {}
+}

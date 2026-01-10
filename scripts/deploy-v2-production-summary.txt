@@ -1,0 +1,253 @@
+=============================================================================
+MCP v2.0 SKETCH PATTERN - PRODUCTION DEPLOYMENT SUMMARY
+=============================================================================
+
+Status: ✅ READY FOR DEPLOYMENT
+Date: 2026-01-07 10:00 UTC
+Deprecated: v1.0 (70+ tools) - Legacy
+Official: v2.0 (2 core tools) - Active
+
+=============================================================================
+FILES CREATED/CONFIGURED
+=============================================================================
+
+Production Files:
+1. docker-compose.prod.yml
+   - Fixed: Dockerfile.http-v2 for mcp-http-v2
+   - Fixed: Port mapping (3033->3032 for v2.0, 3032->3034 for worker)
+   - Ready: Build and deploy
+
+2. infrastructure/nginx/nginx.prod.conf
+   - Added: /mcp-v2 location block (full routing)
+   - Added: CORS headers, health checks
+   - Ready: Nginx restart
+
+3. scripts/deploy-v2-production.sh
+   - Complete deployment automation script
+   - Includes: 12 validation steps, stress tests, log analysis
+   - Ready: Execute on server
+
+4. docs/PRODUCTION-DEPLOY-GUIDE.md
+   - Complete deployment guide
+   - Includes: Step-by-step instructions, success criteria, rollback plan
+   - Ready: Reference during deployment
+
+5. backups/mcp-v1.0-pre-migration/
+   - Backup of docker-compose.prod.yml
+   - Backup of nginx.prod.conf
+   - Pre-migration state documentation
+
+6. docs/MCP-V2-MIGRATION-REPORT.md
+   - Complete migration audit (424 lines)
+   - Includes: Problems identified, solutions, risks, recommendations
+
+=============================================================================
+DEPLOYMENT WORKFLOW
+=============================================================================
+
+Phase 1: Connect to Production Server
+   Server: 148.230.118.124
+   Command: ssh root@148.230.118.124
+   Directory: /var/www/solaria-dfo
+
+Phase 2: Verify Current State
+   - Check Docker services: docker compose -f docker-compose.prod.yml ps
+   - Check v1.0 health: curl http://localhost:3031/health
+   - Check Dashboard API: curl http://localhost:3030/api/health
+
+Phase 3: Pull Latest Changes
+   - Command: git pull origin main
+
+Phase 4: Deploy v2.0
+   - Build: docker compose -f docker-compose.prod.yml up -d --build mcp-http-v2
+   - Restart nginx: docker compose -f docker-compose.prod.yml restart nginx
+
+Phase 5: Validate v2.0 (CRITICAL)
+   - Health check: curl http://localhost:3032/health
+     Expected: "v2.0 healthy"
+   
+   - Tools list: curl -X POST http://localhost:3032/tools/call \
+     -H "Content-Type: application/json" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+     Expected: 2 tools (get_context, run_code)
+   
+   - get_context (projects): 
+     curl -X POST http://localhost:3032/tools/call \
+       -H "Content-Type: application/json" \
+       -d '{
+         "jsonrpc": "2.0",
+         "id": 2,
+         "method": "tools/call",
+         "params": {
+           "name": "get_context",
+           "arguments": {
+             "include": {
+               "projects": true,
+               "tasks": false,
+               "health": true
+             }
+           }
+         }
+       }'
+     Expected: Returns existing projects (>0)
+   
+   - get_context (tasks):
+     curl -X POST http://localhost:3032/tools/call \
+       -H "Content-Type: application/json" \
+       -d '{
+         "jsonrpc": "2.0",
+         "id": 3,
+         "method": "tools/call",
+         "params": {
+           "name": "get_context",
+           "arguments": {
+             "include": {
+               "projects": true,
+               "tasks": true,
+               "health": true
+             }
+           }
+         }
+       }'
+     Expected: Returns existing tasks (>0)
+   
+   - run_code sandbox:
+     curl -X POST http://localhost:3032/tools/call \
+       -H "Content-Type: application/json" \
+       -d '{
+         "jsonrpc": "2.0",
+         "id": 4,
+         "method": "tools/call",
+         "params": {
+           "name": "run_code",
+           "arguments": {
+             "code": "console.log(\"[TEST v2.0] Sandbox OK\"); return { test: \"ok\" };",
+             "timeout": 5000
+           }
+         }
+       }'
+     Expected: { output: { test: "ok" } }
+
+Phase 6: Validate Dashboard API (Backward Compatibility)
+   - Projects: curl -s https://dfo.solaria.agency/api/projects | jq 'length'
+     Expected: >0 (existing projects)
+   
+   - Tasks: curl -s https://dfo.solaria.agency/api/tasks?limit=5 | jq 'length'
+     Expected: >0 (existing tasks)
+   
+   - Memories: curl -s https://dfo.solaria.agency/api/memories?limit=3 | jq 'length'
+     Expected: >0 (existing memories)
+   
+   - Health: curl -s https://dfo.solaria.agency/api/health
+     Expected: Healthy response
+
+Phase 7: Stress Testing (10 concurrent requests)
+   - Command: ./scripts/deploy-v2-production.sh (includes stress test)
+   - Expected: 100% success rate, <2s response time
+
+Phase 8: Log Analysis
+   - Check for errors: docker compose logs mcp-http-v2 | grep -i error
+   - Check for warnings: docker compose logs mcp-http-v2 | grep -i warn
+
+Phase 9: Project Isolation Validation
+   - Test: set_project_context with project_id=1
+   - Test: get_context with project_id=1 (should return only project 1)
+   - Expected: Working isolation
+
+Phase 10: Generate Audit Report
+   - Script auto-generates: deployment-YYYYMMDD_HHMMSS.log
+   - Auto-generates: audit-YYYYMMDD_HHMMSS.md
+   - Includes: All test results, findings, recommendations
+
+=============================================================================
+SUCCESS CRITERIA
+=============================================================================
+
+Deployment is SUCCESSFUL when ALL criteria met:
+
+1. v2.0 Container UP
+   - Command: docker compose -f docker-compose.prod.yml ps | grep mcp-http-v2
+   - Expected: "Up"
+
+2. v2.0 Health Check Returns 200
+   - Command: curl http://localhost:3032/health
+   - Expected: "v2.0 healthy"
+
+3. Tools List Returns 2 Tools
+   - Command: curl -X POST http://localhost:3032/tools/call ...
+   - Expected: tools count = 2 (get_context, run_code)
+
+4. get_context Returns Projects Data
+   - Command: curl -X POST http://localhost:3032/tools/call ...
+   - Expected: projects.length > 0
+
+5. run_code Executes Code
+   - Command: curl -X POST http://localhost:3032/tools/call ...
+   - Expected: output.test === "ok"
+
+6. Dashboard API Accessible (Backward Compatible)
+   - Command: curl -s https://dfo.solaria.agency/api/projects
+   - Expected: Returns projects data (length > 0)
+   - Command: curl -s https://dfo.solaria.agency/api/tasks
+   - Expected: Returns tasks data (length > 0)
+   - Command: curl -s https://dfo.solaria.agency/api/memories
+   - Expected: Returns memories data (length > 0)
+
+7. Project Isolation Works
+   - Command: set_project_context with project_id=1
+   - Command: get_context with project_id=1
+   - Expected: Returns only project 1 data
+
+8. Stress Test Passes
+   - Command: 10 concurrent requests
+   - Expected: 10/10 success, <200ms average
+
+9. No Critical Errors in Logs
+   - Command: docker compose logs mcp-http-v2 | grep -i error
+   - Expected: error count < 5 per hour
+
+10. Audit Report Generated
+   - Command: Script auto-generates report
+   - Expected: Files: deployment-*.log, audit-*.md
+
+=============================================================================
+ROLLBACK PLAN (IF NEEDED)
+=============================================================================
+
+Quick Rollback (if critical issues found):
+
+1. Stop v2.0:
+   docker compose -f docker-compose.prod.yml stop mcp-http-v2
+
+2. Revert nginx:
+   cp backups/mcp-v1.0-pre-migration/nginx.prod.conf infrastructure/nginx/nginx.prod.conf
+   docker compose -f docker-compose.prod.yml restart nginx
+
+3. Verify v1.0 works:
+   curl http://localhost:3031/health
+   curl -X POST http://localhost:3031/tools/call -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+Full Rollback (if v2.0 completely broken):
+
+1. Restore configurations:
+   cp backups/mcp-v1.0-pre-migration/docker-compose.prod.yml docker-compose.prod.yml
+   cp backups/mcp-v1.0-pre-migration/nginx.prod.conf infrastructure/nginx.prod.conf
+
+2. Rebuild and restart:
+   docker compose -f docker-compose.prod.yml up -d --build mcp-http
+   docker compose -f docker-compose.prod.yml restart nginx
+
+3. Report failure to ECO-Lambda
+
+=============================================================================
+NEXT STEPS (ON SERVER)
+=============================================================================
+
+1. ssh root@148.230.118.124
+2. cd /var/www/solaria-dfo
+3. chmod +x scripts/deploy-v2-production.sh
+4. ./scripts/deploy-v2-production.sh
+5. Review output and results
+6. If successful, notify teams to use /mcp-v2
+
+=============================================================================

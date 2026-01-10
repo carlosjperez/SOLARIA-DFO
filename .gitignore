@@ -12,3 +12,4 @@ dashboard/public/office-backup-*/
 *.tsbuildinfo
 dist/
 *.js.map
+oh-my-opencode/

@@ -1,0 +1,20 @@
+# SOLARIA DFO - Nginx Container Dockerfile
+# Reverse Proxy for dfo.solaria.agency
+
+FROM nginx:alpine
+
+# Copy nginx configuration
+COPY infrastructure/nginx/nginx.prod.conf /etc/nginx/nginx.conf
+
+# Expose ports
+EXPOSE 80 443
+
+# Use default nginx config (DO NOT copy custom config to allow nginx to use its built-in default config with SSL)
+# The nginx.prod.conf on the server will be used instead
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
