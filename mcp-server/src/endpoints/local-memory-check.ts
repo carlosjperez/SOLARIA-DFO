@@ -39,15 +39,8 @@ const CheckLocalMemoryInputSchema = z.object({
 export const check_local_memory: Tool = {
   name: 'check_local_memory',
   description: 'Detectar si el agente tiene memoria local (claude-mem) instalada',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      agent_id: {
-        type: 'string',
-        description: 'ID del agente (opcional, usa header x-agent-id si no se proporciona)',
-      },
-    },
-  },
+  inputSchema: CheckLocalMemoryInputSchema,
+  execute: handleCheckLocalMemory,
 };
 
 // ============================================================================
@@ -166,13 +159,15 @@ async function saveAgentStatus(agentId: string, checkResult: any): Promise<void>
 
 async function loadLastCheck(agentId: string): Promise<any | null> {
   try {
-    const [rows] = await db.execute(`
+    const result = await db.execute(`
       SELECT * FROM agent_local_memory_status
       WHERE agent_id = ?
         AND last_checked > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
       ORDER BY last_checked DESC
       LIMIT 1
     `, [agentId]);
+
+    const rows = result.rows;
 
     if (rows.length === 0) {
       return null;

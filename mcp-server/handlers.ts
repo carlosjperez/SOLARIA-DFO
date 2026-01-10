@@ -11,6 +11,8 @@
 
 import type {
   ApiCallFunction,
+  ApiClient,
+  ApiCredentials,
   SetProjectContextResult,
   Project,
   Task,
@@ -52,7 +54,7 @@ export async function executeTool(
   switch (name) {
     case 'get_context': {
       const handler = await import('./src/endpoints/get-context.js');
-      result = await handler.default.handler(args);
+      result = await handler.default.handler(args as any);
       break;
     }
 
@@ -221,6 +223,148 @@ export async function readResource(
     default:
       throw new Error(`Unknown resource: ${uri}`);
   }
+}
+
+// ============================================================================
+// API Client Factory (v1.0 compatibility)
+// ============================================================================
+
+/**
+ * Creates an authenticated API client for Dashboard API calls
+ * Legacy v1.0 compatibility - used by http-server.ts
+ */
+export function createApiClient(dashboardUrl: string, credentials: ApiCredentials): ApiClient {
+  let authToken: string | null = null;
+  const { user, password } = credentials;
+
+  async function authenticate(): Promise<{ token: string }> {
+    console.log('[DEBUG apiClient] Authenticating with dashboard:', dashboardUrl);
+    const response = await fetch(`${dashboardUrl}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user, password }),
+    });
+
+    console.log('[DEBUG apiClient] Auth response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('[DEBUG apiClient] Auth failed:', errorText);
+      throw new Error("Authentication failed");
+    }
+
+    const data = await response.json() as { token: string };
+    authToken = data.token;
+    console.log('[DEBUG apiClient] Auth successful, got token');
+    return data;
+  }
+
+  async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    if (!authToken) {
+      await authenticate();
+    }
+
+    const response = await fetch(`${dashboardUrl}${endpoint}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+        ...options.headers,
+      },
+    });
+
+    if (response.status === 401) {
+      // Token expired, re-authenticate
+      await authenticate();
+      return apiCall(endpoint, options);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
+  function setToken(token: string): void {
+    authToken = token;
+  }
+
+  // Implement request() for v2.0 compatibility
+  async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    return apiCall<T>(endpoint, options);
+  }
+
+  return { apiCall, authenticate, setToken, request };
+}
+
+// ============================================================================
+// HTTP Server Test Helpers
+// ============================================================================
+
+/**
+ * Handle MCP request for HTTP test server
+ */
+export async function handleMCPRequest(body: any): Promise<any> {
+  if (!body || !body.method) {
+    return {
+      jsonrpc: '2.0',
+      id: body?.id || null,
+      error: {
+        code: -32600,
+        message: 'Invalid Request'
+      }
+    };
+  }
+
+  if (body.method === 'tools/list') {
+    return {
+      jsonrpc: '2.0',
+      id: body.id,
+      result: {
+        tools: toolDefinitions
+      }
+    };
+  }
+
+  if (body.method === 'tools/call') {
+    const { name, arguments: args } = body.params || {};
+    try {
+      // Create a simple API call function for testing
+      const apiCall = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
+        // This is a stub - actual implementation would make real API calls
+        return Promise.resolve({} as T);
+      };
+
+      const result = await executeTool(name, args, apiCall, { session_id: 'test-session' });
+      return {
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { content: [{ type: 'text', text: JSON.stringify(result) }] }
+      };
+    } catch (error: any) {
+      return {
+        jsonrpc: '2.0',
+        id: body.id,
+        error: {
+          code: -32603,
+          message: error.message
+        }
+      };
+    }
+  }
+
+  return {
+    jsonrpc: '2.0',
+    id: body.id,
+    error: {
+      code: -32601,
+      message: 'Method not found'
+    }
+  };
+}
+
+/**
+ * List available tools
+ */
+export function listTools(): any[] {
+  return toolDefinitions;
 }
 
 // ============================================================================

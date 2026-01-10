@@ -14,7 +14,7 @@ import {
   wrapEndpoint,
   CommonErrors,
   validateResponse,
-} from '../utils/response-builder';
+} from '../utils/response-builder.js';
 
 describe('ResponseBuilder', () => {
   let builder: ResponseBuilder;
@@ -409,7 +409,7 @@ describe('Integration Tests', () => {
     expect(validateResponse(success2).valid).toBe(true);
     expect(validateResponse(success3).valid).toBe(true);
 
-    const error1 = builder.error('TEST_ERROR', 'Test');
+    const error1 = builder.error({ code: 'TEST_ERROR', message: 'Test' });
     const error2 = errorResponse('TEST_ERROR', 'Test');
     const error3 = await wrapEndpoint(async () => {
       throw new Error('Test');

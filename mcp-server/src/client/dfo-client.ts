@@ -187,7 +187,7 @@ export class DFOClient {
         );
 
         if (response.ok) {
-          const data = await response.json();
+          const data = await response.json() as { tasks?: any[], data?: any[] };
           const tasks = data.tasks || data.data || [];
 
           // Update cache with fresh data
@@ -213,7 +213,7 @@ export class DFOClient {
         );
 
         if (response.ok) {
-          const data = await response.json();
+          const data = await response.json() as { task?: any, data?: any };
           const task = data.task || data.data;
 
           // Update cache

@@ -19,10 +19,10 @@ const mockDb: Database = {
 };
 
 // Mock DFOApiClient methods
-const mockTriggerWorkflow = jest.fn();
-const mockGetWorkflowStatus = jest.fn();
-const mockCreateIssue = jest.fn();
-const mockCreatePR = jest.fn();
+const mockTriggerWorkflow = jest.fn<() => Promise<any>>();
+const mockGetWorkflowStatus = jest.fn<() => Promise<any>>();
+const mockCreateIssue = jest.fn<() => Promise<any>>();
+const mockCreatePR = jest.fn<() => Promise<any>>();
 
 // Mock the database module
 jest.unstable_mockModule('../database.js', () => ({

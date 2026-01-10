@@ -113,7 +113,7 @@ class ApiClient {
       return this.request<T>(endpoint, options);
     }
 
-    return response.json();
+    return response.json() as Promise<T>;
   }
 }
 

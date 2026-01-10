@@ -12,7 +12,7 @@ import {
     TaskNotFoundError,
     InvalidIdentifierError,
     AmbiguousIdentifierError
-} from './taskIdentifier';
+} from './taskIdentifier.js';
 import { ErrorObject } from './response-builder.js'
 
 /**
@@ -32,26 +32,28 @@ import { ErrorObject } from './response-builder.js'
 export function formatTaskError(error: Error): ErrorObject {
     // Task Not Found
     if (error instanceof TaskNotFoundError) {
+        const taskError = error as TaskNotFoundError;
         return {
             code: 'TASK_NOT_FOUND',
-            message: `Task not found: ${error.identifier}`,
+            message: `Task not found: ${taskError.identifier}`,
             details: {
-                identifier: error.identifier,
-                attempted_as: error.attemptedAs,
-                type: typeof error.identifier
+                identifier: taskError.identifier,
+                attempted_as: taskError.attemptedAs,
+                type: typeof taskError.identifier
             },
-            suggestion: getTaskNotFoundSuggestion(error)
+            suggestion: getTaskNotFoundSuggestion(taskError)
         };
     }
 
     // Invalid Identifier Format
     if (error instanceof InvalidIdentifierError) {
+        const invalidError = error as InvalidIdentifierError;
         return {
             code: 'INVALID_TASK_IDENTIFIER',
-            message: error.message,
+            message: invalidError.message,
             details: {
-                identifier: error.identifier,
-                received_type: typeof error.identifier
+                identifier: invalidError.identifier,
+                received_type: typeof invalidError.identifier
             },
             suggestion: 'Valid formats: task_id (491), task_number (158), or task_code ("DFO-158-EPIC15")'
         };
@@ -59,12 +61,13 @@ export function formatTaskError(error: Error): ErrorObject {
 
     // Ambiguous Identifier (Multiple Matches)
     if (error instanceof AmbiguousIdentifierError) {
+        const ambiguousError = error as AmbiguousIdentifierError;
         return {
             code: 'AMBIGUOUS_TASK_IDENTIFIER',
-            message: `Found ${error.matchCount} tasks with task_number ${error.identifier}`,
+            message: `Found ${ambiguousError.matchCount} tasks with task_number ${ambiguousError.identifier}`,
             details: {
-                identifier: error.identifier,
-                match_count: error.matchCount
+                identifier: ambiguousError.identifier,
+                match_count: ambiguousError.matchCount
             },
             suggestion: 'Provide project_id to disambiguate, or use task_code format (DFO-158-EPIC15)'
         };

@@ -29,6 +29,12 @@ export interface ApiClient {
   authenticate(): Promise<{ token: string }>;
   setToken(token: string): void;
   request<T>(endpoint: string, options?: RequestInit): Promise<T>;
+  apiCall?<T>(endpoint: string, options?: RequestInit): Promise<T>; // Legacy v1.0 compatibility
+}
+
+export interface ApiCredentials {
+  user: string;
+  password: string;
 }
 
 export type ApiCallFunction = <T>(endpoint: string, options?: RequestInit) => Promise<T>;

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+import type { Request, Response } from 'express';
 import { getProjects, getTasks, getAgents } from './src/dashboard-api.js';
 
 export const toolDefinitions = [
@@ -44,7 +45,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 
-app.post('/mcp', async (req, res) => {
+app.post('/mcp', async (req: Request, res: Response) => {
   const { method, id, params } = req.body;
   try {
     if (method !== 'tools/list' && method !== 'tools/call') {
@@ -81,7 +82,7 @@ app.post('/mcp', async (req, res) => {
   }
 });
 
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', version: '2.0-minimal', mode: 'minimal', timestamp: new Date().toISOString() });
 });
 
@@ -98,7 +99,7 @@ app.listen(PORT, () => {
 });
 
 
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', version: '2.0-minimal', mode: 'minimal', timestamp: new Date().toISOString() });
 });
 

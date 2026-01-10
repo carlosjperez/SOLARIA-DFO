@@ -14,7 +14,7 @@ const mockQuery = jest.fn<(sql: string, params?: any[]) => Promise<any[]>>();
 
 const mockDb: Database = {
   query: mockQuery,
-  execute: jest.fn(),
+  execute: jest.fn<() => Promise<{ rows: any[]; affectedRows?: number; insertId?: number }>>(),
 };
 
 // Mock the database module
@@ -33,54 +33,54 @@ describe('get_stats Endpoint', () => {
     mockQuery.mockImplementation((query: string) => {
       // Task status query
       if (query.includes('SUM(CASE WHEN status')) {
-        return [{
+        return Promise.resolve([{
           total: 60,
           pending: 15,
           in_progress: 7,
           completed: 35,
           blocked: 3,
-        }];
+        }]);
       }
 
       // Priority query
       if (query.includes('SUM(CASE WHEN priority')) {
-        return [{
+        return Promise.resolve([{
           critical: 3,
           high: 12,
           medium: 28,
           low: 17,
-        }];
+        }]);
       }
 
       // Velocity current sprint
       if (query.includes('SELECT COALESCE(SUM')) {
-        return [{ points: 42 }];
+        return Promise.resolve([{ points: 42 }]);
       }
 
       // Velocity history
       if (query.includes('FROM sprints s')) {
-        return [
+        return Promise.resolve([
           { sprint_id: 3, points: 42 },
           { sprint_id: 2, points: 38 },
           { sprint_id: 1, points: 35 },
-        ];
+        ]);
       }
 
       // Agent workload
       if (query.includes('FROM agents a')) {
-        return [
+        return Promise.resolve([
           { agent_id: 1, agent_name: 'Agent 1', agent_status: 'active', tasks_assigned: 15, tasks_completed: 12 },
           { agent_id: 2, agent_name: 'Agent 2', agent_status: 'active', tasks_assigned: 10, tasks_completed: 8 },
           { agent_id: 3, agent_name: 'Agent 3', agent_status: 'inactive', tasks_assigned: 5, tasks_completed: 5 },
-        ];
+        ]);
       }
 
       // Project name
       if (query.includes('FROM projects')) {
-        return [{ name: 'DFO Enhancement Plan' }];
+        return Promise.resolve([{ name: 'DFO Enhancement Plan' }]);
       }
 
-      return [];
+      return Promise.resolve([]);
     });
   });
 
@@ -173,21 +173,21 @@ describe('get_stats Endpoint', () => {
     it('should handle zero tasks gracefully', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
-          return [{ total: 0, pending: 0, in_progress: 0, completed: 0, blocked: 0 }];
+          return Promise.resolve([{ total: 0, pending: 0, in_progress: 0, completed: 0, blocked: 0 }]);
         }
         if (query.includes('SUM(CASE WHEN priority')) {
-          return [{ critical: 0, high: 0, medium: 0, low: 0 }];
+          return Promise.resolve([{ critical: 0, high: 0, medium: 0, low: 0 }]);
         }
         if (query.includes('SELECT COALESCE(SUM')) {
-          return [{ points: 0 }];
+          return Promise.resolve([{ points: 0 }]);
         }
         if (query.includes('FROM sprints s')) {
-          return [];
+          return Promise.resolve([]);
         }
         if (query.includes('FROM agents a')) {
-          return [];
+          return Promise.resolve([]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -223,12 +223,12 @@ describe('get_stats Endpoint', () => {
     it('should detect upward velocity trend', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM sprints s')) {
-          return [
+          return Promise.resolve([
             { sprint_id: 3, points: 50 },
             { sprint_id: 2, points: 35 },
-          ];
+          ]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -242,12 +242,12 @@ describe('get_stats Endpoint', () => {
     it('should detect downward velocity trend', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM sprints s')) {
-          return [
+          return Promise.resolve([
             { sprint_id: 3, points: 30 },
             { sprint_id: 2, points: 50 },
-          ];
+          ]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -261,12 +261,12 @@ describe('get_stats Endpoint', () => {
     it('should detect stable velocity trend', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM sprints s')) {
-          return [
+          return Promise.resolve([
             { sprint_id: 3, points: 40 },
             { sprint_id: 2, points: 41 },
-          ];
+          ]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -292,9 +292,9 @@ describe('get_stats Endpoint', () => {
     it('should return 100 for empty project', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
-          return [{ total: 0, pending: 0, in_progress: 0, completed: 0, blocked: 0 }];
+          return Promise.resolve([{ total: 0, pending: 0, in_progress: 0, completed: 0, blocked: 0 }]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -374,11 +374,11 @@ describe('get_stats Endpoint', () => {
     it('should handle agents with no tasks', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM agents a')) {
-          return [
+          return Promise.resolve([
             { agent_id: 1, agent_name: 'Agent 1', agent_status: 'active', tasks_assigned: 0, tasks_completed: 0 },
-          ];
+          ]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -460,7 +460,7 @@ describe('get_stats Endpoint', () => {
 
   describe('Edge Cases', () => {
     it('should handle empty project returns zeros', async () => {
-      mockQuery.mockReturnValue([]);
+      mockQuery.mockResolvedValue([]);
 
       const result = await getStats.execute({ project_id: 999 });
 
@@ -470,12 +470,12 @@ describe('get_stats Endpoint', () => {
     it('should handle single task project', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
-          return [{ total: 1, pending: 0, in_progress: 0, completed: 1, blocked: 0 }];
+          return Promise.resolve([{ total: 1, pending: 0, in_progress: 0, completed: 1, blocked: 0 }]);
         }
         if (query.includes('SUM(CASE WHEN priority')) {
-          return [{ critical: 1, high: 0, medium: 0, low: 0 }];
+          return Promise.resolve([{ critical: 1, high: 0, medium: 0, low: 0 }]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -490,9 +490,9 @@ describe('get_stats Endpoint', () => {
     it('should handle all tasks completed', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
-          return [{ total: 50, pending: 0, in_progress: 0, completed: 50, blocked: 0 }];
+          return Promise.resolve([{ total: 50, pending: 0, in_progress: 0, completed: 50, blocked: 0 }]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -506,9 +506,9 @@ describe('get_stats Endpoint', () => {
     it('should handle all tasks blocked', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('SUM(CASE WHEN status')) {
-          return [{ total: 10, pending: 0, in_progress: 0, completed: 0, blocked: 10 }];
+          return Promise.resolve([{ total: 10, pending: 0, in_progress: 0, completed: 0, blocked: 10 }]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});
@@ -522,9 +522,9 @@ describe('get_stats Endpoint', () => {
     it('should handle no active agents', async () => {
       mockQuery.mockImplementation((query: string) => {
         if (query.includes('FROM agents a')) {
-          return [];
+          return Promise.resolve([]);
         }
-        return [];
+        return Promise.resolve([]);
       });
 
       const result = await getStats.execute({});

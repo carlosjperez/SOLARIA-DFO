@@ -10,7 +10,7 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHttpTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -427,10 +427,11 @@ export class MCPClientManager {
       }
     }
 
-    return new StreamableHttpTransport({
-      url: config.transport.url,
-      headers,
-    });
+    // TODO: Implement custom authProvider to pass headers
+    // StreamableHTTPClientTransport doesn't accept headers directly
+    return new StreamableHTTPClientTransport(
+      new URL(config.transport.url)
+    );
   }
 
   /**
@@ -444,7 +445,7 @@ export class MCPClientManager {
     return new StdioClientTransport({
       command: config.transport.command,
       args: config.transport.args || [],
-      env: config.transport.env || process.env,
+      env: (config.transport.env || process.env) as Record<string, string> | undefined,
     });
   }
 
@@ -472,10 +473,11 @@ export class MCPClientManager {
       }
     }
 
-    return new SSEClientTransport({
-      url: config.transport.url,
-      headers,
-    });
+    // TODO: Implement custom authProvider to pass headers
+    // SSEClientTransport doesn't accept headers directly
+    return new SSEClientTransport(
+      new URL(config.transport.url)
+    );
   }
 
   // ============================================================================

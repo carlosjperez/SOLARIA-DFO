@@ -6,7 +6,7 @@
  * @task MEM-005
  */
 
-import { CheckLocalMemoryParams } from '../types/params.js';
+import type { MCPToolDefinition } from '../types/mcp.js';
 import { handleCheckLocalMemory } from '../endpoints/local-memory-check.js';
 
 // ============================================================================

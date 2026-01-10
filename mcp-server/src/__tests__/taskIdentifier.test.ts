@@ -23,7 +23,7 @@ describe('resolveTaskIdentifier', () => {
         // Create fresh mock database for each test
         mockDb = {
             query: async () => [],
-            execute: async () => ({ affectedRows: 0 })
+            execute: async () => ({ rows: [], affectedRows: 0 })
         };
     });
 
@@ -178,7 +178,7 @@ describe('resolveTaskIdentifier', () => {
 
             try {
                 await resolveTaskIdentifier(158, 1, mockDb);
-                expect.fail('Should have thrown TaskNotFoundError');
+                throw new Error('Should have thrown TaskNotFoundError');
             } catch (error) {
                 expect(error).toBeInstanceOf(TaskNotFoundError);
                 const notFoundError = error as TaskNotFoundError;
@@ -192,7 +192,7 @@ describe('resolveTaskIdentifier', () => {
 
             try {
                 await resolveTaskIdentifier(invalidIdentifier as any, undefined, mockDb);
-                expect.fail('Should have thrown InvalidIdentifierError');
+                throw new Error('Should have thrown InvalidIdentifierError');
             } catch (error) {
                 expect(error).toBeInstanceOf(InvalidIdentifierError);
                 const invalidError = error as InvalidIdentifierError;
@@ -213,7 +213,7 @@ describe('resolveTaskIdentifier', () => {
 
             try {
                 await resolveTaskIdentifier(158, undefined, mockDb);
-                expect.fail('Should have thrown AmbiguousIdentifierError');
+                throw new Error('Should have thrown AmbiguousIdentifierError');
             } catch (error) {
                 expect(error).toBeInstanceOf(AmbiguousIdentifierError);
                 const ambiguousError = error as AmbiguousIdentifierError;

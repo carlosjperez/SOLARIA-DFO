@@ -14,7 +14,7 @@ export interface Tool {
   name: string;
   description: string;
   inputSchema: ZodSchema;
-  execute: (params: any) => Promise<any>;
+  execute: (params: any, testDb?: any) => Promise<any>;
 }
 
 /**

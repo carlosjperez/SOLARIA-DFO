@@ -95,7 +95,7 @@ Use /dfo status to see all tasks.
       high: '🟠',
       medium: '🟡',
       low: '🔵',
-    }[task.priority] || '⚪';
+    }[task.priority as 'critical' | 'high' | 'medium' | 'low'] || '⚪';
 
     lines.push(
       `${index + 1}. ${priorityIcon} ${task.task_code}: ${task.title}`,

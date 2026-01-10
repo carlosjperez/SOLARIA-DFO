@@ -28,7 +28,7 @@ describe('DFN-008: Dependency Tree Visualization', () => {
       query: async () => {
         return queryResults.shift() || [];
       },
-      execute: async () => ({ affectedRows: 0 })
+      execute: async () => ({ rows: [], affectedRows: 0 })
     };
   });
 

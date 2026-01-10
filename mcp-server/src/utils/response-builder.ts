@@ -114,23 +114,7 @@ export class ResponseBuilder {
   }
 
   errorFromException(error: any, defaultCode: string = 'INTERNAL_ERROR'): StandardErrorResponse {
-    if (error.code && error.message) {
-      return this.error({
-        code: error.code,
-        message: error.message,
-        details: error.details,
-      });
-    }
-
-    if (error.name === 'ZodError') {
-      return this.error({
-        code: 'VALIDATION_ERROR',
-        message: 'Input validation failed',
-        details: error.errors,
-        suggestion: 'Check input parameters and try again',
-      });
-    }
-
+    // Check for database errors first (MariaDB/MySQL errors start with ER_)
     if (error.code?.startsWith('ER_')) {
       return this.error({
         code: 'DATABASE_ERROR',
@@ -140,6 +124,26 @@ export class ResponseBuilder {
       });
     }
 
+    // Check for Zod validation errors
+    if (error.name === 'ZodError') {
+      return this.error({
+        code: 'VALIDATION_ERROR',
+        message: 'Input validation failed',
+        details: error.errors,
+        suggestion: 'Check input parameters and try again',
+      });
+    }
+
+    // Check for custom errors with code/message
+    if (error.code && error.message) {
+      return this.error({
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      });
+    }
+
+    // Fallback for generic errors
     return this.error({
       code: defaultCode,
       message: error.message || 'An unexpected error occurred',
@@ -294,7 +298,24 @@ export function validateResponse(response: unknown): {
   errors?: z.ZodError;
 } {
   try {
-    StandardResponseSchema.parse(response);
+    // First validate against the schema
+    const parsed = StandardResponseSchema.parse(response);
+
+    // Additional validation: success responses must have 'data' field present
+    if (typeof response === 'object' && response !== null && 'success' in response) {
+      const obj = response as any;
+      if (obj.success === true && !('data' in obj)) {
+        return {
+          valid: false,
+          errors: new z.ZodError([{
+            code: 'custom',
+            path: ['data'],
+            message: 'data field is required for success responses'
+          }])
+        };
+      }
+    }
+
     return { valid: true };
   } catch (error) {
     if (error instanceof z.ZodError) {

@@ -124,6 +124,7 @@ async function checkRedis(): Promise<HealthCheckResult> {
   // Redis check is optional - if not configured, return healthy with note
   try {
     // Check if redis module is available
+    // @ts-ignore - Redis module is optional and may not exist
     const redis = await import('../redis').catch(() => null);
 
     if (!redis || !redis.client) {

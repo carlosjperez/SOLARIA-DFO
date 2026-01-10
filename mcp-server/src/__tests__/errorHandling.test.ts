@@ -10,12 +10,12 @@ import {
     formatTaskError,
     formatError,
     isTaskError
-} from '../utils/errorHandling';
+} from '../utils/errorHandling.js';
 import {
     TaskNotFoundError,
     InvalidIdentifierError,
     AmbiguousIdentifierError
-} from '../utils/taskIdentifier';
+} from '../utils/taskIdentifier.js';
 
 describe('errorHandling', () => {
 

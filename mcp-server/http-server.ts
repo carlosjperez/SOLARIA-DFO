@@ -19,16 +19,17 @@ import crypto from "crypto";
 import jwt, { JwtPayload, VerifyErrors } from "jsonwebtoken";
 import {
   toolDefinitions,
-  resourceDefinitions,
   createApiClient,
   executeTool,
   readResource,
 } from "./handlers.js";
+import { resourceDefinitions } from "./tool-definitions.js";
 import type {
   MCPSession,
   MCPContext,
   MCPToolResult,
   ApiClient,
+  ApiCallFunction,
   JSONRPCRequest,
   JSONRPCResponse,
   JSON_RPC_ERRORS,
@@ -240,7 +241,7 @@ function getSession(sessionId: string | undefined): MCPSession | null {
 /**
  * Create a new session
  */
-function createSession(projectId: number | null): MCPSession {
+function createSession(projectId?: number): MCPSession {
   const sessionId = `mcp-${crypto.randomUUID()}`;
   const session: MCPSession = {
     id: sessionId,
@@ -268,7 +269,7 @@ function updateSessionProject(sessionId: string, projectId: number): MCPSession 
 /**
  * Get existing session or create new one
  */
-function getOrCreateSession(sessionId: string | undefined, projectId: number | null = null): MCPSession {
+function getOrCreateSession(sessionId?: string, projectId?: number): MCPSession {
   if (sessionId && sessions.has(sessionId)) {
     return sessions.get(sessionId)!;
   }
@@ -340,7 +341,7 @@ app.post("/mcp/session", async (req: Request<{}, {}, SessionCreateRequest>, res:
       return;
     }
 
-    const session = createSession(project_id || null);
+    const session = createSession(project_id || undefined);
 
     res.json({
       session_id: session.id,
@@ -365,7 +366,7 @@ app.post("/mcp", async (req: Request<{}, {}, MCPRequestBody>, res: Response) => 
     const isPublicMethod = publicMethods.includes(method) || isNotification;
 
     let auth: AuthResult | null = null;
-    let apiCall: ((endpoint: string, options?: RequestInit) => Promise<unknown>) | null = null;
+    let apiCall: ApiCallFunction | undefined = undefined;
 
     // Only authenticate for protected methods
     if (!isPublicMethod) {
@@ -382,13 +383,13 @@ app.post("/mcp", async (req: Request<{}, {}, MCPRequestBody>, res: Response) => 
     let session = getSession(sessionId);
     if (!session && !projectIdHeader) {
       // Create a new session for this connection
-      session = getOrCreateSession(undefined, null);
+      session = getOrCreateSession();
       sessionId = session.id;
     }
 
     const context: MCPContext = {
       session_id: sessionId || session?.id,
-      project_id: session?.project_id || (projectIdHeader ? parseInt(projectIdHeader, 10) : null),
+      project_id: session?.project_id || (projectIdHeader ? parseInt(projectIdHeader, 10) : undefined),
       // Admin mode: explicit header OR no project_id
       adminMode: adminModeHeader === "true" || adminModeHeader === "1",
     };
@@ -413,7 +414,7 @@ app.post("/mcp", async (req: Request<{}, {}, MCPRequestBody>, res: Response) => 
       case "initialize":
         // Create or get session for this connection
         if (!session) {
-          session = createSession(null);
+          session = createSession();
         }
         // Set Mcp-Session-Id header as per MCP Streamable HTTP spec
         res.setHeader("Mcp-Session-Id", session.id);

@@ -17,6 +17,16 @@ import { ResponseBuilder, CommonErrors } from '../utils/response-builder.js';
 
 const VERSION = '4.0.0';
 
+// Extend Tool type to include execute function
+interface ToolWithExecute extends Omit<Tool, 'inputSchema'> {
+  inputSchema: {
+    type: 'object';
+    properties?: Record<string, any>;
+    required?: string[];
+  };
+  execute: (params: any) => Promise<any>;
+}
+
 // ============================================================================
 // Zod Validation Schemas
 // ============================================================================
@@ -25,6 +35,7 @@ const VERSION = '4.0.0';
  * Schema for proxy_external_tool
  * Executes a tool on an external MCP server
  */
+// Zod schemas for runtime validation
 const ProxyExternalToolInputSchema = z.object({
   server_name: z
     .string()
@@ -41,10 +52,6 @@ const ProxyExternalToolInputSchema = z.object({
   format: z.enum(['json', 'human']).default('json').describe('Output format'),
 });
 
-/**
- * Schema for list_external_tools
- * Discovers available tools on external MCP servers
- */
 const ListExternalToolsInputSchema = z.object({
   server_name: z
     .string()
@@ -54,6 +61,47 @@ const ListExternalToolsInputSchema = z.object({
     ),
   format: z.enum(['json', 'human']).default('json').describe('Output format'),
 });
+
+// JSON schemas for MCP SDK Tool definitions
+const ProxyExternalToolJsonSchema = {
+  type: 'object' as const,
+  properties: {
+    server_name: {
+      type: 'string',
+      description: 'Name of the external MCP server (e.g., "context7", "playwright", "coderabbit")',
+    },
+    tool_name: {
+      type: 'string',
+      description: 'Name of the tool to execute on the external server',
+    },
+    params: {
+      type: 'object',
+      description: 'Parameters to pass to the external tool',
+      additionalProperties: true,
+    },
+    format: {
+      type: 'string',
+      enum: ['json', 'human'],
+      description: 'Output format',
+    },
+  },
+  required: ['server_name', 'tool_name'],
+};
+
+const ListExternalToolsJsonSchema = {
+  type: 'object' as const,
+  properties: {
+    server_name: {
+      type: 'string',
+      description: 'Optional server name to filter tools. If omitted, lists tools from all connected servers.',
+    },
+    format: {
+      type: 'string',
+      enum: ['json', 'human'],
+      description: 'Output format',
+    },
+  },
+};
 
 // ============================================================================
 // Type Definitions
@@ -110,7 +158,7 @@ interface ListToolsResponse {
 // Tool: proxy_external_tool
 // ============================================================================
 
-export const proxyExternalTool: Tool = {
+export const proxyExternalTool: ToolWithExecute = {
   name: 'proxy_external_tool',
   description: `Execute a tool on an external MCP server.
 
@@ -124,7 +172,7 @@ Example use cases:
 
 The external server must be configured and connected in the agent's MCP configuration.`,
 
-  inputSchema: ProxyExternalToolInputSchema,
+  inputSchema: ProxyExternalToolJsonSchema,
 
   async execute(params: z.infer<typeof ProxyExternalToolInputSchema>) {
     const builder = new ResponseBuilder({ version: VERSION });
@@ -135,12 +183,13 @@ The external server must be configured and connected in the agent's MCP configur
 
       // Validate server connection
       if (!manager.isConnected(params.server_name)) {
-        return builder.error(
-          CommonErrors.notFound('MCP server', params.server_name, {
-            suggestion:
-              'Ensure the MCP server is configured in the agent MCP config and connected. Use list_external_tools to see available servers.',
-          })
-        );
+        return builder.error({
+          code: 'MCP_SERVER_NOT_FOUND',
+          message: `MCP server with ID ${params.server_name} not found`,
+          details: { entity: 'MCP server', id: params.server_name },
+          suggestion:
+            'Ensure the MCP server is configured in the agent MCP config and connected. Use list_external_tools to see available servers.',
+        });
       }
 
       // Execute tool on external server
@@ -193,7 +242,7 @@ ${JSON.stringify(result.content, null, 2)}`;
   },
 };
 
-export const listExternalTools: Tool = {
+export const listExternalTools: ToolWithExecute = {
   name: 'list_external_tools',
   description: `List available tools from external MCP servers.
 
@@ -204,7 +253,7 @@ Discovers all tools available on connected external MCP servers. This is useful 
 
 If server_name is provided, only lists tools from that server. Otherwise, lists all tools from all connected servers.`,
 
-  inputSchema: ListExternalToolsInputSchema,
+  inputSchema: ListExternalToolsJsonSchema,
 
   async execute(params: z.infer<typeof ListExternalToolsInputSchema>) {
     const builder = new ResponseBuilder({ version: VERSION });
@@ -212,40 +261,40 @@ If server_name is provided, only lists tools from that server. Otherwise, lists 
     try {
       const manager = getMCPClientManager();
 
-      // Get all connected servers
-      const allServers = manager.listServers();
+      // Get all connected servers (returns string[])
+      const allServers = manager.getConnectedServers();
 
       if (allServers.length === 0) {
-        return builder.error(
-          CommonErrors.validation({
-            field: 'external_servers',
-            message: 'No external MCP servers are connected',
-            suggestion:
-              'Configure and connect external MCP servers in the agent MCP configuration before using proxy tools.',
-          })
-        );
+        return builder.error({
+          code: 'NO_EXTERNAL_SERVERS',
+          message: 'No external MCP servers are connected',
+          field: 'external_servers',
+          suggestion:
+            'Configure and connect external MCP servers in the agent MCP configuration before using proxy tools.',
+        });
       }
 
       // Filter by server_name if provided
       const targetServers = params.server_name
-        ? allServers.filter((s) => s.name === params.server_name)
+        ? allServers.filter((serverName) => serverName === params.server_name)
         : allServers;
 
       if (params.server_name && targetServers.length === 0) {
-        return builder.error(
-          CommonErrors.notFound('MCP server', params.server_name, {
-            suggestion: `Available servers: ${allServers.map((s) => s.name).join(', ')}`,
-          })
-        );
+        return builder.error({
+          code: 'MCP_SERVER_NOT_FOUND',
+          message: `MCP server with ID ${params.server_name} not found`,
+          details: { entity: 'MCP server', id: params.server_name },
+          suggestion: `Available servers: ${allServers.join(', ')}`,
+        });
       }
 
       // Fetch tools from each server
       const serversData = await Promise.all(
-        targetServers.map(async (server) => {
+        targetServers.map(async (serverName) => {
           try {
-            const tools = await manager.listTools(server.name);
+            const tools = await manager.listTools(serverName);
             return {
-              name: server.name,
+              name: serverName,
               connected: true,
               tools_count: tools.length,
               tools: tools.map((t) => ({
@@ -255,7 +304,7 @@ If server_name is provided, only lists tools from that server. Otherwise, lists 
             };
           } catch (error) {
             return {
-              name: server.name,
+              name: serverName,
               connected: false,
               tools_count: 0,
               tools: [],

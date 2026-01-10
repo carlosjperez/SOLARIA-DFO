@@ -14,7 +14,7 @@ const mockQuery = jest.fn<(sql: string, params?: any[]) => Promise<any[]>>();
 
 const mockDb: Database = {
   query: mockQuery,
-  execute: jest.fn(),
+  execute: jest.fn<() => Promise<{ rows: any[]; affectedRows?: number; insertId?: number }>>(),
 };
 
 // Mock the database module
@@ -77,7 +77,8 @@ describe('get_ready_tasks Endpoint', () => {
       expect(mockQuery).toHaveBeenCalled();
       const queryCall = mockQuery.mock.calls[0];
       const queryParams = queryCall[1];
-      expect(queryParams[queryParams.length - 1]).toBe(10);
+      expect(queryParams).toBeDefined();
+      expect(queryParams![queryParams!.length - 1]).toBe(10);
     });
 
     it('should reject invalid limit', async () => {
@@ -403,8 +404,9 @@ describe('get_ready_tasks Endpoint', () => {
 
       const queryCall = mockQuery.mock.calls[0];
       const queryParams = queryCall[1];
-      expect(queryParams[0]).toBe(98); // First project_id
-      expect(queryParams[1]).toBe(98); // Second project_id (for NULL check)
+      expect(queryParams).toBeDefined();
+      expect(queryParams![0]).toBe(98); // First project_id
+      expect(queryParams![1]).toBe(98); // Second project_id (for NULL check)
     });
 
     it('should filter by agent_id', async () => {
@@ -417,8 +419,9 @@ describe('get_ready_tasks Endpoint', () => {
 
       const queryCall = mockQuery.mock.calls[0];
       const queryParams = queryCall[1];
-      expect(queryParams[2]).toBe(11); // First agent_id
-      expect(queryParams[3]).toBe(11); // Second agent_id
+      expect(queryParams).toBeDefined();
+      expect(queryParams![2]).toBe(11); // First agent_id
+      expect(queryParams![3]).toBe(11); // Second agent_id
     });
 
     it('should return filter metadata', async () => {

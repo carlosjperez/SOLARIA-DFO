@@ -12,7 +12,7 @@
 
 import { z } from 'zod';
 import { ResponseBuilder } from '../utils/response-builder.js';
-import { Tool } from '../types/mcp.js';
+import { Tool, MCPToolDefinition } from '../types/mcp.js';
 
 // ============================================================================
 // Configuration
@@ -56,7 +56,7 @@ const DeleteCollectionInputSchema = z.object({
 // MCP Tool Export
 // ============================================================================
 
-export const chroma_health_check: Tool = {
+export const chroma_health_check: MCPToolDefinition = {
   name: 'chroma_health_check',
   description: 'Verificar si el servicio Chroma está disponible',
   inputSchema: {
@@ -65,7 +65,7 @@ export const chroma_health_check: Tool = {
   },
 };
 
-export const chroma_add_document: Tool = {
+export const chroma_add_document: MCPToolDefinition = {
   name: 'chroma_add_document',
   description: 'Añadir documento con embedding a Chroma',
   inputSchema: {
@@ -91,7 +91,7 @@ export const chroma_add_document: Tool = {
   },
 };
 
-export const chroma_query: Tool = {
+export const chroma_query: MCPToolDefinition = {
   name: 'chroma_query',
   description: 'Buscar documentos por similitud vectorial en Chroma',
   inputSchema: {
@@ -119,7 +119,7 @@ export const chroma_query: Tool = {
   },
 };
 
-export const chroma_create_collection: Tool = {
+export const chroma_create_collection: MCPToolDefinition = {
   name: 'chroma_create_collection',
   description: 'Crear nueva colección en Chroma',
   inputSchema: {
@@ -137,7 +137,7 @@ export const chroma_create_collection: Tool = {
   },
 };
 
-export const chroma_delete_collection: Tool = {
+export const chroma_delete_collection: MCPToolDefinition = {
   name: 'chroma_delete_collection',
   description: 'Eliminar colección de Chroma',
   inputSchema: {
@@ -157,7 +157,7 @@ export const chroma_delete_collection: Tool = {
 
 class ChromaClient {
   private baseUrl: string;
-  private collections: Map<string, string> = new Map();
+  public collections: Map<string, string> = new Map();
 
   constructor(baseUrl: string = CHROMA_URL) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -170,6 +170,7 @@ class ChromaClient {
   headers?: Record<string, string>,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    // TODO: Implement timeout with AbortController
     const response = await fetch(url, {
       method,
       headers: {
@@ -177,7 +178,7 @@ class ChromaClient {
         ...headers,
       },
       body: body ? JSON.stringify(body) : undefined,
-      timeout: 30000, // 30 seconds
+      // timeout: 30000, // Native fetch doesn't support timeout - use AbortController
     });
 
     if (!response.ok) {
@@ -185,7 +186,7 @@ class ChromaClient {
       throw new Error(`Chroma API error [${method} ${endpoint}]: ${response.status} - ${errorText}`);
     }
 
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
   async healthCheck(): Promise<boolean> {
@@ -201,7 +202,7 @@ class ChromaClient {
   async createCollection(
     collectionName: string,
     metadata?: Record<string, any>
-  ): Promise<{ id: string; name: string }> {
+  ): Promise<{ id: string; name: string; metadata?: Record<string, any> }> {
     const result = await this.request<{
       id: string;
       name: string;
@@ -244,7 +245,7 @@ class ChromaClient {
     textContent: string,
     metadata?: Record<string, any>,
     id?: string
-  ): Promise<{ success: boolean; id: string }> {
+  ): Promise<{ success: boolean; ids: string[] }> {
     const result = await this.request<{
       success: boolean;
       ids: string[];
@@ -311,6 +312,12 @@ function getChromaClient(): ChromaClient {
 async function initializeCollections() {
   console.log('Initializing Chroma collections...');
   const client = getChromaClient();
+
+  // Ensure chromaClient is initialized for module-level access
+  if (!chromaClient) {
+    throw new Error('ChromaClient initialization failed');
+  }
+
   const healthOk = await client.healthCheck();
 
   if (!healthOk) {
@@ -323,11 +330,11 @@ async function initializeCollections() {
   // List existing collections
   const existingCollections = await client.listCollections();
   existingCollections.forEach((c) => {
-    chromaClient.collections.set(c.name, c.id);
+    chromaClient!.collections.set(c.name, c.id);
   });
 
   // Create observations collection if it doesn't exist
-  if (!chromaClient.collections.has(CHROMA_COLLECTION_OBSERVATIONS)) {
+  if (!chromaClient!.collections.has(CHROMA_COLLECTION_OBSERVATIONS)) {
     console.log(`Creating collection: ${CHROMA_COLLECTION_OBSERVATIONS}`);
     const obsCollection = await client.createCollection(CHROMA_COLLECTION_OBSERVATIONS, {
       description: 'Tool usage observations from claude-mem',
@@ -337,12 +344,12 @@ async function initializeCollections() {
     metadata_source: 'hybrid',
     source: 'claude-mem-sync-agent',
     });
-    chromaClient.collections.set(CHROMA_COLLECTION_OBSERVATIONS, obsCollection.id);
+    chromaClient!.collections.set(CHROMA_COLLECTION_OBSERVATIONS, obsCollection.id);
     console.log(`✓ Collection created: ${CHROMA_COLLECTION_OBSERVATIONS} (ID: ${obsCollection.id})`);
   }
 
   // Create summaries collection if it doesn't exist
-  if (!chromaClient.collections.has(CHROMA_COLLECTION_SUMMARIES)) {
+  if (!chromaClient!.collections.has(CHROMA_COLLECTION_SUMMARIES)) {
     console.log(`Creating collection: ${CHROMA_COLLECTION_SUMMARIES}`);
     const sumCollection = await client.createCollection(CHROMA_COLLECTION_SUMMARIES, {
       description: 'Session summaries from claude-mem',
@@ -352,12 +359,12 @@ async function initializeCollections() {
       metadata_source: 'hybrid',
       source: 'claude-mem-sync-agent',
     });
-    chromaClient.collections.set(CHROMA_COLLECTION_SUMMARIES, sumCollection.id);
+    chromaClient!.collections.set(CHROMA_COLLECTION_SUMMARIES, sumCollection.id);
     console.log(`✓ Collection created: ${CHROMA_COLLECTION_SUMMARIES} (ID: ${sumCollection.id})`);
   }
 
   console.log('Chroma collections initialized');
-  console.log(`Available collections: ${chromaClient.collections.size}`);
+  console.log(`Available collections: ${chromaClient!.collections.size}`);
 }
 
 // ============================================================================
@@ -366,6 +373,7 @@ async function initializeCollections() {
 
 export async function generateEmbedding(text: string): Promise<number[]> {
     try {
+      // TODO: Implement timeout with AbortController if needed
       const response = await fetch(`${LLM_SERVICE_URL}/api/embeddings`, {
         method: 'POST',
         headers: {
@@ -376,14 +384,14 @@ export async function generateEmbedding(text: string): Promise<number[]> {
           text: text,
           model: EMBEDDING_MODEL,
         }),
-        timeout: 30000, // 30 seconds
+        // timeout: 30000, // Native fetch doesn't support timeout - use AbortController
       });
 
       if (!response.ok) {
         throw new Error(`LLM embedding API error: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as { embedding?: number[] };
       return data.embedding || [];
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -405,15 +413,17 @@ export async function handleChromaHealthCheck(params: any) {
     return ResponseBuilder.success({
       chroma_healthy: isHealthy,
       chroma_url: CHROMA_URL,
-      collections: Object.fromEntries(chromaClient.collections),
+      collections: Object.fromEntries(chromaClient!.collections),
       message: isHealthy ? '✅ Chroma service is available' : '❌ Chroma service is not responding',
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Chroma health check error:', errorMessage);
 
-    return ResponseBuilder.error('Failed to check Chroma health', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'CHROMA_HEALTH_CHECK_ERROR',
+      message: 'Failed to check Chroma health',
+      details: errorMessage
     });
   }
 }
@@ -427,13 +437,18 @@ export async function handleChromaAddDocument(params: any) {
 
     const collectionId = client.getCollectionId(collection_name);
     if (!collectionId) {
-      return ResponseBuilder.error('Collection not found', {
-        details: `Collection '${collection_name}' does not exist`,
-        available_collections: Array.from(client.collections.keys()),
+      return ResponseBuilder.error({
+        code: 'COLLECTION_NOT_FOUND',
+        message: 'Collection not found',
+        details: {
+          collection_name,
+          error: `Collection '${collection_name}' does not exist`,
+          available_collections: Array.from(client.collections.keys())
+        }
       });
     }
 
-    const result = await client.addDocument(collectionName, text_content, metadata, id);
+    const result = await client.addDocument(collection_name, text_content, metadata, id);
 
     return ResponseBuilder.success({
       success: result.success,
@@ -445,8 +460,10 @@ export async function handleChromaAddDocument(params: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Chroma add document error:', errorMessage);
 
-    return ResponseBuilder.error('Failed to add document to Chroma', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'CHROMA_ADD_DOCUMENT_ERROR',
+      message: 'Failed to add document to Chroma',
+      details: errorMessage
     });
   }
 }
@@ -460,9 +477,14 @@ export async function handleChromaQuery(params: any) {
 
     const collectionId = client.getCollectionId(collection_name);
     if (!collectionId) {
-      return ResponseBuilder.error('Collection not found', {
-        details: `Collection '${collection_name}' does not exist`,
-        available_collections: Array.from(client.collections.keys()),
+      return ResponseBuilder.error({
+        code: 'COLLECTION_NOT_FOUND',
+        message: 'Collection not found',
+        details: {
+          collection_name,
+          error: `Collection '${collection_name}' does not exist`,
+          available_collections: Array.from(client.collections.keys())
+        }
       });
     }
 
@@ -473,7 +495,7 @@ export async function handleChromaQuery(params: any) {
     const output = {
       query: query_texts.join(', '),
       n_results: formattedResults.ids?.length || 0,
-      results: formattedResults.ids?.map((id, index) => ({
+      results: formattedResults.ids?.map((id: string, index: number) => ({
         id,
         index: index + 1,
         distance: formattedResults.distances?.[index],
@@ -487,8 +509,10 @@ export async function handleChromaQuery(params: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Chroma query error:', errorMessage);
 
-    return ResponseBuilder.error('Failed to query Chroma', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'CHROMA_QUERY_ERROR',
+      message: 'Failed to query Chroma',
+      details: errorMessage
     });
   }
 }
@@ -511,8 +535,10 @@ export async function handleChromaCreateCollection(params: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Chroma create collection error:', errorMessage);
 
-    return ResponseBuilder.error('Failed to create collection', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'CHROMA_CREATE_COLLECTION_ERROR',
+      message: 'Failed to create collection',
+      details: errorMessage
     });
   }
 }
@@ -534,8 +560,10 @@ export async function handleChromaDeleteCollection(params: any) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Chroma delete collection error:', errorMessage);
 
-    return ResponseBuilder.error('Failed to delete collection', {
-      details: errorMessage,
+    return ResponseBuilder.error({
+      code: 'CHROMA_DELETE_COLLECTION_ERROR',
+      message: 'Failed to delete collection',
+      details: errorMessage
     });
   }
 }

@@ -14,7 +14,7 @@ const mockQuery = jest.fn<(sql: string, params?: any[]) => Promise<any[]>>();
 
 const mockDb: Database = {
   query: mockQuery,
-  execute: jest.fn(),
+  execute: jest.fn<() => Promise<{ rows: any[]; affectedRows?: number; insertId?: number }>>(),
 };
 
 // Mock os module functions
@@ -26,7 +26,7 @@ const mockOsFunctions = {
 };
 
 // Mock child_process exec
-const mockExec = jest.fn();
+const mockExec = jest.fn<(cmd: string, callback: (err: any, stdout: string, stderr: string) => void) => void>();
 
 // Mock the database module
 jest.unstable_mockModule('../database.js', () => ({
@@ -45,8 +45,8 @@ jest.unstable_mockModule('child_process', () => ({
 
 // Mock util
 jest.unstable_mockModule('util', () => ({
-  promisify: (fn: any) => (...args: any[]) => new Promise((resolve, reject) => {
-    mockExec(...args, (err: any, stdout: any, stderr: any) => {
+  promisify: (fn: any) => (cmd: string) => new Promise((resolve, reject) => {
+    mockExec(cmd, (err: any, stdout: any, stderr: any) => {
       if (err) reject(err);
       else resolve({ stdout, stderr });
     });

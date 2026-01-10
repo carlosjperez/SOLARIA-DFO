@@ -182,7 +182,7 @@ export const createInlineDocument: Tool = {
         null, // created_by_agent_id
       ]);
 
-      const document = await getDocumentById(result.insertId);
+      const document = await getDocumentById(result.insertId!);
 
       const formatted = params.format === 'human' && document
         ? formatDocument(document as any)
@@ -362,7 +362,7 @@ export const updateInlineDocument: Tool = {
         null, // created_by_agent_id
       ]);
 
-      const updatedDocument = await getDocumentById(result.insertId);
+      const updatedDocument = await getDocumentById(result.insertId!);
 
       const formatted = params.format === 'human' && updatedDocument
         ? formatDocument(updatedDocument as any)

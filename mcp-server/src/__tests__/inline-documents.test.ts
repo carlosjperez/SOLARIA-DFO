@@ -47,7 +47,7 @@ describe('Inline Documents Endpoints', () => {
       // Mock no duplicate
       mockQuery.mockResolvedValueOnce([[{ count: 0 }], undefined] as any);
       // Mock insert
-      mockExecute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], insertId: 1, affectedRows: 1 });
       // Mock get created document
       mockQuery.mockResolvedValueOnce([[{
         id: 1,
@@ -77,7 +77,7 @@ describe('Inline Documents Endpoints', () => {
 
     it('should create document with minimum required fields', async () => {
       mockQuery.mockResolvedValueOnce([[{ count: 0 }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], insertId: 1, affectedRows: 1 });
       mockQuery.mockResolvedValueOnce([[{
         id: 1,
         name: 'Min Doc',
@@ -159,7 +159,7 @@ describe('Inline Documents Endpoints', () => {
 
     it('should return human format when requested', async () => {
       mockQuery.mockResolvedValueOnce([[{ count: 0 }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ insertId: 1, affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], insertId: 1, affectedRows: 1 });
       mockQuery.mockResolvedValueOnce([[{
         id: 1,
         name: 'Test Document',
@@ -406,9 +406,9 @@ describe('Inline Documents Endpoints', () => {
         is_active: true,
       }], undefined] as any);
       // Archive old
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], affectedRows: 1 });
       // Insert new
-      mockExecute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], insertId: 2, affectedRows: 1 });
       // Get updated
       mockQuery.mockResolvedValueOnce([[{
         id: 2,
@@ -442,8 +442,8 @@ describe('Inline Documents Endpoints', () => {
       }], undefined] as any);
       // Check no duplicate
       mockQuery.mockResolvedValueOnce([[{ count: 0 }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
-      mockExecute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], insertId: 2, affectedRows: 1 });
       mockQuery.mockResolvedValueOnce([[{
         id: 2,
         name: 'New Name',
@@ -470,8 +470,8 @@ describe('Inline Documents Endpoints', () => {
         content_md: '# Content',
         version: 1,
       }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
-      mockExecute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], insertId: 2, affectedRows: 1 });
       mockQuery.mockResolvedValueOnce([[{
         id: 2,
         name: 'Doc',
@@ -498,8 +498,8 @@ describe('Inline Documents Endpoints', () => {
         content_md: '# Content',
         version: 1,
       }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
-      mockExecute.mockResolvedValueOnce({ insertId: 2, affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], insertId: 2, affectedRows: 1 });
       mockQuery.mockResolvedValueOnce([[{
         id: 2,
         name: 'Doc',
@@ -570,7 +570,7 @@ describe('Inline Documents Endpoints', () => {
         version: 1,
         is_active: true,
       }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], affectedRows: 1 });
 
       const result = await deleteInlineDocument.execute({
         document_id: 1,
@@ -617,7 +617,7 @@ describe('Inline Documents Endpoints', () => {
         type: 'spec',
         version: 1,
       }], undefined] as any);
-      mockExecute.mockResolvedValueOnce({ affectedRows: 1 });
+      mockExecute.mockResolvedValueOnce({ rows: [], affectedRows: 1 });
 
       const result = await deleteInlineDocument.execute({
         document_id: 1,
