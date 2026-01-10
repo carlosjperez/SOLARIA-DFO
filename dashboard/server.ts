@@ -2692,9 +2692,14 @@ class SolariaDashboardServer {
      */
     private async getSprintFullHierarchy(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo, epicsRepo, tasksRepo
+            // TODO: Add project_name to sprintsRepo.findSprintById() or use JOIN helper
+            // TODO: Add task counts to epicsRepo (tasks_total, tasks_completed)
+            // TODO: Add epicId filter support to tasksRepo
             const { id } = req.params;
+            const sprintId = parseInt(id);
 
-            // 1. Get sprint details
+            // 1. Get sprint details (SQL until sprintsRepo supports project join)
             const [sprints] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT s.*, p.name as project_name
                 FROM sprints s
@@ -2710,18 +2715,30 @@ class SolariaDashboardServer {
             const sprint = sprints[0];
 
             // 2. Get epics in this sprint
-            const [epics] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT e.*,
-                    (SELECT COUNT(*) FROM tasks WHERE epic_id = e.id) as tasks_total,
-                    (SELECT COUNT(*) FROM tasks WHERE epic_id = e.id AND status = 'completed') as tasks_completed
-                FROM epics e
-                WHERE e.sprint_id = ?
-                ORDER BY e.epic_number ASC
-            `, [id]);
+            const epicsRaw = await epicsRepo.findAllEpics({ sprintId });
 
-            // 3. Get tasks for each epic
+            // Enrich epics with task counts via Promise.all (SQL until epicsRepo supports)
+            const epicsWithCounts = await Promise.all(
+                epicsRaw.map(async (epic: any) => {
+                    const [counts] = await this.db!.execute<RowDataPacket[]>(`
+                        SELECT
+                            COUNT(*) as tasks_total,
+                            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as tasks_completed
+                        FROM tasks WHERE epic_id = ?
+                    `, [epic.id]);
+
+                    const count = counts[0] as any;
+                    return {
+                        ...epic,
+                        tasks_total: count?.tasks_total || 0,
+                        tasks_completed: count?.tasks_completed || 0
+                    };
+                })
+            );
+
+            // 3. Get tasks for each epic (SQL until tasksRepo supports epicId filter)
             const epicsWithTasks = await Promise.all(
-                epics.map(async (epic: any) => {
+                epicsWithCounts.map(async (epic: any) => {
                     const [tasks] = await this.db!.execute<RowDataPacket[]>(`
                         SELECT id, task_number, title, status, progress, priority, estimated_hours
                         FROM tasks
@@ -2738,6 +2755,7 @@ class SolariaDashboardServer {
             );
 
             // 4. Get standalone tasks (direct sprint assignment, no epic)
+            // SQL until tasksRepo supports composite filters (sprint_id AND epic_id IS NULL)
             const [standaloneTasks] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT id, task_number, title, status, progress, priority, estimated_hours
                 FROM tasks
