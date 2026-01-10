@@ -35,6 +35,7 @@ import {
 // Import Drizzle repositories
 import * as agentsRepo from './db/repositories/agents.js';
 import * as projectsRepo from './db/repositories/projects.js';
+import * as tasksRepo from './db/repositories/tasks.js';
 
 // Import local types
 import type {
@@ -4081,21 +4082,17 @@ class SolariaDashboardServer {
 
     private async getTaskItems(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo.findTaskItems()
+            // TODO: Add completed_by_name join to repository (LEFT JOIN ai_agents)
             const taskId = parseInt(req.params.id);
 
-            const [items] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT ti.*, a.name as completed_by_name
-                FROM task_items ti
-                LEFT JOIN ai_agents a ON ti.completed_by_agent_id = a.id
-                WHERE ti.task_id = ?
-                ORDER BY ti.sort_order ASC, ti.created_at ASC
-            `, [taskId]);
+            const items = await tasksRepo.findTaskItems(taskId, true);
 
             res.json({
                 items,
                 task_id: taskId,
                 total: items.length,
-                completed: items.filter((i: any) => i.is_completed).length
+                completed: items.filter((i: any) => i.isCompleted).length
             });
         } catch (error) {
             console.error('Error fetching task items:', error);
@@ -4105,6 +4102,7 @@ class SolariaDashboardServer {
 
     private async createTaskItems(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.createTaskItems()
             const taskId = parseInt(req.params.id);
             let { items } = req.body;
 
@@ -4113,33 +4111,20 @@ class SolariaDashboardServer {
                 items = [req.body];
             }
 
-            // Get current max sort_order
-            const [maxOrder] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT COALESCE(MAX(sort_order), -1) as max_order FROM task_items WHERE task_id = ?',
-                [taskId]
-            );
-            let currentOrder = maxOrder[0].max_order;
+            // Map to repository format (snake_case → camelCase)
+            const itemsData = items.map((item: any) => ({
+                title: item.title,
+                description: item.description || null,
+                estimatedMinutes: item.estimated_minutes || 0,
+            }));
 
-            const createdItems: any[] = [];
-            for (const item of items) {
-                currentOrder++;
-                const [result] = await this.db!.execute<ResultSetHeader>(`
-                    INSERT INTO task_items (task_id, title, description, sort_order, estimated_minutes)
-                    VALUES (?, ?, ?, ?, ?)
-                `, [taskId, item.title, item.description || null, currentOrder, item.estimated_minutes || 0]);
+            const createdItems = await tasksRepo.createTaskItems(taskId, itemsData);
 
-                createdItems.push({
-                    id: result.insertId,
-                    task_id: taskId,
-                    title: item.title,
-                    sort_order: currentOrder
-                });
-            }
-
-            // Recalculate progress
+            // Recalculate progress (repository updateTaskProgress already called internally)
             const progress = await this.recalculateTaskProgress(taskId);
 
-            // Log activity
+            // TODO: Migrate to activity_logs repository when available
+            // Log activity (still raw SQL - pending activity_logs repository)
             await this.logActivity({
                 action: `Created ${createdItems.length} checklist item(s) for task #${taskId}`,
                 category: 'task',
@@ -4159,51 +4144,51 @@ class SolariaDashboardServer {
 
     private async updateTaskItem(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.updateTaskItem() and completeTaskItem()
             const taskId = parseInt(req.params.id);
             const itemId = parseInt(req.params.itemId);
             const { title, description, is_completed, notes, actual_minutes, completed_by_agent_id } = req.body;
 
-            const updates: string[] = [];
-            const values: (string | number | null)[] = [];
+            // Check if this is a completion request
+            if (is_completed !== undefined && is_completed === true) {
+                await tasksRepo.completeTaskItem(
+                    taskId,
+                    itemId,
+                    notes,
+                    actual_minutes,
+                    completed_by_agent_id
+                );
+            } else {
+                // Build update data object (snake_case → camelCase)
+                const data: any = {};
+                if (title !== undefined) data.title = title;
+                if (description !== undefined) data.description = description;
+                if (notes !== undefined) data.notes = notes;
+                if (actual_minutes !== undefined) data.actualMinutes = actual_minutes;
 
-            if (title !== undefined) { updates.push('title = ?'); values.push(title); }
-            if (description !== undefined) { updates.push('description = ?'); values.push(description); }
-            if (notes !== undefined) { updates.push('notes = ?'); values.push(notes); }
-            if (actual_minutes !== undefined) { updates.push('actual_minutes = ?'); values.push(actual_minutes); }
-
-            if (is_completed !== undefined) {
-                updates.push('is_completed = ?');
-                values.push(is_completed);
-                if (is_completed) {
-                    updates.push('completed_at = NOW()');
-                    if (completed_by_agent_id) {
-                        updates.push('completed_by_agent_id = ?');
-                        values.push(completed_by_agent_id);
-                    }
-                } else {
-                    updates.push('completed_at = NULL');
-                    updates.push('completed_by_agent_id = NULL');
+                // Handle un-completion
+                if (is_completed === false) {
+                    data.isCompleted = false;
+                    data.completedAt = null;
+                    data.completedByAgentId = null;
                 }
-            }
 
-            if (updates.length === 0) {
-                res.status(400).json({ error: 'No fields to update' });
-                return;
-            }
+                if (Object.keys(data).length === 0) {
+                    res.status(400).json({ error: 'No fields to update' });
+                    return;
+                }
 
-            values.push(itemId, taskId);
-            await this.db!.execute(
-                `UPDATE task_items SET ${updates.join(', ')} WHERE id = ? AND task_id = ?`,
-                values
-            );
+                await tasksRepo.updateTaskItem(taskId, itemId, data);
+            }
 
             // Recalculate progress
             const progress = await this.recalculateTaskProgress(taskId);
 
-            // Get updated item
-            const [items] = await this.db!.execute<RowDataPacket[]>('SELECT * FROM task_items WHERE id = ?', [itemId]);
+            // Get updated items
+            const items = await tasksRepo.findTaskItems(taskId);
+            const updatedItem = items.find(i => i.id === itemId);
 
-            res.json({ item: items[0], ...progress });
+            res.json({ item: updatedItem, ...progress });
         } catch (error) {
             console.error('Error updating task item:', error);
             res.status(500).json({ error: 'Failed to update task item' });
@@ -4242,12 +4227,13 @@ class SolariaDashboardServer {
 
     private async deleteTaskItem(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.deleteTaskItem()
             const taskId = parseInt(req.params.id);
             const itemId = parseInt(req.params.itemId);
 
-            await this.db!.execute('DELETE FROM task_items WHERE id = ? AND task_id = ?', [itemId, taskId]);
+            await tasksRepo.deleteTaskItem(taskId, itemId);
 
-            // Recalculate progress
+            // Recalculate progress (repository updateTaskProgress already called internally)
             const progress = await this.recalculateTaskProgress(taskId);
 
             res.json({ deleted: true, item_id: itemId, ...progress });
