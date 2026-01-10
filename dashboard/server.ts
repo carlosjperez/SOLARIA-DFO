@@ -37,6 +37,7 @@ import * as agentsRepo from './db/repositories/agents.js';
 import * as projectsRepo from './db/repositories/projects.js';
 import * as tasksRepo from './db/repositories/tasks.js';
 import * as memoriesRepo from './db/repositories/memories.js';
+import * as alertsRepo from './db/repositories/alerts.js';
 
 // Import local types
 import type {
@@ -1028,10 +1029,8 @@ class SolariaDashboardServer {
     }
 
     private async getCriticalAlerts(): Promise<Alert[]> {
-        const [rows] = await this.db!.execute<RowDataPacket[]>(
-            "SELECT * FROM alerts WHERE severity = 'critical' AND status = 'active' ORDER BY created_at DESC LIMIT 10"
-        );
-        return rows as Alert[];
+        // ✅ MIGRATED TO DRIZZLE ORM - Using alertsRepo.getCriticalAlerts()
+        return alertsRepo.getCriticalAlerts() as Promise<Alert[]>;
     }
 
     // ========================================================================
@@ -5681,21 +5680,25 @@ class SolariaDashboardServer {
 
     private async logAgentActivity(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using alertsRepo.createActivityLog()
             const { project_id, agent_id, action, details, category = 'system', level = 'info' } = req.body;
 
-            const safeProjectId = project_id ?? null;
-            const safeAgentId = agent_id ?? null;
-            const safeAction = action ?? 'unknown';
+            // Serialize details if object
             const safeDetails = details ? JSON.stringify(details) : null;
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO activity_logs (project_id, agent_id, action, details, category, level)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `, [safeProjectId, safeAgentId, safeAction, safeDetails, category, level]);
+            // Create activity log via repository (snake_case → camelCase)
+            const createdLog = await alertsRepo.createActivityLog({
+                projectId: project_id ?? null,
+                agentId: agent_id ?? null,
+                action: action ?? 'unknown',
+                details: safeDetails,
+                category,
+                level,
+            });
 
             res.status(201).json({
                 success: true,
-                log_id: result.insertId,
+                log_id: createdLog.id,
                 message: 'Activity logged successfully'
             });
         } catch (error) {
