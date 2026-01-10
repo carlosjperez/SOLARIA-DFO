@@ -8,3 +8,5 @@ export * as tasksRepo from './tasks.js';
 export * as memoriesRepo from './memories.js';
 export * as agentsRepo from './agents.js';
 export * as alertsRepo from './alerts.js';
+export * as sprintsRepo from './sprints.js';
+export * as epicsRepo from './epics.js';

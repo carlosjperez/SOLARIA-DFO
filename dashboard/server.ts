@@ -38,6 +38,8 @@ import * as projectsRepo from './db/repositories/projects.js';
 import * as tasksRepo from './db/repositories/tasks.js';
 import * as memoriesRepo from './db/repositories/memories.js';
 import * as alertsRepo from './db/repositories/alerts.js';
+import * as sprintsRepo from './db/repositories/sprints.js';
+import * as epicsRepo from './db/repositories/epics.js';
 
 // Import local types
 import type {
@@ -2270,25 +2272,19 @@ class SolariaDashboardServer {
 
     private async getEpicById(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.findEpicWithStats()
+            // TODO: Migrate tasks query to tasksRepo.findAllTasks({ epicId })
             const { id } = req.params;
 
-            const [epics] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT e.*,
-                    p.name as project_name,
-                    p.code as project_code,
-                    (SELECT COUNT(*) FROM tasks WHERE epic_id = e.id) as tasks_count,
-                    (SELECT COUNT(*) FROM tasks WHERE epic_id = e.id AND status = 'completed') as tasks_completed
-                FROM epics e
-                LEFT JOIN projects p ON e.project_id = p.id
-                WHERE e.id = ?
-            `, [id]);
+            const result = await epicsRepo.findEpicWithStats(parseInt(id));
+            const epics = result[0] as unknown as any[];
 
             if (epics.length === 0) {
                 res.status(404).json({ error: 'Epic not found' });
                 return;
             }
 
-            // Get associated tasks
+            // Get associated tasks (SQL until tasksRepo supports epicId filter)
             const [tasks] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT id, title, status, progress, priority, estimated_hours
                 FROM tasks
@@ -2338,28 +2334,20 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Get next epic number for this project (auto-numbering)
-            const [maxNum] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT COALESCE(MAX(epic_number), 0) as max_num FROM epics WHERE project_id = ?',
-                [id]
-            );
-            const epicNumber = ((maxNum as any[])[0]?.max_num || 0) + 1;
-            const epicCode = `EPIC${String(epicNumber).padStart(3, '0')}`;
-
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO epics (project_id, epic_number, name, description, color, status, start_date, target_date, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                id,
-                epicNumber,
+            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.createEpic()
+            const epic = await epicsRepo.createEpic({
+                projectId,
                 name,
-                description || null,
-                color || '#6366f1',
-                status || 'open',
-                start_date || null,
-                target_date || null,
-                req.user?.userId || null
-            ]);
+                epicNumber: 0, // Placeholder, will be overwritten by repository
+                description: description || null,
+                color: color || '#6366f1',
+                status: status || 'open',
+                startDate: start_date || null,
+                targetDate: target_date || null,
+                createdBy: req.user?.userId || null
+            });
+
+            const epicCode = `EPIC${String(epic.epicNumber).padStart(3, '0')}`;
 
             // Log activity and emit Socket.IO event
             await this.logActivity({
@@ -2368,20 +2356,20 @@ class SolariaDashboardServer {
                 category: 'epic',
                 level: 'info',
                 project_id: projectId,
-                metadata: { epicId: result.insertId, epicNumber, epicCode, name }
+                metadata: { epicId: epic.id, epicNumber: epic.epicNumber, epicCode, name }
             });
 
             // Emit epic_created event for real-time updates
             this.io.to('notifications').emit('epic_created', {
-                id: result.insertId,
-                epicNumber,
+                id: epic.id,
+                epicNumber: epic.epicNumber,
                 name,
                 projectId
             });
 
             res.status(201).json({
-                id: result.insertId,
-                epic_number: epicNumber,
+                id: epic.id,
+                epic_number: epic.epicNumber,
                 epic_code: epicCode,
                 message: 'Epic created successfully'
             });
@@ -2395,22 +2383,21 @@ class SolariaDashboardServer {
 
     private async updateEpic(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.updateEpic()
             const { id } = req.params;
             const { name, description, color, status, start_date, target_date } = req.body;
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                UPDATE epics SET
-                    name = COALESCE(?, name),
-                    description = COALESCE(?, description),
-                    color = COALESCE(?, color),
-                    status = COALESCE(?, status),
-                    start_date = COALESCE(?, start_date),
-                    target_date = COALESCE(?, target_date),
-                    updated_at = NOW()
-                WHERE id = ?
-            `, [name, description, color, status, start_date, target_date, id]);
+            const updateData: any = {};
+            if (name !== undefined) updateData.name = name;
+            if (description !== undefined) updateData.description = description;
+            if (color !== undefined) updateData.color = color;
+            if (status !== undefined) updateData.status = status;
+            if (start_date !== undefined) updateData.startDate = start_date;
+            if (target_date !== undefined) updateData.targetDate = target_date;
 
-            if (result.affectedRows === 0) {
+            const epic = await epicsRepo.updateEpic(parseInt(id), updateData);
+
+            if (!epic) {
                 res.status(404).json({ error: 'Epic not found' });
                 return;
             }
@@ -2426,15 +2413,13 @@ class SolariaDashboardServer {
 
     private async deleteEpic(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.deleteEpic()
             const { id } = req.params;
 
             // Tasks with this epic_id will have it set to NULL via FK constraint
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                'DELETE FROM epics WHERE id = ?',
-                [id]
-            );
+            const result = await epicsRepo.deleteEpic(parseInt(id));
 
-            if (result.affectedRows === 0) {
+            if (result[0].affectedRows === 0) {
                 res.status(404).json({ error: 'Epic not found' });
                 return;
             }
@@ -2505,26 +2490,19 @@ class SolariaDashboardServer {
 
     private async getSprintById(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.findSprintWithStats()
+            // TODO: Migrate tasks query to tasksRepo.findAllTasks({ sprintId })
             const { id } = req.params;
 
-            const [sprints] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT s.*,
-                    p.name as project_name,
-                    p.code as project_code,
-                    (SELECT COUNT(*) FROM tasks WHERE sprint_id = s.id) as tasks_count,
-                    (SELECT COUNT(*) FROM tasks WHERE sprint_id = s.id AND status = 'completed') as tasks_completed,
-                    (SELECT SUM(estimated_hours) FROM tasks WHERE sprint_id = s.id) as total_estimated_hours
-                FROM sprints s
-                LEFT JOIN projects p ON s.project_id = p.id
-                WHERE s.id = ?
-            `, [id]);
+            const result = await sprintsRepo.findSprintWithStats(parseInt(id));
+            const sprints = result[0] as unknown as any[];
 
             if (sprints.length === 0) {
                 res.status(404).json({ error: 'Sprint not found' });
                 return;
             }
 
-            // Get associated tasks
+            // Get associated tasks (SQL until tasksRepo supports sprintId filter)
             const [tasks] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT id, title, status, progress, priority, estimated_hours
                 FROM tasks
@@ -2590,29 +2568,21 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Get next sprint number for this project (auto-numbering)
-            const [maxNum] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT COALESCE(MAX(sprint_number), 0) as max_num FROM sprints WHERE project_id = ?',
-                [id]
-            );
-            const sprintNumber = ((maxNum as any[])[0]?.max_num || 0) + 1;
-            const sprintCode = `SPRINT${String(sprintNumber).padStart(3, '0')}`;
+            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.createSprint()
+            const sprint = await sprintsRepo.createSprint({
+                projectId,
+                name: sprintName,
+                sprintNumber: 0, // Placeholder, will be overwritten by repository
+                goal: goal || null,
+                status: status || 'planned',
+                startDate: start_date || null,
+                endDate: end_date || null,
+                velocity: velocity || 0,
+                capacity: capacity || 0,
+                createdBy: req.user?.userId || null
+            });
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO sprints (project_id, sprint_number, name, goal, status, start_date, end_date, velocity, capacity, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                id,
-                sprintNumber,
-                sprintName,
-                goal || null,
-                status || 'planned',
-                start_date || null,
-                end_date || null,
-                velocity || 0,
-                capacity || 0,
-                req.user?.userId || null
-            ]);
+            const sprintCode = `SPRINT${String(sprint.sprintNumber).padStart(3, '0')}`;
 
             // Log activity and emit Socket.IO event
             await this.logActivity({
@@ -2621,20 +2591,20 @@ class SolariaDashboardServer {
                 category: 'sprint',
                 level: 'info',
                 project_id: projectId,
-                metadata: { sprintId: result.insertId, sprintNumber, sprintCode, name: sprintName, goal }
+                metadata: { sprintId: sprint.id, sprintNumber: sprint.sprintNumber, sprintCode, name: sprintName, goal }
             });
 
             // Emit sprint_created event for real-time updates
             this.io.to('notifications').emit('sprint_created', {
-                id: result.insertId,
-                sprintNumber,
+                id: sprint.id,
+                sprintNumber: sprint.sprintNumber,
                 name: sprintName,
                 projectId
             });
 
             res.status(201).json({
-                id: result.insertId,
-                sprint_number: sprintNumber,
+                id: sprint.id,
+                sprint_number: sprint.sprintNumber,
                 sprint_code: sprintCode,
                 message: 'Sprint created successfully'
             });
@@ -2648,23 +2618,22 @@ class SolariaDashboardServer {
 
     private async updateSprint(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.updateSprint()
             const { id } = req.params;
             const { name, goal, status, start_date, end_date, velocity, capacity } = req.body;
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                UPDATE sprints SET
-                    name = COALESCE(?, name),
-                    goal = COALESCE(?, goal),
-                    status = COALESCE(?, status),
-                    start_date = COALESCE(?, start_date),
-                    end_date = COALESCE(?, end_date),
-                    velocity = COALESCE(?, velocity),
-                    capacity = COALESCE(?, capacity),
-                    updated_at = NOW()
-                WHERE id = ?
-            `, [name, goal, status, start_date, end_date, velocity, capacity, id]);
+            const updateData: any = {};
+            if (name !== undefined) updateData.name = name;
+            if (goal !== undefined) updateData.goal = goal;
+            if (status !== undefined) updateData.status = status;
+            if (start_date !== undefined) updateData.startDate = start_date;
+            if (end_date !== undefined) updateData.endDate = end_date;
+            if (velocity !== undefined) updateData.velocity = velocity;
+            if (capacity !== undefined) updateData.capacity = capacity;
 
-            if (result.affectedRows === 0) {
+            const sprint = await sprintsRepo.updateSprint(parseInt(id), updateData);
+
+            if (!sprint) {
                 res.status(404).json({ error: 'Sprint not found' });
                 return;
             }
@@ -2680,15 +2649,13 @@ class SolariaDashboardServer {
 
     private async deleteSprint(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.deleteSprint()
             const { id } = req.params;
 
             // Tasks with this sprint_id will have it set to NULL via FK constraint
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                'DELETE FROM sprints WHERE id = ?',
-                [id]
-            );
+            const result = await sprintsRepo.deleteSprint(parseInt(id));
 
-            if (result.affectedRows === 0) {
+            if (result[0].affectedRows === 0) {
                 res.status(404).json({ error: 'Sprint not found' });
                 return;
             }
