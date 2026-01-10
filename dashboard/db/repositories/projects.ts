@@ -131,6 +131,17 @@ export async function createProjectDocument(
     return docs[0];
 }
 
+export async function deleteProjectDocument(id: number, projectId: number) {
+    return db
+        .delete(projectDocuments)
+        .where(
+            and(
+                eq(projectDocuments.id, id),
+                eq(projectDocuments.projectId, projectId)
+            )
+        );
+}
+
 // ============================================================================
 // Project Requests
 // ============================================================================
@@ -167,6 +178,17 @@ export async function updateProjectRequest(
         .where(eq(projectRequests.id, id))
         .limit(1);
     return requests[0] || null;
+}
+
+export async function deleteProjectRequest(id: number, projectId: number) {
+    return db
+        .delete(projectRequests)
+        .where(
+            and(
+                eq(projectRequests.id, id),
+                eq(projectRequests.projectId, projectId)
+            )
+        );
 }
 
 // ============================================================================
