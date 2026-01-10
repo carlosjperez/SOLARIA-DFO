@@ -1009,10 +1009,17 @@ class SolariaDashboardServer {
     }
 
     private async getAgentStates(): Promise<AgentState[]> {
-        const [rows] = await this.db!.execute<RowDataPacket[]>(
-            'SELECT id, name, status, NULL as current_task_id, last_activity as last_active_at FROM ai_agents'
-        );
-        return rows as AgentState[];
+        // ✅ MIGRATED TO DRIZZLE ORM - Using agentsRepo.findAllAgents()
+        const agents = await agentsRepo.findAllAgents();
+
+        // Map to AgentState format (camelCase → snake_case for compatibility)
+        return agents.map((agent: any) => ({
+            id: agent.id,
+            name: agent.name,
+            status: agent.status,
+            current_task_id: null,
+            last_active_at: agent.lastActivity,
+        })) as AgentState[];
     }
 
     private async getProjectMetrics(): Promise<any[]> {
