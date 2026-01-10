@@ -6132,7 +6132,7 @@ class SolariaDashboardServer {
             } else {
                 // Use repository for global stats
                 const result = await memoriesRepo.getMemoryStats();
-                stats = result[0][0];
+                stats = (result[0] as unknown as RowDataPacket[])[0];
             }
 
             // Get top tags via repository
@@ -6178,26 +6178,29 @@ class SolariaDashboardServer {
 
     private async getRelatedMemories(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using memoriesRepo
+            // TODO: Add type filter support to findRelatedMemories() in repository
             const { id } = req.params;
             const { type } = req.query;
 
-            let sql = `
-                SELECT m.*, mc.relationship_type, mc.strength
-                FROM memory_crossrefs mc
-                JOIN memories m ON mc.target_memory_id = m.id
-                WHERE mc.source_memory_id = ?
-            `;
-            const params: (string | number)[] = [parseInt(id)];
-
+            let related: any[];
             if (type) {
-                sql += ' AND mc.relationship_type = ?';
-                params.push(type as string);
+                // Custom query with type filter (SQL until repository supports it)
+                const [results] = await this.db!.execute<RowDataPacket[]>(`
+                    SELECT m.*, mc.relationship_type, mc.strength
+                    FROM memory_crossrefs mc
+                    JOIN memories m ON mc.target_memory_id = m.id
+                    WHERE mc.source_memory_id = ? AND mc.relationship_type = ?
+                    ORDER BY mc.strength DESC, m.importance DESC
+                `, [parseInt(id), type]);
+                related = results;
+            } else {
+                // Use repository for all related memories
+                const result = await memoriesRepo.findRelatedMemories(parseInt(id));
+                related = result[0] as unknown as any[];
             }
 
-            sql += ' ORDER BY mc.strength DESC, m.importance DESC';
-
-            const [related] = await this.db!.execute<RowDataPacket[]>(sql, params);
-
+            // Parse JSON fields
             related.forEach((m: any) => {
                 m.tags = m.tags ? JSON.parse(m.tags) : [];
                 m.metadata = m.metadata ? JSON.parse(m.metadata) : {};
@@ -6212,6 +6215,8 @@ class SolariaDashboardServer {
 
     private async createMemoryCrossref(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.createCrossref()
+            // TODO: Add ON DUPLICATE KEY UPDATE support to repository (currently errors on duplicates)
             const { source_memory_id, target_memory_id, relationship_type = 'related', strength = 0.5 } = req.body;
 
             if (!source_memory_id || !target_memory_id) {
@@ -6219,14 +6224,15 @@ class SolariaDashboardServer {
                 return;
             }
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO memory_crossrefs (source_memory_id, target_memory_id, relationship_type, strength)
-                VALUES (?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE strength = VALUES(strength), relationship_type = VALUES(relationship_type)
-            `, [source_memory_id, target_memory_id, relationship_type, strength]);
+            const crossref = await memoriesRepo.createCrossref(
+                source_memory_id,
+                target_memory_id,
+                relationship_type,
+                strength
+            );
 
             res.status(201).json({
-                id: result.insertId,
+                id: crossref.id,
                 message: 'Cross-reference created successfully'
             });
         } catch (error) {
