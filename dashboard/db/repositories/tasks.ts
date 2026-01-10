@@ -208,7 +208,7 @@ export async function toggleTaskItemComplete(
     `);
 
     return {
-        item: (result[0] as any[])[0],
+        item: (result[0] as unknown as any[])[0],
         progress: await getTaskProgress(taskId)
     };
 }

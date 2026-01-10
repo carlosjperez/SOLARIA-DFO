@@ -79,3 +79,113 @@ export async function findBusinessWithStats(id: number) {
         WHERE b.id = ${id}
     `);
 }
+
+// ============================================================================
+// Office Client Contacts
+// ============================================================================
+
+export async function findClientContacts(clientId: number) {
+    return db.execute(sql`
+        SELECT * FROM office_client_contacts
+        WHERE client_id = ${clientId}
+        ORDER BY is_primary DESC, name
+    `);
+}
+
+export async function createClientContact(data: {
+    clientId: number;
+    name: string;
+    title?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    isPrimary?: boolean;
+    notes?: string | null;
+}) {
+    // If setting as primary, unset other primaries
+    if (data.isPrimary) {
+        await db.execute(sql`
+            UPDATE office_client_contacts SET is_primary = 0
+            WHERE client_id = ${data.clientId}
+        `);
+    }
+
+    const result = await db.execute(sql`
+        INSERT INTO office_client_contacts (client_id, name, title, email, phone, is_primary, notes)
+        VALUES (
+            ${data.clientId},
+            ${data.name},
+            ${data.title || null},
+            ${data.email || null},
+            ${data.phone || null},
+            ${data.isPrimary ? 1 : 0},
+            ${data.notes || null}
+        )
+    `);
+
+    return (result[0] as any).insertId;
+}
+
+export async function updateClientContact(contactId: number, data: {
+    name?: string;
+    title?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    isPrimary?: boolean;
+    notes?: string | null;
+}) {
+    // If setting as primary, get client_id first then unset other primaries
+    if (data.isPrimary) {
+        const contactResult = await db.execute(sql`
+            SELECT client_id FROM office_client_contacts WHERE id = ${contactId}
+        `);
+        const contact = (contactResult[0] as unknown as any[])[0];
+
+        if (contact) {
+            await db.execute(sql`
+                UPDATE office_client_contacts SET is_primary = 0
+                WHERE client_id = ${contact.client_id} AND id != ${contactId}
+            `);
+        }
+    }
+
+    // Update with conditional logic - only update provided fields
+    const sets: string[] = [];
+
+    if (data.name !== undefined) {
+        await db.execute(sql`UPDATE office_client_contacts SET name = ${data.name} WHERE id = ${contactId}`);
+    }
+    if (data.title !== undefined) {
+        await db.execute(sql`UPDATE office_client_contacts SET title = ${data.title} WHERE id = ${contactId}`);
+    }
+    if (data.email !== undefined) {
+        await db.execute(sql`UPDATE office_client_contacts SET email = ${data.email} WHERE id = ${contactId}`);
+    }
+    if (data.phone !== undefined) {
+        await db.execute(sql`UPDATE office_client_contacts SET phone = ${data.phone} WHERE id = ${contactId}`);
+    }
+    if (data.isPrimary !== undefined) {
+        await db.execute(sql`UPDATE office_client_contacts SET is_primary = ${data.isPrimary ? 1 : 0} WHERE id = ${contactId}`);
+    }
+    if (data.notes !== undefined) {
+        await db.execute(sql`UPDATE office_client_contacts SET notes = ${data.notes} WHERE id = ${contactId}`);
+    }
+
+    return contactId;
+}
+
+export async function deleteClientContact(contactId: number) {
+    return db.execute(sql`
+        DELETE FROM office_client_contacts WHERE id = ${contactId}
+    `);
+}
+
+export async function findClientProjects(clientId: number) {
+    return db.execute(sql`
+        SELECT p.*,
+            (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as task_count,
+            (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks
+        FROM projects p
+        WHERE p.office_client_id = ${clientId}
+        ORDER BY p.created_at DESC
+    `);
+}

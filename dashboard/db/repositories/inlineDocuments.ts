@@ -1,4 +1,4 @@
-import { db } from '../drizzle';
+import { db } from '../index.js';
 import { sql, eq, and } from 'drizzle-orm';
 
 // ============================================================================
@@ -51,7 +51,7 @@ export async function createInlineDocument(data: {
         SELECT * FROM inline_documents WHERE id = ${insertId}
     `);
 
-    return (newDoc[0] as any[])[0];
+    return (newDoc[0] as unknown as any[])[0];
 }
 
 export async function updateInlineDocument(id: number, data: {
@@ -66,7 +66,7 @@ export async function updateInlineDocument(id: number, data: {
         SELECT * FROM inline_documents WHERE id = ${id} AND is_active = 1
     `);
 
-    const currentDoc = (current[0] as any[])[0];
+    const currentDoc = (current[0] as unknown as any[])[0];
 
     if (!currentDoc) {
         return null;
@@ -103,7 +103,7 @@ export async function updateInlineDocument(id: number, data: {
     `);
 
     return {
-        document: (newDoc[0] as any[])[0],
+        document: (newDoc[0] as unknown as any[])[0],
         previousVersion: currentDoc.version
     };
 }

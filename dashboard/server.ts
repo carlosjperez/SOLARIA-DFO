@@ -41,6 +41,7 @@ import * as alertsRepo from './db/repositories/alerts.js';
 import * as sprintsRepo from './db/repositories/sprints.js';
 import * as epicsRepo from './db/repositories/epics.js';
 import * as businessesRepo from './db/repositories/businesses.js';
+import * as inlineDocumentsRepo from './db/repositories/inlineDocuments.js';
 import * as agentMcpConfigsRepo from './db/repositories/agentMcpConfigs.js';
 import * as usersRepo from './db/repositories/users.js';
 import * as permissionsRepo from './db/repositories/permissions.js';
@@ -7739,12 +7740,11 @@ class SolariaDashboardServer {
 
     private async getClientContacts(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findClientContacts()
             const { id } = req.params;
 
-            const [contacts] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT * FROM office_client_contacts WHERE client_id = ? ORDER BY is_primary DESC, name',
-                [id]
-            );
+            const result = await businessesRepo.findClientContacts(parseInt(id));
+            const contacts = (result[0] as unknown as RowDataPacket[]);
 
             res.json({ success: true, contacts });
         } catch (error) {
@@ -7755,6 +7755,7 @@ class SolariaDashboardServer {
 
     private async createClientContact(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.createClientContact()
             const { id: client_id } = req.params;
             const { name, title, email, phone, is_primary, notes } = req.body;
 
@@ -7763,27 +7764,20 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // If setting as primary, unset other primaries
-            if (is_primary) {
-                await this.db!.execute(
-                    'UPDATE office_client_contacts SET is_primary = 0 WHERE client_id = ?',
-                    [client_id]
-                );
-            }
-
-            // Convert undefined to null for SQL compatibility
-            const toNull = (v: unknown) => v === undefined ? null : v;
-
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                `INSERT INTO office_client_contacts (client_id, name, title, email, phone, is_primary, notes)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                [client_id, name, toNull(title), toNull(email), toNull(phone), is_primary ? 1 : 0, toNull(notes)]
-            );
+            const contactId = await businessesRepo.createClientContact({
+                clientId: parseInt(client_id),
+                name,
+                title,
+                email,
+                phone,
+                isPrimary: is_primary,
+                notes
+            });
 
             res.status(201).json({
                 success: true,
                 message: 'Contact created',
-                contact_id: result.insertId
+                contact_id: contactId
             });
         } catch (error) {
             console.error('Error creating client contact:', error);
@@ -7793,23 +7787,18 @@ class SolariaDashboardServer {
 
     private async updateClientContact(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            const { clientId, id } = req.params;
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.updateClientContact()
+            const { id } = req.params;
             const { name, title, email, phone, is_primary, notes } = req.body;
 
-            if (is_primary) {
-                await this.db!.execute(
-                    'UPDATE office_client_contacts SET is_primary = 0 WHERE client_id = ?',
-                    [clientId]
-                );
-            }
-
-            await this.db!.execute(
-                `UPDATE office_client_contacts
-                 SET name = COALESCE(?, name), title = ?, email = ?, phone = ?,
-                     is_primary = ?, notes = ?
-                 WHERE id = ? AND client_id = ?`,
-                [name, title, email, phone, is_primary ? 1 : 0, notes, id, clientId]
-            );
+            await businessesRepo.updateClientContact(parseInt(id), {
+                name,
+                title,
+                email,
+                phone,
+                isPrimary: is_primary,
+                notes
+            });
 
             res.json({ success: true, message: 'Contact updated' });
         } catch (error) {
@@ -7820,12 +7809,10 @@ class SolariaDashboardServer {
 
     private async deleteClientContact(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            const { clientId, id } = req.params;
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.deleteClientContact()
+            const { id } = req.params;
 
-            await this.db!.execute(
-                'DELETE FROM office_client_contacts WHERE id = ? AND client_id = ?',
-                [id, clientId]
-            );
+            await businessesRepo.deleteClientContact(parseInt(id));
 
             res.json({ success: true, message: 'Contact deleted' });
         } catch (error) {
@@ -7836,17 +7823,11 @@ class SolariaDashboardServer {
 
     private async getClientProjects(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findClientProjects()
             const { id } = req.params;
 
-            const [projects] = await this.db!.execute<RowDataPacket[]>(
-                `SELECT p.*,
-                        (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as task_count,
-                        (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks
-                 FROM projects p
-                 WHERE p.office_client_id = ?
-                 ORDER BY p.created_at DESC`,
-                [id]
-            );
+            const result = await businessesRepo.findClientProjects(parseInt(id));
+            const projects = (result[0] as unknown as RowDataPacket[]);
 
             res.json({ success: true, projects });
         } catch (error) {
