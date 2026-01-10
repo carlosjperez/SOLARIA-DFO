@@ -235,6 +235,15 @@ export async function findAllTags() {
     return db.select().from(taskTags).orderBy(desc(taskTags.usageCount));
 }
 
+export async function findTagByName(name: string) {
+    const result = await db
+        .select()
+        .from(taskTags)
+        .where(eq(taskTags.name, name.toLowerCase()))
+        .limit(1);
+    return result[0] || null;
+}
+
 export async function findTaskTags(taskId: number) {
     return db.execute(sql`
         SELECT tt.*
@@ -259,16 +268,22 @@ export async function addTagToTask(taskId: number, tagId: number, userId?: numbe
     return findTaskTags(taskId);
 }
 
-export async function removeTagFromTask(taskId: number, tagId: number) {
-    await db.delete(taskTagAssignments).where(and(
+export async function removeTagFromTask(taskId: number, tagId: number): Promise<boolean> {
+    const result = await db.delete(taskTagAssignments).where(and(
         eq(taskTagAssignments.taskId, taskId),
         eq(taskTagAssignments.tagId, tagId)
     ));
 
-    // Update usage count
-    await db.update(taskTags).set({
-        usageCount: sql`GREATEST(usage_count - 1, 0)`,
-    }).where(eq(taskTags.id, tagId));
+    const deleted = result[0].affectedRows > 0;
+
+    if (deleted) {
+        // Update usage count only if something was deleted
+        await db.update(taskTags).set({
+            usageCount: sql`GREATEST(usage_count - 1, 0)`,
+        }).where(eq(taskTags.id, tagId));
+    }
+
+    return deleted;
 }
 
 // ============================================================================

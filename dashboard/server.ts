@@ -4236,6 +4236,7 @@ class SolariaDashboardServer {
 
     private async addTaskTag(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.addTagToTask() and findTagByName()
             const taskId = parseInt(req.params.id);
             const { tag_id, tag_name } = req.body;
             const userId = req.user?.userId || null;
@@ -4244,15 +4245,12 @@ class SolariaDashboardServer {
 
             // If tag_name provided instead of tag_id, look up the tag
             if (!tagIdToAssign && tag_name) {
-                const [tagRows] = await this.db!.execute<RowDataPacket[]>(
-                    'SELECT id FROM task_tags WHERE name = ?',
-                    [tag_name.toLowerCase()]
-                );
-                if (tagRows.length === 0) {
+                const tag = await tasksRepo.findTagByName(tag_name);
+                if (!tag) {
                     res.status(404).json({ error: `Tag '${tag_name}' not found` });
                     return;
                 }
-                tagIdToAssign = tagRows[0].id;
+                tagIdToAssign = tag.id;
             }
 
             if (!tagIdToAssign) {
@@ -4260,31 +4258,21 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Insert assignment
-            await this.db!.execute(`
-                INSERT INTO task_tag_assignments (task_id, tag_id, assigned_by)
-                VALUES (?, ?, ?)
-            `, [taskId, tagIdToAssign, userId]);
+            // Add tag to task (includes incrementing usage count)
+            await tasksRepo.addTagToTask(taskId, tagIdToAssign, userId);
 
-            // Increment usage count
-            await this.db!.execute(
-                'UPDATE task_tags SET usage_count = usage_count + 1 WHERE id = ?',
-                [tagIdToAssign]
-            );
-
-            // Get the added tag info
-            const [tagInfo] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT id, name, color, icon FROM task_tags WHERE id = ?',
-                [tagIdToAssign]
-            );
+            // Get the added tag info from result
+            const result = await tasksRepo.findTaskTags(taskId);
+            const tags = result[0] as unknown as any[];
+            const addedTag = tags.find((t: any) => t.id === tagIdToAssign);
 
             // Emit WebSocket event
             this.io.emit('task_tag_added', {
                 task_id: taskId,
-                tag: tagInfo[0]
+                tag: addedTag
             } as any);
 
-            res.json({ success: true, task_id: taskId, tag: tagInfo[0] });
+            res.json({ success: true, task_id: taskId, tag: addedTag });
         } catch (error: any) {
             if (error.code === 'ER_DUP_ENTRY') {
                 res.status(409).json({ error: 'Tag already assigned to this task' });
@@ -4297,24 +4285,16 @@ class SolariaDashboardServer {
 
     private async removeTaskTag(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.removeTagFromTask()
             const taskId = parseInt(req.params.id);
             const tagId = parseInt(req.params.tagId);
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                DELETE FROM task_tag_assignments
-                WHERE task_id = ? AND tag_id = ?
-            `, [taskId, tagId]);
+            const deleted = await tasksRepo.removeTagFromTask(taskId, tagId);
 
-            if (result.affectedRows === 0) {
+            if (!deleted) {
                 res.status(404).json({ error: 'Tag assignment not found' });
                 return;
             }
-
-            // Decrement usage count
-            await this.db!.execute(
-                'UPDATE task_tags SET usage_count = GREATEST(usage_count - 1, 0) WHERE id = ?',
-                [tagId]
-            );
 
             // Emit WebSocket event
             this.io.emit('task_tag_removed', {
