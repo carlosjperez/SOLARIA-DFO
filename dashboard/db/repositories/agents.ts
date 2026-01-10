@@ -144,6 +144,24 @@ export async function getAgentMetrics(agentId: number, metricType?: string, limi
         .limit(limit);
 }
 
+export async function getAgentReports() {
+    return db.execute(sql`
+        SELECT
+            aa.name as agent_name,
+            aa.role,
+            COUNT(t.id) as total_tasks,
+            SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
+            AVG(am.metric_value) as avg_performance,
+            as_.status as current_status
+        FROM ai_agents aa
+        LEFT JOIN tasks t ON aa.id = t.assigned_agent_id
+        LEFT JOIN agent_metrics am ON aa.id = am.agent_id
+        LEFT JOIN agent_states as_ ON aa.id = as_.agent_id
+        GROUP BY aa.id, aa.name, aa.role, as_.status
+        ORDER BY avg_performance DESC
+    `);
+}
+
 // ============================================================================
 // Agent Tasks
 // ============================================================================

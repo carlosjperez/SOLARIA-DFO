@@ -973,7 +973,8 @@ class SolariaDashboardServer {
 
     private async healthCheck(_req: Request, res: Response): Promise<void> {
         try {
-            // Check database
+            // ✅ MIGRATED TO DRIZZLE ORM - Using db.execute for health check
+            // Check database connectivity
             if (this.db) {
                 await this.db.execute('SELECT 1');
             }
@@ -1269,17 +1270,9 @@ class SolariaDashboardServer {
 
     private async getDocs(_req: Request, res: Response): Promise<void> {
         try {
-            const [docs] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    pd.id, pd.name, pd.type, pd.description, pd.url,
-                    pd.file_size, pd.uploaded_by,
-                    pd.created_at, pd.updated_at,
-                    p.name as project_name, p.code as project_code
-                FROM project_documents pd
-                LEFT JOIN projects p ON pd.project_id = p.id
-                ORDER BY pd.updated_at DESC
-                LIMIT 50
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.getAllDocuments()
+            const result = await projectsRepo.getAllDocuments(50);
+            const docs = (result[0] as unknown as RowDataPacket[]);
 
             res.json({ docs, count: docs.length });
         } catch (error) {
@@ -4761,20 +4754,9 @@ class SolariaDashboardServer {
 
     private async getProjectReports(_req: Request, res: Response): Promise<void> {
         try {
-            const [reports] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    p.name as project_name,
-                    COUNT(t.id) as total_tasks,
-                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
-                    AVG(pm.completion_percentage) as avg_completion,
-                    AVG(pm.agent_efficiency) as avg_efficiency
-                FROM projects p
-                LEFT JOIN tasks t ON p.id = t.project_id
-                LEFT JOIN project_metrics pm ON p.id = pm.project_id
-                WHERE p.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                GROUP BY p.id, p.name
-                ORDER BY avg_completion DESC
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.getProjectReports()
+            const result = await projectsRepo.getProjectReports();
+            const reports = (result[0] as unknown as RowDataPacket[]);
 
             res.json(reports);
         } catch (error) {
@@ -4784,21 +4766,9 @@ class SolariaDashboardServer {
 
     private async getAgentReports(_req: Request, res: Response): Promise<void> {
         try {
-            const [reports] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    aa.name as agent_name,
-                    aa.role,
-                    COUNT(t.id) as total_tasks,
-                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
-                    AVG(am.metric_value) as avg_performance,
-                    as_.status as current_status
-                FROM ai_agents aa
-                LEFT JOIN tasks t ON aa.id = t.assigned_agent_id
-                LEFT JOIN agent_metrics am ON aa.id = am.agent_id
-                LEFT JOIN agent_states as_ ON aa.id = as_.agent_id
-                GROUP BY aa.id, aa.name, aa.role, as_.status
-                ORDER BY avg_performance DESC
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using agentsRepo.getAgentReports()
+            const result = await agentsRepo.getAgentReports();
+            const reports = (result[0] as unknown as RowDataPacket[]);
 
             res.json(reports);
         } catch (error) {
@@ -4808,22 +4778,9 @@ class SolariaDashboardServer {
 
     private async getFinancialReports(_req: Request, res: Response): Promise<void> {
         try {
-            const [reports] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    p.name as project_name,
-                    p.budget,
-                    COALESCE(pm.budget_used, 0) as actual_cost,
-                    p.budget - COALESCE(pm.budget_used, 0) as remaining_budget,
-                    CASE
-                        WHEN p.budget > 0 THEN
-                            (COALESCE(pm.budget_used, 0) / p.budget) * 100
-                        ELSE 0
-                    END as budget_usage_percentage
-                FROM projects p
-                LEFT JOIN project_metrics pm ON p.id = pm.project_id AND pm.metric_date = CURDATE()
-                GROUP BY p.id, p.name, p.budget, pm.budget_used
-                ORDER BY budget_usage_percentage DESC
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.getFinancialReports()
+            const result = await projectsRepo.getFinancialReports();
+            const reports = (result[0] as unknown as RowDataPacket[]);
 
             res.json(reports);
         } catch (error) {
