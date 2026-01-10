@@ -12,3 +12,5 @@ export * as sprintsRepo from './sprints.js';
 export * as epicsRepo from './epics.js';
 export * as businessesRepo from './businesses.js';
 export * as agentMcpConfigsRepo from './agentMcpConfigs.js';
+export * as usersRepo from './users.js';
+export * as permissionsRepo from './permissions.js';

@@ -42,6 +42,8 @@ import * as sprintsRepo from './db/repositories/sprints.js';
 import * as epicsRepo from './db/repositories/epics.js';
 import * as businessesRepo from './db/repositories/businesses.js';
 import * as agentMcpConfigsRepo from './db/repositories/agentMcpConfigs.js';
+import * as usersRepo from './db/repositories/users.js';
+import * as permissionsRepo from './db/repositories/permissions.js';
 
 // Import Drizzle schema types
 import type { NewAgentMcpConfig } from './db/schema/index.js';
@@ -854,22 +856,19 @@ class SolariaDashboardServer {
 
     private async handleLogin(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using usersRepo.findUserByUsernameOrId() and updateLastLogin()
             const { userId, username, password } = req.body;
 
             // Bypass mode for development
             if (password === 'bypass') {
                 const identifier = userId || username;
-                const [rows] = await this.db!.execute<RowDataPacket[]>(
-                    'SELECT * FROM users WHERE username = ? OR id = ?',
-                    [identifier, identifier]
-                );
+                const user = await usersRepo.findUserByUsernameOrId(identifier);
 
-                if (rows.length === 0) {
+                if (!user) {
                     res.status(401).json({ error: 'User not found' });
                     return;
                 }
 
-                const user = rows[0] as User;
                 const token = jwt.sign(
                     { userId: user.id, username: user.username, role: user.role },
                     process.env.JWT_SECRET || 'default-secret',
@@ -891,18 +890,14 @@ class SolariaDashboardServer {
 
             // Normal authentication
             const identifier = userId || username;
-            const [rows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT * FROM users WHERE username = ? OR id = ?',
-                [identifier, identifier]
-            );
+            const user = await usersRepo.findUserByUsernameOrId(identifier);
 
-            if (rows.length === 0) {
+            if (!user) {
                 res.status(401).json({ error: 'Invalid credentials' });
                 return;
             }
 
-            const user = rows[0] as User;
-            const validPassword = await bcrypt.compare(password, user.password_hash);
+            const validPassword = await bcrypt.compare(password, user.passwordHash);
 
             if (!validPassword) {
                 res.status(401).json({ error: 'Invalid credentials' });
@@ -916,7 +911,7 @@ class SolariaDashboardServer {
             );
 
             // Update last login
-            await this.db!.execute('UPDATE users SET last_login = NOW() WHERE id = ?', [user.id]);
+            await usersRepo.updateLastLogin(user.id);
 
             res.json({
                 token,
@@ -1008,11 +1003,9 @@ class SolariaDashboardServer {
     // ========================================================================
 
     private async getUserById(userId: number): Promise<User | null> {
-        const [rows] = await this.db!.execute<RowDataPacket[]>(
-            'SELECT * FROM users WHERE id = ?',
-            [userId]
-        );
-        return rows.length > 0 ? (rows[0] as User) : null;
+        // ✅ MIGRATED TO DRIZZLE ORM - Using usersRepo.findUserById()
+        // TODO: Fix type mapping (Drizzle camelCase vs API snake_case)
+        return usersRepo.findUserById(userId) as any;
     }
 
     private async getAgentStates(): Promise<AgentState[]> {
@@ -8205,19 +8198,14 @@ class SolariaDashboardServer {
 
     private async getPermissions(_req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            const [permissions] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT * FROM permissions ORDER BY category, code'
-            );
-
-            const [rolePermissions] = await this.db!.execute<RowDataPacket[]>(
-                `SELECT rp.role, p.code as permission
-                 FROM role_permissions rp
-                 JOIN permissions p ON rp.permission_id = p.id`
-            );
+            // ✅ MIGRATED TO DRIZZLE ORM - Using permissionsRepo
+            const permissions = await permissionsRepo.findAllPermissions();
+            const rolePermissionsResult: any = await permissionsRepo.findAllRolePermissions();
+            const rolePermissionsRaw = rolePermissionsResult[0];
 
             // Group permissions by role
             const roleMap: Record<string, string[]> = {};
-            for (const rp of rolePermissions) {
+            for (const rp of rolePermissionsRaw) {
                 if (!roleMap[rp.role]) roleMap[rp.role] = [];
                 roleMap[rp.role].push(rp.permission);
             }
