@@ -1299,44 +1299,38 @@ class SolariaDashboardServer {
 
     private async getProjectsPublic(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.findAllProjects()
+            // TODO: Add task counts to repository (currently SQL for aggregation)
             const { status, priority, limit = '50' } = req.query;
 
-            let query = `
-                SELECT
-                    p.id,
-                    p.name,
-                    p.code,
-                    p.client,
-                    p.description,
-                    p.status,
-                    p.priority,
-                    p.budget,
-                    p.completion_percentage,
-                    p.start_date,
-                    p.deadline,
-                    p.created_at,
-                    p.updated_at,
-                    (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as task_count,
-                    (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks
-                FROM projects p
-                WHERE (p.archived = FALSE OR p.archived IS NULL)
-            `;
+            const filters: any = {
+                archived: false,
+                limit: parseInt(limit as string, 10)
+            };
 
-            const params: (string | number)[] = [];
+            if (status) filters.status = status as string;
+            if (priority) filters.priority = priority as string;
 
-            if (status) {
-                query += ' AND p.status = ?';
-                params.push(status as string);
-            }
+            const projectsRaw = await projectsRepo.findAllProjects(filters);
 
-            if (priority) {
-                query += ' AND p.priority = ?';
-                params.push(priority as string);
-            }
+            // Enrich with task counts via Promise.all (SQL until tasksRepo supports aggregations)
+            const statsPromises = projectsRaw.map(async (project: any) => {
+                const [stats] = await this.db!.execute<RowDataPacket[]>(`
+                    SELECT
+                        COUNT(*) as task_count,
+                        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
+                    FROM tasks WHERE project_id = ?
+                `, [project.id]);
 
-            query += ` ORDER BY p.updated_at DESC LIMIT ${parseInt(limit as string, 10)}`;
+                const stat = stats[0] as any;
+                return {
+                    ...project,
+                    task_count: stat?.task_count || 0,
+                    completed_tasks: stat?.completed_tasks || 0
+                };
+            });
 
-            const [projects] = await this.db!.execute<RowDataPacket[]>(query, params);
+            const projects = await Promise.all(statsPromises);
 
             res.json({ projects, count: projects.length });
         } catch (error) {
@@ -1347,27 +1341,35 @@ class SolariaDashboardServer {
 
     private async getBusinessesPublic(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findAllBusinesses()
+            // TODO: Add project count aggregation to repository
             const { status, limit = '50' } = req.query;
 
-            let query = `
-                SELECT
-                    b.id, b.name, b.description, b.website, b.status,
-                    b.revenue, b.expenses, b.profit, b.logo_url,
-                    b.created_at, b.updated_at,
-                    (SELECT COUNT(*) FROM projects WHERE client = b.name) as project_count
-                FROM businesses b
-                WHERE 1=1
-            `;
-            const params: (string | number)[] = [];
+            const filters: any = {
+                limit: parseInt(limit as string, 10)
+            };
 
             if (status && status !== 'all') {
-                query += ` AND b.status = ?`;
-                params.push(status as string);
+                filters.status = status as string;
             }
 
-            query += ` ORDER BY b.name ASC LIMIT ${parseInt(limit as string, 10)}`;
+            const businessesRaw = await businessesRepo.findAllBusinesses(filters);
 
-            const [businesses] = await this.db!.execute<RowDataPacket[]>(query, params);
+            // Enrich with project counts via Promise.all (SQL until projectsRepo supports client filter)
+            const statsPromises = businessesRaw.map(async (business: any) => {
+                const [stats] = await this.db!.execute<RowDataPacket[]>(`
+                    SELECT COUNT(*) as project_count
+                    FROM projects WHERE client = ?
+                `, [business.name]);
+
+                const stat = stats[0] as any;
+                return {
+                    ...business,
+                    project_count: stat?.project_count || 0
+                };
+            });
+
+            const businesses = await Promise.all(statsPromises);
 
             res.json({ businesses, count: businesses.length });
         } catch (error) {
@@ -1378,6 +1380,9 @@ class SolariaDashboardServer {
 
     private async getTasksPublic(req: Request, res: Response): Promise<void> {
         try {
+            // ⚠️ PARTIAL MIGRATION - Uses SQL for JOIN with archived filter
+            // TODO: Add archived filter to tasksRepo or implement via projectsRepo integration
+            // NOTE: Full migration requires JOIN support with projects.archived filter
             const { status, priority, project_id, limit = '100' } = req.query;
 
             let query = `
