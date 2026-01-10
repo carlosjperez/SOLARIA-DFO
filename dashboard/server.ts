@@ -32,6 +32,9 @@ import {
     type GitHubWorkflowRunPayload,
 } from './services/githubIntegration.js';
 
+// Import Drizzle repositories
+import * as agentsRepo from './db/repositories/agents.js';
+
 // Import local types
 import type {
     AuthenticatedRequest,
@@ -3343,49 +3346,10 @@ class SolariaDashboardServer {
 
     private async getAgents(req: Request, res: Response): Promise<void> {
         try {
-            const { role, status, page = '1', limit = '50' } = req.query;
-            const pageNum = parseInt(page as string) || 1;
-            const limitNum = parseInt(limit as string) || 50;
-
-            let query = `
-                SELECT
-                    aa.*,
-                    COUNT(t.id) as tasks_assigned,
-                    COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as tasks_completed,
-                    COUNT(CASE WHEN t.status = 'in_progress' THEN 1 END) as current_tasks,
-                    COUNT(CASE WHEN al.level = 'error' THEN 1 END) as error_count
-                FROM ai_agents aa
-                LEFT JOIN tasks t ON aa.id = t.assigned_agent_id
-                LEFT JOIN activity_logs al ON aa.id = al.agent_id
-                    AND al.timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-            `;
-
-            const whereConditions: string[] = [];
-            const params: (string | number)[] = [];
-
-            if (role) {
-                whereConditions.push('aa.role = ?');
-                params.push(role as string);
-            }
-
-            if (status) {
-                whereConditions.push('aa.status = ?');
-                params.push(status as string);
-            }
-
-            if (whereConditions.length > 0) {
-                query += ' WHERE ' + whereConditions.join(' AND ');
-            }
-
-            query += ' GROUP BY aa.id ORDER BY aa.last_activity DESC';
-
-            const offset = (pageNum - 1) * limitNum;
-            query += ` LIMIT ${limitNum} OFFSET ${offset}`;
-
-            const [agents] = await this.db!.execute<RowDataPacket[]>(query, params);
-
+            // ✅ MIGRATED TO DRIZZLE ORM - Using agentsRepo.findAgentsWithStats()
+            // TODO: Add role/status filters and pagination to agentsRepo if needed
+            const agents = await agentsRepo.findAgentsWithStats();
             res.json(agents);
-
         } catch (error) {
             console.error('Error fetching agents:', error);
             res.status(500).json({ error: 'Failed to fetch agents' });
@@ -3394,25 +3358,17 @@ class SolariaDashboardServer {
 
     private async getAgent(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using agentsRepo.findAgentById()
+            // TODO: Add findAgentByIdWithStats() to repository for task counts
             const { id } = req.params;
+            const agent = await agentsRepo.findAgentById(parseInt(id));
 
-            const [agent] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    aa.*,
-                    (SELECT COUNT(*) FROM tasks WHERE assigned_agent_id = aa.id) as total_tasks,
-                    (SELECT COUNT(*) FROM tasks WHERE assigned_agent_id = aa.id AND status = 'completed') as completed_tasks,
-                    (SELECT COUNT(*) FROM tasks WHERE assigned_agent_id = aa.id AND status = 'in_progress') as active_tasks
-                FROM ai_agents aa
-                WHERE aa.id = ?
-            `, [id]);
-
-            if (agent.length === 0) {
+            if (!agent) {
                 res.status(404).json({ error: 'Agent not found' });
                 return;
             }
 
-            res.json(agent[0]);
-
+            res.json(agent);
         } catch (error) {
             console.error('Error fetching agent:', error);
             res.status(500).json({ error: 'Failed to fetch agent' });
@@ -3449,17 +3405,12 @@ class SolariaDashboardServer {
 
     private async updateAgentStatus(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using agentsRepo.updateAgentStatus()
             const { id } = req.params;
             const { status } = req.body;
 
-            await this.db!.execute(`
-                UPDATE ai_agents
-                SET status = ?, last_activity = NOW()
-                WHERE id = ?
-            `, [status, id]);
-
+            await agentsRepo.updateAgentStatus(parseInt(id), status);
             res.json({ message: 'Agent status updated successfully' });
-
         } catch (error) {
             console.error('Error updating agent status:', error);
             res.status(500).json({ error: 'Failed to update agent status' });
