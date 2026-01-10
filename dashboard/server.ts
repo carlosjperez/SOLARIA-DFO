@@ -3702,44 +3702,29 @@ class SolariaDashboardServer {
 
     private async getTask(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo
+            // TODO: Add completed_by_name JOIN to findTaskItems() in repository
             const { id } = req.params;
 
-            const [task] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.*,
-                    p.name as project_name,
-                    p.code as project_code,
-                    CONCAT(
-                        COALESCE(p.code, 'TSK'), '-',
-                        LPAD(COALESCE(t.task_number, t.id), 3, '0')
-                    ) as task_code,
-                    aa.name as agent_name,
-                    u.username as assigned_by_name
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                LEFT JOIN users u ON t.assigned_by = u.id
-                WHERE t.id = ?
-            `, [id]);
+            // Get task with details (JOINs project, agent, user)
+            const taskResult = await tasksRepo.findTaskWithDetails(parseInt(id));
+            const taskRows = taskResult[0] as unknown as Array<any>;
 
-            if (task.length === 0) {
+            if (!taskRows || taskRows.length === 0) {
                 res.status(404).json({ error: 'Task not found' });
                 return;
             }
 
-            // Fetch task items (subtasks/checklist)
-            const [items] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT ti.*, a.name as completed_by_name
-                FROM task_items ti
-                LEFT JOIN ai_agents a ON ti.completed_by_agent_id = a.id
-                WHERE ti.task_id = ?
-                ORDER BY ti.sort_order ASC, ti.created_at ASC
-            `, [id]);
+            const task = taskRows[0];
 
-            const result = task[0] as any;
+            // Get task items (subtasks/checklist)
+            const items = await tasksRepo.findTaskItems(parseInt(id), true);
+
+            // Assemble result
+            const result = task as any;
             result.items = items;
             result.items_total = items.length;
-            result.items_completed = items.filter((i: any) => i.is_completed).length;
+            result.items_completed = items.filter((i: any) => i.isCompleted).length;
 
             res.json(result);
 
@@ -3751,6 +3736,9 @@ class SolariaDashboardServer {
 
     private async createTask(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo.createTask()
+            // TODO: Add findAgentByName() to agents repository
+            // TODO: Add repositories for epics and sprints
             const {
                 title,
                 description,
@@ -3774,46 +3762,33 @@ class SolariaDashboardServer {
                 }
             }
 
-            // Get next task_number for this project
-            let taskNumber = 1;
-            if (project_id) {
-                const [maxTask] = await this.db!.execute<RowDataPacket[]>(
-                    'SELECT COALESCE(MAX(task_number), 0) + 1 as next_number FROM tasks WHERE project_id = ?',
-                    [project_id]
-                );
-                taskNumber = maxTask[0].next_number;
-            }
+            // Create task via repository (task_number auto-increment handled internally)
+            const createdTask = await tasksRepo.createTask({
+                title: title || 'Nueva tarea',
+                description: description ?? null,
+                projectId: project_id ?? null,
+                epicId: epic_id ?? null,
+                sprintId: sprint_id ?? null,
+                assignedAgentId: agentId ?? null,
+                priority: priority || 'medium',
+                estimatedHours: estimated_hours ?? null,
+                deadline: deadline ?? null,
+                assignedBy: req.user?.userId ?? null,
+            });
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO tasks (
-                    title, description, project_id, epic_id, sprint_id, assigned_agent_id, task_number,
-                    priority, estimated_hours, deadline, assigned_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `, [
-                title || 'Nueva tarea',
-                description ?? null,
-                project_id ?? null,
-                epic_id ?? null,
-                sprint_id ?? null,
-                agentId ?? null,
-                taskNumber,
-                priority || 'medium',
-                estimated_hours ?? null,
-                deadline ?? null,
-                req.user?.userId ?? null
-            ]);
+            const taskNumber = createdTask.taskNumber;
 
             // Generate task_code with suffix
             let taskCode = `#${taskNumber}`;
             let suffix = '';
             let epics: RowDataPacket[] = [];
+
             if (project_id) {
-                const [projects] = await this.db!.execute<RowDataPacket[]>(
-                    'SELECT code FROM projects WHERE id = ?',
-                    [project_id]
-                );
-                if (projects.length > 0 && projects[0].code) {
-                    taskCode = `${projects[0].code}-${String(taskNumber).padStart(3, '0')}`;
+                // Use repository to get project code
+                const project = await projectsRepo.findProjectById(project_id);
+
+                if (project && project.code) {
+                    taskCode = `${project.code}-${String(taskNumber).padStart(3, '0')}`;
 
                     // Add suffix based on epic or sprint
                     if (epic_id) {
@@ -3839,8 +3814,8 @@ class SolariaDashboardServer {
 
             // Emit task:created notification (colon format for NotificationContext)
             (this.io as any).emit('task:created', {
-                id: result.insertId,
-                taskId: result.insertId,
+                id: createdTask.id,
+                taskId: createdTask.id,
                 task_code: taskCode,
                 task_number: taskNumber,
                 epic_id: epic_id || null,
@@ -3858,7 +3833,7 @@ class SolariaDashboardServer {
 
             // Dispatch webhook event for n8n integration
             this.dispatchWebhookEvent('task.created', {
-                task_id: result.insertId,
+                task_id: createdTask.id,
                 task_code: taskCode,
                 task_number: taskNumber,
                 title: title || 'Nueva tarea',
@@ -3872,7 +3847,7 @@ class SolariaDashboardServer {
             }, project_id || undefined);
 
             res.status(201).json({
-                id: result.insertId,
+                id: createdTask.id,
                 task_code: taskCode,
                 task_number: taskNumber,
                 message: 'Task created successfully'
