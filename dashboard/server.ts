@@ -7542,47 +7542,30 @@ class SolariaDashboardServer {
 
     private async getOfficeClients(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findOfficeClients()
             const { status, industry, search, limit = 50, offset = 0 } = req.query;
 
-            let query = 'SELECT * FROM office_clients WHERE 1=1';
-            const params: unknown[] = [];
-
-            if (status) {
-                query += ' AND status = ?';
-                params.push(status);
-            }
-            if (industry) {
-                query += ' AND industry = ?';
-                params.push(industry);
-            }
-            if (search) {
-                query += ' AND (name LIKE ? OR commercial_name LIKE ? OR primary_email LIKE ?)';
-                const searchTerm = `%${search}%`;
-                params.push(searchTerm, searchTerm, searchTerm);
-            }
-
-            query += ' ORDER BY updated_at DESC LIMIT ? OFFSET ?';
-            params.push(Number(limit), Number(offset));
-
-            const [clients] = await this.db!.execute<RowDataPacket[]>(query, params);
+            const result = await businessesRepo.findOfficeClients({
+                status: status as string,
+                industry: industry as string,
+                search: search as string,
+                limit: Number(limit),
+                offset: Number(offset)
+            });
+            const clients = (result[0] as unknown as RowDataPacket[]);
 
             // Get total count
-            let countQuery = 'SELECT COUNT(*) as total FROM office_clients WHERE 1=1';
-            const countParams: unknown[] = [];
-            if (status) { countQuery += ' AND status = ?'; countParams.push(status); }
-            if (industry) { countQuery += ' AND industry = ?'; countParams.push(industry); }
-            if (search) {
-                countQuery += ' AND (name LIKE ? OR commercial_name LIKE ? OR primary_email LIKE ?)';
-                const searchTerm = `%${search}%`;
-                countParams.push(searchTerm, searchTerm, searchTerm);
-            }
-
-            const [countResult] = await this.db!.execute<RowDataPacket[]>(countQuery, countParams);
+            const countResult = await businessesRepo.countOfficeClients({
+                status: status as string,
+                industry: industry as string,
+                search: search as string
+            });
+            const count = (countResult[0] as unknown as RowDataPacket[])[0];
 
             res.json({
                 success: true,
                 clients,
-                total: countResult[0]?.total || 0,
+                total: count?.total || 0,
                 limit: Number(limit),
                 offset: Number(offset)
             });
@@ -7594,43 +7577,23 @@ class SolariaDashboardServer {
 
     private async getOfficeClient(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findOfficeClientWithDetails()
             const { id } = req.params;
 
-            const [clients] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT * FROM office_clients WHERE id = ?',
-                [id]
-            );
+            const details = await businessesRepo.findOfficeClientWithDetails(parseInt(id));
 
-            if (clients.length === 0) {
+            if (!details.client) {
                 res.status(404).json({ error: 'Client not found' });
                 return;
             }
 
-            // Get contacts
-            const [contacts] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT * FROM office_client_contacts WHERE client_id = ? ORDER BY is_primary DESC, name',
-                [id]
-            );
-
-            // Get projects linked to this client
-            const [projects] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT id, name, code, status, budget, deadline FROM projects WHERE office_client_id = ?',
-                [id]
-            );
-
-            // Get payments
-            const [payments] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT * FROM office_payments WHERE client_id = ? ORDER BY payment_date DESC LIMIT 10',
-                [id]
-            );
-
             res.json({
                 success: true,
                 client: {
-                    ...clients[0],
-                    contacts,
-                    projects,
-                    payments
+                    ...details.client,
+                    contacts: details.contacts,
+                    projects: details.projects,
+                    payments: details.payments
                 }
             });
         } catch (error) {
@@ -7641,6 +7604,7 @@ class SolariaDashboardServer {
 
     private async createOfficeClient(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.createOfficeClient()
             const {
                 name, commercial_name, industry, company_size, status,
                 primary_email, primary_phone, website,
@@ -7653,26 +7617,32 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Convert undefined to null for SQL compatibility
-            const toNull = (v: unknown) => v === undefined ? null : v;
-
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                `INSERT INTO office_clients
-                (name, commercial_name, industry, company_size, status,
-                 primary_email, primary_phone, website,
-                 address_line1, address_line2, city, state, postal_code, country,
-                 tax_id, fiscal_name, notes, created_by, assigned_to)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [name, toNull(commercial_name), toNull(industry), company_size || 'small', status || 'lead',
-                 toNull(primary_email), toNull(primary_phone), toNull(website),
-                 toNull(address_line1), toNull(address_line2), toNull(city), toNull(state), toNull(postal_code), country || 'Mexico',
-                 toNull(tax_id), toNull(fiscal_name), toNull(notes), req.user?.userId || null, toNull(assigned_to)]
-            );
+            const clientId = await businessesRepo.createOfficeClient({
+                name,
+                commercialName: commercial_name,
+                industry,
+                companySize: company_size,
+                status,
+                primaryEmail: primary_email,
+                primaryPhone: primary_phone,
+                website,
+                addressLine1: address_line1,
+                addressLine2: address_line2,
+                city,
+                state,
+                postalCode: postal_code,
+                country,
+                taxId: tax_id,
+                fiscalName: fiscal_name,
+                notes,
+                createdBy: req.user?.userId || null,
+                assignedTo: assigned_to
+            });
 
             res.status(201).json({
                 success: true,
                 message: 'Client created',
-                client_id: result.insertId
+                client_id: clientId
             });
         } catch (error) {
             console.error('Error creating office client:', error);
@@ -7682,37 +7652,16 @@ class SolariaDashboardServer {
 
     private async updateOfficeClient(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.updateOfficeClient()
             const { id } = req.params;
             const updates = req.body;
 
-            const allowedFields = [
-                'name', 'commercial_name', 'industry', 'company_size', 'status',
-                'primary_email', 'primary_phone', 'website',
-                'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country',
-                'tax_id', 'fiscal_name', 'notes', 'assigned_to', 'lifetime_value', 'logo_url'
-            ];
+            const result = await businessesRepo.updateOfficeClient(parseInt(id), updates);
 
-            const fields: string[] = [];
-            const values: unknown[] = [];
-
-            for (const field of allowedFields) {
-                if (updates[field] !== undefined) {
-                    fields.push(`${field} = ?`);
-                    values.push(updates[field]);
-                }
-            }
-
-            if (fields.length === 0) {
+            if (!result) {
                 res.status(400).json({ error: 'No valid fields to update' });
                 return;
             }
-
-            values.push(id);
-
-            await this.db!.execute(
-                `UPDATE office_clients SET ${fields.join(', ')} WHERE id = ?`,
-                values
-            );
 
             res.json({ success: true, message: 'Client updated' });
         } catch (error) {
@@ -7723,13 +7672,11 @@ class SolariaDashboardServer {
 
     private async deleteOfficeClient(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.updateOfficeClient()
             const { id } = req.params;
 
             // Soft delete - change status to churned
-            await this.db!.execute(
-                'UPDATE office_clients SET status = ? WHERE id = ?',
-                ['churned', id]
-            );
+            await businessesRepo.updateOfficeClient(parseInt(id), { status: 'churned' });
 
             res.json({ success: true, message: 'Client archived' });
         } catch (error) {
@@ -7838,27 +7785,17 @@ class SolariaDashboardServer {
 
     private async getOfficePayments(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findOfficePayments()
             const { status, client_id, project_id, limit = 50, offset = 0 } = req.query;
 
-            let query = `
-                SELECT p.*,
-                       c.name as client_name,
-                       pr.name as project_name
-                FROM office_payments p
-                LEFT JOIN office_clients c ON p.client_id = c.id
-                LEFT JOIN projects pr ON p.project_id = pr.id
-                WHERE 1=1
-            `;
-            const params: unknown[] = [];
-
-            if (status) { query += ' AND p.status = ?'; params.push(status); }
-            if (client_id) { query += ' AND p.client_id = ?'; params.push(client_id); }
-            if (project_id) { query += ' AND p.project_id = ?'; params.push(project_id); }
-
-            query += ' ORDER BY p.created_at DESC LIMIT ? OFFSET ?';
-            params.push(Number(limit), Number(offset));
-
-            const [payments] = await this.db!.execute<RowDataPacket[]>(query, params);
+            const result = await businessesRepo.findOfficePayments({
+                status: status as string,
+                clientId: client_id ? Number(client_id) : undefined,
+                projectId: project_id ? Number(project_id) : undefined,
+                limit: Number(limit),
+                offset: Number(offset)
+            });
+            const payments = (result[0] as unknown as RowDataPacket[]);
 
             res.json({ success: true, payments });
         } catch (error) {
@@ -7869,18 +7806,11 @@ class SolariaDashboardServer {
 
     private async getOfficePayment(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findOfficePaymentById()
             const { id } = req.params;
 
-            const [payments] = await this.db!.execute<RowDataPacket[]>(
-                `SELECT p.*,
-                        c.name as client_name,
-                        pr.name as project_name
-                 FROM office_payments p
-                 LEFT JOIN office_clients c ON p.client_id = c.id
-                 LEFT JOIN projects pr ON p.project_id = pr.id
-                 WHERE p.id = ?`,
-                [id]
-            );
+            const result = await businessesRepo.findOfficePaymentById(parseInt(id));
+            const payments = (result[0] as unknown as RowDataPacket[]);
 
             if (payments.length === 0) {
                 res.status(404).json({ error: 'Payment not found' });
@@ -7896,6 +7826,7 @@ class SolariaDashboardServer {
 
     private async createOfficePayment(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.createOfficePayment()
             const {
                 client_id, project_id, amount, currency, status,
                 payment_type, payment_date, due_date, reference, invoice_number, notes
@@ -7906,23 +7837,25 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Convert undefined to null for SQL compatibility
-            const toNull = (v: unknown) => v === undefined ? null : v;
-
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                `INSERT INTO office_payments
-                (client_id, project_id, amount, currency, status, payment_type,
-                 payment_date, due_date, reference, invoice_number, notes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [toNull(client_id), toNull(project_id), amount, currency || 'MXN', status || 'pending',
-                 payment_type || 'milestone', toNull(payment_date), toNull(due_date), toNull(reference), toNull(invoice_number),
-                 toNull(notes), req.user?.userId || null]
-            );
+            const paymentId = await businessesRepo.createOfficePayment({
+                clientId: client_id,
+                projectId: project_id,
+                amount,
+                currency,
+                status,
+                paymentType: payment_type,
+                paymentDate: payment_date,
+                dueDate: due_date,
+                reference,
+                invoiceNumber: invoice_number,
+                notes,
+                createdBy: req.user?.userId || null
+            });
 
             res.status(201).json({
                 success: true,
                 message: 'Payment created',
-                payment_id: result.insertId
+                payment_id: paymentId
             });
         } catch (error) {
             console.error('Error creating office payment:', error);
@@ -7932,35 +7865,16 @@ class SolariaDashboardServer {
 
     private async updateOfficePayment(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.updateOfficePayment()
             const { id } = req.params;
             const updates = req.body;
 
-            const allowedFields = [
-                'amount', 'currency', 'status', 'payment_type',
-                'payment_date', 'due_date', 'reference', 'invoice_number', 'notes'
-            ];
+            const result = await businessesRepo.updateOfficePayment(parseInt(id), updates);
 
-            const fields: string[] = [];
-            const values: unknown[] = [];
-
-            for (const field of allowedFields) {
-                if (updates[field] !== undefined) {
-                    fields.push(`${field} = ?`);
-                    values.push(updates[field]);
-                }
-            }
-
-            if (fields.length === 0) {
+            if (!result) {
                 res.status(400).json({ error: 'No valid fields to update' });
                 return;
             }
-
-            values.push(id);
-
-            await this.db!.execute(
-                `UPDATE office_payments SET ${fields.join(', ')} WHERE id = ?`,
-                values
-            );
 
             res.json({ success: true, message: 'Payment updated' });
         } catch (error) {
@@ -7971,26 +7885,16 @@ class SolariaDashboardServer {
 
     private async getOfficeProjects(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findOfficeProjectsWithStats()
             const { status, client_id, limit = 50, offset = 0 } = req.query;
 
-            let query = `
-                SELECT p.*,
-                       c.name as client_name,
-                       (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as task_count,
-                       (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks
-                FROM projects p
-                LEFT JOIN office_clients c ON p.office_client_id = c.id
-                WHERE p.office_visible = 1
-            `;
-            const params: unknown[] = [];
-
-            if (status) { query += ' AND p.status = ?'; params.push(status); }
-            if (client_id) { query += ' AND p.office_client_id = ?'; params.push(client_id); }
-
-            query += ' ORDER BY p.updated_at DESC LIMIT ? OFFSET ?';
-            params.push(Number(limit), Number(offset));
-
-            const [projects] = await this.db!.execute<RowDataPacket[]>(query, params);
+            const result = await businessesRepo.findOfficeProjectsWithStats({
+                status: status as string,
+                clientId: client_id ? Number(client_id) : undefined,
+                limit: Number(limit),
+                offset: Number(offset)
+            });
+            const projects = (result[0] as unknown as RowDataPacket[]);
 
             res.json({ success: true, projects });
         } catch (error) {

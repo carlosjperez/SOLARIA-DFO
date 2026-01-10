@@ -3,7 +3,7 @@
  * Replaces raw SQL queries with type-safe Drizzle queries
  */
 
-import { db } from '../index.js';
+import { db, pool } from '../index.js';
 import { eq, desc, sql, and } from 'drizzle-orm';
 import {
     businesses,
@@ -188,4 +188,369 @@ export async function findClientProjects(clientId: number) {
         WHERE p.office_client_id = ${clientId}
         ORDER BY p.created_at DESC
     `);
+}
+
+// ============================================================================
+// Office Clients (office_clients table)
+// ============================================================================
+
+export async function findOfficeClients(filters?: {
+    status?: string;
+    industry?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+}) {
+    let query = sql`SELECT * FROM office_clients WHERE 1=1`;
+    const conditions = [];
+
+    if (filters?.status) {
+        conditions.push(sql`status = ${filters.status}`);
+    }
+    if (filters?.industry) {
+        conditions.push(sql`industry = ${filters.industry}`);
+    }
+    if (filters?.search) {
+        const searchTerm = `%${filters.search}%`;
+        conditions.push(sql`(name LIKE ${searchTerm} OR commercial_name LIKE ${searchTerm} OR primary_email LIKE ${searchTerm})`);
+    }
+
+    // Build full query with conditions
+    let fullQuery = 'SELECT * FROM office_clients WHERE 1=1';
+    const params: any[] = [];
+
+    if (filters?.status) {
+        fullQuery += ' AND status = ?';
+        params.push(filters.status);
+    }
+    if (filters?.industry) {
+        fullQuery += ' AND industry = ?';
+        params.push(filters.industry);
+    }
+    if (filters?.search) {
+        fullQuery += ' AND (name LIKE ? OR commercial_name LIKE ? OR primary_email LIKE ?)';
+        const searchTerm = `%${filters.search}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+    }
+
+    fullQuery += ' ORDER BY updated_at DESC';
+
+    if (filters?.limit) {
+        fullQuery += ' LIMIT ?';
+        params.push(filters.limit);
+    }
+    if (filters?.offset) {
+        fullQuery += ' OFFSET ?';
+        params.push(filters.offset);
+    }
+
+    return pool.execute(fullQuery, params);
+}
+
+export async function countOfficeClients(filters?: {
+    status?: string;
+    industry?: string;
+    search?: string;
+}) {
+    let query = 'SELECT COUNT(*) as total FROM office_clients WHERE 1=1';
+    const params: any[] = [];
+
+    if (filters?.status) {
+        query += ' AND status = ?';
+        params.push(filters.status);
+    }
+    if (filters?.industry) {
+        query += ' AND industry = ?';
+        params.push(filters.industry);
+    }
+    if (filters?.search) {
+        query += ' AND (name LIKE ? OR commercial_name LIKE ? OR primary_email LIKE ?)';
+        const searchTerm = `%${filters.search}%`;
+        params.push(searchTerm, searchTerm, searchTerm);
+    }
+
+    return pool.execute(query, params);
+}
+
+export async function findOfficeClientById(clientId: number) {
+    return db.execute(sql`
+        SELECT * FROM office_clients WHERE id = ${clientId}
+    `);
+}
+
+export async function findOfficeClientWithDetails(clientId: number) {
+    const client = await findOfficeClientById(clientId);
+    const contacts = await findClientContacts(clientId);
+    const projects = await db.execute(sql`
+        SELECT id, name, code, status, budget, deadline
+        FROM projects
+        WHERE office_client_id = ${clientId}
+    `);
+    const payments = await db.execute(sql`
+        SELECT * FROM office_payments
+        WHERE client_id = ${clientId}
+        ORDER BY payment_date DESC
+        LIMIT 10
+    `);
+
+    return {
+        client: (client[0] as unknown as any[])[0] || null,
+        contacts: (contacts[0] as unknown as any[]),
+        projects: (projects[0] as unknown as any[]),
+        payments: (payments[0] as unknown as any[])
+    };
+}
+
+export async function createOfficeClient(data: {
+    name: string;
+    commercialName?: string | null;
+    industry?: string | null;
+    companySize?: string;
+    status?: string;
+    primaryEmail?: string | null;
+    primaryPhone?: string | null;
+    website?: string | null;
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+    country?: string;
+    taxId?: string | null;
+    fiscalName?: string | null;
+    notes?: string | null;
+    createdBy?: number | null;
+    assignedTo?: number | null;
+}) {
+    const result = await db.execute(sql`
+        INSERT INTO office_clients
+        (name, commercial_name, industry, company_size, status,
+         primary_email, primary_phone, website,
+         address_line1, address_line2, city, state, postal_code, country,
+         tax_id, fiscal_name, notes, created_by, assigned_to)
+        VALUES (
+            ${data.name},
+            ${data.commercialName || null},
+            ${data.industry || null},
+            ${data.companySize || 'small'},
+            ${data.status || 'lead'},
+            ${data.primaryEmail || null},
+            ${data.primaryPhone || null},
+            ${data.website || null},
+            ${data.addressLine1 || null},
+            ${data.addressLine2 || null},
+            ${data.city || null},
+            ${data.state || null},
+            ${data.postalCode || null},
+            ${data.country || 'Mexico'},
+            ${data.taxId || null},
+            ${data.fiscalName || null},
+            ${data.notes || null},
+            ${data.createdBy || null},
+            ${data.assignedTo || null}
+        )
+    `);
+
+    return (result[0] as any).insertId;
+}
+
+export async function updateOfficeClient(clientId: number, data: Record<string, any>) {
+    const allowedFields = [
+        'name', 'commercial_name', 'industry', 'company_size', 'status',
+        'primary_email', 'primary_phone', 'website',
+        'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country',
+        'tax_id', 'fiscal_name', 'notes', 'assigned_to', 'lifetime_value', 'logo_url'
+    ];
+
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    Object.keys(data).forEach(key => {
+        if (allowedFields.includes(key)) {
+            updates.push(`${key} = ?`);
+            values.push(data[key]);
+        }
+    });
+
+    if (updates.length === 0) return null;
+
+    const query = `UPDATE office_clients SET ${updates.join(', ')} WHERE id = ?`;
+    values.push(clientId);
+
+    await pool.execute(query, values);
+    return findOfficeClientById(clientId);
+}
+
+export async function deleteOfficeClient(clientId: number) {
+    return db.execute(sql`
+        DELETE FROM office_clients WHERE id = ${clientId}
+    `);
+}
+
+// ============================================================================
+// Office Payments
+// ============================================================================
+
+export async function findOfficePayments(filters?: {
+    status?: string;
+    clientId?: number;
+    projectId?: number;
+    limit?: number;
+    offset?: number;
+}) {
+    let query = `
+        SELECT p.*,
+               c.name as client_name,
+               pr.name as project_name
+        FROM office_payments p
+        LEFT JOIN office_clients c ON p.client_id = c.id
+        LEFT JOIN projects pr ON p.project_id = pr.id
+        WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (filters?.status) {
+        query += ' AND p.status = ?';
+        params.push(filters.status);
+    }
+    if (filters?.clientId) {
+        query += ' AND p.client_id = ?';
+        params.push(filters.clientId);
+    }
+    if (filters?.projectId) {
+        query += ' AND p.project_id = ?';
+        params.push(filters.projectId);
+    }
+
+    query += ' ORDER BY p.created_at DESC';
+
+    if (filters?.limit) {
+        query += ' LIMIT ?';
+        params.push(filters.limit);
+    }
+    if (filters?.offset) {
+        query += ' OFFSET ?';
+        params.push(filters.offset);
+    }
+
+    return pool.execute(query, params);
+}
+
+export async function findOfficePaymentById(paymentId: number) {
+    return db.execute(sql`
+        SELECT p.*,
+               c.name as client_name,
+               pr.name as project_name
+        FROM office_payments p
+        LEFT JOIN office_clients c ON p.client_id = c.id
+        LEFT JOIN projects pr ON p.project_id = pr.id
+        WHERE p.id = ${paymentId}
+    `);
+}
+
+export async function createOfficePayment(data: {
+    clientId?: number | null;
+    projectId?: number | null;
+    amount: number;
+    currency?: string;
+    status?: string;
+    paymentType?: string;
+    paymentDate?: string | null;
+    dueDate?: string | null;
+    reference?: string | null;
+    invoiceNumber?: string | null;
+    notes?: string | null;
+    createdBy?: number | null;
+}) {
+    const result = await db.execute(sql`
+        INSERT INTO office_payments
+        (client_id, project_id, amount, currency, status, payment_type,
+         payment_date, due_date, reference, invoice_number, notes, created_by)
+        VALUES (
+            ${data.clientId || null},
+            ${data.projectId || null},
+            ${data.amount},
+            ${data.currency || 'MXN'},
+            ${data.status || 'pending'},
+            ${data.paymentType || 'milestone'},
+            ${data.paymentDate || null},
+            ${data.dueDate || null},
+            ${data.reference || null},
+            ${data.invoiceNumber || null},
+            ${data.notes || null},
+            ${data.createdBy || null}
+        )
+    `);
+
+    return (result[0] as any).insertId;
+}
+
+export async function updateOfficePayment(paymentId: number, data: Record<string, any>) {
+    const allowedFields = [
+        'amount', 'currency', 'status', 'payment_type',
+        'payment_date', 'due_date', 'reference', 'invoice_number', 'notes'
+    ];
+
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    Object.keys(data).forEach(key => {
+        if (allowedFields.includes(key)) {
+            updates.push(`${key} = ?`);
+            values.push(data[key]);
+        }
+    });
+
+    if (updates.length === 0) return null;
+
+    const query = `UPDATE office_payments SET ${updates.join(', ')} WHERE id = ?`;
+    values.push(paymentId);
+
+    await pool.execute(query, values);
+    return findOfficePaymentById(paymentId);
+}
+
+// ============================================================================
+// Office Projects Stats
+// ============================================================================
+
+export async function findOfficeProjectsWithStats(filters?: {
+    status?: string;
+    clientId?: number;
+    limit?: number;
+    offset?: number;
+}) {
+    let query = `
+        SELECT p.*,
+               c.name as client_name,
+               (SELECT COUNT(*) FROM tasks WHERE project_id = p.id) as task_count,
+               (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'completed') as completed_tasks,
+               (SELECT SUM(amount) FROM office_payments WHERE project_id = p.id AND status = 'paid') as total_paid
+        FROM projects p
+        LEFT JOIN office_clients c ON p.office_client_id = c.id
+        WHERE p.office_visible = 1
+    `;
+    const params: any[] = [];
+
+    if (filters?.status) {
+        query += ' AND p.status = ?';
+        params.push(filters.status);
+    }
+    if (filters?.clientId) {
+        query += ' AND p.office_client_id = ?';
+        params.push(filters.clientId);
+    }
+
+    query += ' ORDER BY p.updated_at DESC';
+
+    if (filters?.limit) {
+        query += ' LIMIT ?';
+        params.push(filters.limit);
+    }
+    if (filters?.offset) {
+        query += ' OFFSET ?';
+        params.push(filters.offset);
+    }
+
+    return pool.execute(query, params);
 }
