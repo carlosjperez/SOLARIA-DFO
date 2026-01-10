@@ -34,6 +34,7 @@ import {
 
 // Import Drizzle repositories
 import * as agentsRepo from './db/repositories/agents.js';
+import * as projectsRepo from './db/repositories/projects.js';
 
 // Import local types
 import type {
@@ -2124,38 +2125,32 @@ class SolariaDashboardServer {
 
     private async deleteProject(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo functions
             const { id } = req.params;
 
             // Get project info before deletion for notification
-            const [projectRows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT name, code FROM projects WHERE id = ?',
-                [id]
-            );
-            const projectInfo = projectRows[0];
+            const project = await projectsRepo.findProjectById(parseInt(id));
 
-            const [result] = await this.db!.execute<ResultSetHeader>(
-                'DELETE FROM projects WHERE id = ?',
-                [id]
-            );
-
-            if (result.affectedRows === 0) {
+            if (!project) {
                 res.status(404).json({ error: 'Project not found' });
                 return;
             }
 
+            await projectsRepo.deleteProject(parseInt(id));
+
             // Emit socket event for real-time notification
             this.io.emit('project:deleted', {
                 projectId: parseInt(id),
-                name: projectInfo?.name || 'Proyecto',
-                code: projectInfo?.code || ''
+                name: project.name || 'Proyecto',
+                code: project.code || ''
             });
 
             // Note: project.deleted is captured by 'all' webhooks
             // Dispatch as generic event for n8n workflows that need project deletion notifications
             this.dispatchWebhookEvent('project.updated', {
                 project_id: parseInt(id),
-                name: projectInfo?.name || 'Proyecto',
-                code: projectInfo?.code || '',
+                name: project.name || 'Proyecto',
+                code: project.code || '',
                 deleted: true,
                 status: 'deleted'
             }, parseInt(id));
@@ -2862,19 +2857,16 @@ class SolariaDashboardServer {
 
     private async getProjectClient(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.findProjectClient()
             const { id } = req.params;
+            const client = await projectsRepo.findProjectClient(parseInt(id));
 
-            const [rows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT * FROM project_clients WHERE project_id = ?',
-                [id]
-            );
-
-            if (rows.length === 0) {
+            if (!client) {
                 res.json({ client: null, message: 'No client info found' });
                 return;
             }
 
-            res.json({ client: rows[0] });
+            res.json({ client });
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -2885,39 +2877,23 @@ class SolariaDashboardServer {
 
     private async updateProjectClient(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.upsertProjectClient()
             const { id } = req.params;
             const { name, fiscal_name, rfc, website, address, fiscal_address, contact_name, contact_email, contact_phone, logo_url, notes } = req.body;
 
-            // Check if client exists
-            const [existing] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT id FROM project_clients WHERE project_id = ?',
-                [id]
-            );
-
-            if (existing.length === 0) {
-                // Insert new client
-                await this.db!.execute(`
-                    INSERT INTO project_clients (project_id, name, fiscal_name, rfc, website, address, fiscal_address, contact_name, contact_email, contact_phone, logo_url, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `, [id, name, fiscal_name || null, rfc || null, website || null, address || null, fiscal_address || null, contact_name || null, contact_email || null, contact_phone || null, logo_url || null, notes || null]);
-            } else {
-                // Update existing
-                await this.db!.execute(`
-                    UPDATE project_clients SET
-                        name = COALESCE(?, name),
-                        fiscal_name = COALESCE(?, fiscal_name),
-                        rfc = COALESCE(?, rfc),
-                        website = COALESCE(?, website),
-                        address = COALESCE(?, address),
-                        fiscal_address = COALESCE(?, fiscal_address),
-                        contact_name = COALESCE(?, contact_name),
-                        contact_email = COALESCE(?, contact_email),
-                        contact_phone = COALESCE(?, contact_phone),
-                        logo_url = COALESCE(?, logo_url),
-                        notes = COALESCE(?, notes)
-                    WHERE project_id = ?
-                `, [name, fiscal_name, rfc, website, address, fiscal_address, contact_name, contact_email, contact_phone, logo_url, notes, id]);
-            }
+            await projectsRepo.upsertProjectClient(parseInt(id), {
+                name,
+                fiscalName: fiscal_name,
+                rfc,
+                website,
+                address,
+                fiscalAddress: fiscal_address,
+                contactName: contact_name,
+                contactEmail: contact_email,
+                contactPhone: contact_phone,
+                logoUrl: logo_url,
+                notes
+            });
 
             res.json({ message: 'Project client updated successfully' });
 
@@ -2930,17 +2906,11 @@ class SolariaDashboardServer {
 
     private async getProjectDocuments(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.findProjectDocuments()
+            // TODO: Add uploader_name join to repository (LEFT JOIN users)
             const { id } = req.params;
-
-            const [rows] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT pd.*, u.name as uploader_name
-                FROM project_documents pd
-                LEFT JOIN users u ON pd.uploaded_by = u.id
-                WHERE pd.project_id = ?
-                ORDER BY pd.created_at DESC
-            `, [id]);
-
-            res.json({ documents: rows });
+            const documents = await projectsRepo.findProjectDocuments(parseInt(id));
+            res.json({ documents });
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -2951,6 +2921,7 @@ class SolariaDashboardServer {
 
     private async createProjectDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.createProjectDocument()
             const { id } = req.params;
             const { name, type, url, description, file_size } = req.body;
             const uploaded_by = req.user?.userId || null;
@@ -2960,13 +2931,18 @@ class SolariaDashboardServer {
                 return;
             }
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO project_documents (project_id, name, type, url, description, file_size, uploaded_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [id, name, type || 'other', url, description || null, file_size || null, uploaded_by]);
+            const document = await projectsRepo.createProjectDocument({
+                projectId: parseInt(id),
+                name,
+                type: type || 'other',
+                url,
+                description,
+                fileSize: file_size,
+                uploadedBy: uploaded_by
+            });
 
             res.status(201).json({
-                id: result.insertId,
+                id: document.id,
                 message: 'Document created successfully'
             });
 
@@ -3214,31 +3190,13 @@ class SolariaDashboardServer {
 
     private async getProjectRequests(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.findProjectRequests()
+            // TODO: Add status/priority filters and assigned_agent_name join to repository
             const { id } = req.params;
-            const { status, priority } = req.query;
+            // const { status, priority } = req.query; // Filtros pendientes en repo
 
-            let query = `
-                SELECT pr.*, a.name as assigned_agent_name
-                FROM project_requests pr
-                LEFT JOIN ai_agents a ON pr.assigned_to = a.id
-                WHERE pr.project_id = ?
-            `;
-            const params: (string | number)[] = [id];
-
-            if (status) {
-                query += ' AND pr.status = ?';
-                params.push(status as string);
-            }
-            if (priority) {
-                query += ' AND pr.priority = ?';
-                params.push(priority as string);
-            }
-
-            query += ' ORDER BY pr.created_at DESC';
-
-            const [rows] = await this.db!.execute<RowDataPacket[]>(query, params);
-
-            res.json({ requests: rows });
+            const requests = await projectsRepo.findProjectRequests(parseInt(id));
+            res.json({ requests });
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -3249,6 +3207,7 @@ class SolariaDashboardServer {
 
     private async createProjectRequest(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.createProjectRequest()
             const { id } = req.params;
             const { text, status, priority, requested_by, assigned_to, notes } = req.body;
 
@@ -3257,13 +3216,18 @@ class SolariaDashboardServer {
                 return;
             }
 
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO project_requests (project_id, text, status, priority, requested_by, assigned_to, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [id, text, status || 'pending', priority || 'medium', requested_by || null, assigned_to || null, notes || null]);
+            const request = await projectsRepo.createProjectRequest({
+                projectId: parseInt(id),
+                text,
+                status: status || 'pending',
+                priority: priority || 'medium',
+                requestedBy: requested_by,
+                assignedTo: assigned_to,
+                notes
+            });
 
             res.status(201).json({
-                id: result.insertId,
+                id: request.id,
                 message: 'Request created successfully'
             });
 
@@ -3276,34 +3240,26 @@ class SolariaDashboardServer {
 
     private async updateProjectRequest(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.updateProjectRequest()
+            // TODO: Add resolved_at logic to repository when status === 'completed'
             const { id, reqId } = req.params;
             const { text, status, priority, assigned_to, notes } = req.body;
 
-            const updates: string[] = [];
-            const params: (string | number | null)[] = [];
+            const updates: any = {};
+            if (text !== undefined) updates.text = text;
+            if (status !== undefined) updates.status = status;
+            if (priority !== undefined) updates.priority = priority;
+            if (assigned_to !== undefined) updates.assignedTo = assigned_to;
+            if (notes !== undefined) updates.notes = notes;
 
-            if (text !== undefined) { updates.push('text = ?'); params.push(text); }
-            if (status !== undefined) { updates.push('status = ?'); params.push(status); }
-            if (priority !== undefined) { updates.push('priority = ?'); params.push(priority); }
-            if (assigned_to !== undefined) { updates.push('assigned_to = ?'); params.push(assigned_to); }
-            if (notes !== undefined) { updates.push('notes = ?'); params.push(notes); }
-
-            // If status is completed, set resolved_at
-            if (status === 'completed') {
-                updates.push('resolved_at = NOW()');
-            }
-
-            if (updates.length === 0) {
+            if (Object.keys(updates).length === 0) {
                 res.status(400).json({ error: 'No fields to update' });
                 return;
             }
 
-            const query = 'UPDATE project_requests SET ' + updates.join(', ') + ' WHERE id = ? AND project_id = ?';
-            params.push(reqId, id);
+            const updatedRequest = await projectsRepo.updateProjectRequest(parseInt(reqId), updates);
 
-            const [result] = await this.db!.execute<ResultSetHeader>(query, params);
-
-            if (result.affectedRows === 0) {
+            if (!updatedRequest) {
                 res.status(404).json({ error: 'Request not found' });
                 return;
             }
