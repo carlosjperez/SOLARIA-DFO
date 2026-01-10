@@ -77,6 +77,18 @@ export async function deleteProject(id: number) {
     return db.delete(projects).where(eq(projects.id, id));
 }
 
+export async function getProjectMetrics() {
+    return db.execute(sql`
+        SELECT DATE(updated_at) as date,
+               AVG(completion_percentage) as avg_completion,
+               COUNT(*) as project_count
+        FROM projects
+        WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        GROUP BY DATE(updated_at)
+        ORDER BY date DESC
+    `);
+}
+
 // ============================================================================
 // Project Clients
 // ============================================================================

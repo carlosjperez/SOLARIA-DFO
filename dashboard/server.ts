@@ -935,6 +935,7 @@ class SolariaDashboardServer {
     }
 
     private async verifyToken(req: Request, res: Response): Promise<void> {
+        // ✅ MIGRATED TO DRIZZLE ORM - Uses getUserById() which uses usersRepo.findUserById()
         const authHeader = req.headers['authorization'];
         const token = authHeader && authHeader.split(' ')[1];
 
@@ -1023,16 +1024,9 @@ class SolariaDashboardServer {
     }
 
     private async getProjectMetrics(): Promise<any[]> {
-        const [rows] = await this.db!.execute<RowDataPacket[]>(`
-            SELECT DATE(updated_at) as date,
-                   AVG(completion_percentage) as avg_completion,
-                   COUNT(*) as project_count
-            FROM projects
-            WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY DATE(updated_at)
-            ORDER BY date DESC
-        `);
-        return rows;
+        // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.getProjectMetrics()
+        const result = await projectsRepo.getProjectMetrics();
+        return (result[0] as unknown as RowDataPacket[]);
     }
 
     private async getCriticalAlerts(): Promise<Alert[]> {
@@ -5315,7 +5309,9 @@ class SolariaDashboardServer {
 
     private async getCTODashboard(_req: Request, res: Response): Promise<void> {
         try {
-            const [agents] = await this.db!.execute<RowDataPacket[]>(`SELECT * FROM ai_agents`);
+            // ✅ PARTIAL MIGRATION - Using agentsRepo.findAllAgents() and projectsRepo.findAllProjects()
+            // TODO: Migrate techMetrics and techDebt queries when metrics/stats repos available
+            const agents = await agentsRepo.findAllAgents();
             const [techMetrics] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT
                     AVG(code_quality_score) as avg_quality,
@@ -5326,9 +5322,7 @@ class SolariaDashboardServer {
             const [techDebt] = await this.db!.execute<RowDataPacket[]>(`
                 SELECT COUNT(*) as count FROM tasks WHERE status = 'blocked' OR priority = 'critical'
             `);
-            const [projects] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT id, name, status, code, description FROM projects ORDER BY created_at DESC
-            `);
+            const projects = await projectsRepo.findAllProjects();
 
             res.json({
                 role: 'CTO',
