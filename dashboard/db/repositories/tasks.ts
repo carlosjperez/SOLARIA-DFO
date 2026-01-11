@@ -135,20 +135,19 @@ export async function deleteTask(id: number) {
 // ============================================================================
 
 export async function findTaskItems(taskId: number, includeCompleted = true) {
-    const query = db.select().from(taskItems).where(eq(taskItems.taskId, taskId));
+    const completedFilter = includeCompleted ? '' : 'AND ti.is_completed = 0';
 
-    if (!includeCompleted) {
-        return db
-            .select()
-            .from(taskItems)
-            .where(and(
-                eq(taskItems.taskId, taskId),
-                eq(taskItems.isCompleted, false)
-            ))
-            .orderBy(asc(taskItems.sortOrder));
-    }
+    const [rows] = await pool.execute(`
+        SELECT
+            ti.*,
+            aa.name as completed_by_name
+        FROM task_items ti
+        LEFT JOIN ai_agents aa ON ti.completed_by = aa.id
+        WHERE ti.task_id = ? ${completedFilter}
+        ORDER BY ti.sort_order ASC
+    `, [taskId]);
 
-    return query.orderBy(asc(taskItems.sortOrder));
+    return rows as any[];
 }
 
 export async function createTaskItems(
@@ -584,4 +583,16 @@ export async function getRecentCompletedTasks(limit = 20) {
         ORDER BY COALESCE(t.completed_at, t.updated_at) DESC
         LIMIT ${limit}
     `);
+}
+
+// ============================================================================
+// Cascade Delete Helpers
+// ============================================================================
+
+export async function deleteTaskItems(taskId: number) {
+    return pool.execute('DELETE FROM task_items WHERE task_id = ?', [taskId]);
+}
+
+export async function deleteTaskTagAssignments(taskId: number) {
+    return pool.execute('DELETE FROM task_tag_assignments WHERE task_id = ?', [taskId]);
 }

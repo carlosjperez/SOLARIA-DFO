@@ -3364,8 +3364,7 @@ class SolariaDashboardServer {
 
     private async deleteTask(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo
-            // TODO: Add cascade delete helpers to repository (task_items, task_tag_assignments)
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo with cascade helpers
             const { id } = req.params;
 
             // Check if task exists and get metadata for events
@@ -3376,10 +3375,10 @@ class SolariaDashboardServer {
             }
 
             // Delete associated task_items first (cascade delete)
-            await this.db!.execute('DELETE FROM task_items WHERE task_id = ?', [id]);
+            await tasksRepo.deleteTaskItems(parseInt(id));
 
             // Delete associated task_tag_assignments (cascade delete)
-            await this.db!.execute('DELETE FROM task_tag_assignments WHERE task_id = ?', [id]);
+            await tasksRepo.deleteTaskTagAssignments(parseInt(id));
 
             // Delete the task via repository
             await tasksRepo.deleteTask(parseInt(id));
@@ -3409,8 +3408,7 @@ class SolariaDashboardServer {
 
     private async getTaskItems(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo.findTaskItems()
-            // TODO: Add completed_by_name join to repository (LEFT JOIN ai_agents)
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.findTaskItems() with completed_by_name JOIN
             const taskId = parseInt(req.params.id);
 
             const items = await tasksRepo.findTaskItems(taskId, true);
@@ -3419,7 +3417,7 @@ class SolariaDashboardServer {
                 items,
                 task_id: taskId,
                 total: items.length,
-                completed: items.filter((i: any) => i.isCompleted).length
+                completed: items.filter((i: any) => i.is_completed).length
             });
         } catch (error) {
             console.error('Error fetching task items:', error);
