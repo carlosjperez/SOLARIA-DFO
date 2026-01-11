@@ -443,6 +443,23 @@ export async function getRecentTasksByProject(filters?: {
 }
 
 // ============================================================================
+// Project Tasks (for getProject endpoint)
+// ============================================================================
+
+export async function getProjectTasks(projectId: number) {
+    return pool.execute(`
+        SELECT
+            t.*,
+            aa.name as agent_name,
+            aa.role as agent_role
+        FROM tasks t
+        LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+        WHERE t.project_id = ?
+        ORDER BY t.created_at DESC
+    `, [projectId]);
+}
+
+// ============================================================================
 // Kanban Aggregations
 // ============================================================================
 

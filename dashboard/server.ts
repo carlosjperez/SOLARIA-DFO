@@ -1285,7 +1285,7 @@ class SolariaDashboardServer {
 
             res.json({
                 period_days: days,
-                total_tasks: tasks.length,
+                total_tasks: (tasks as any[]).length,
                 projects: result
             });
 
@@ -1378,8 +1378,7 @@ class SolariaDashboardServer {
 
     private async getProject(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Project query migrated
-            // TODO: Migrate tasks/agents/alerts queries when repositories available
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo, agentsRepo, alertsRepo
             const { id } = req.params;
 
             const project = await projectsRepo.findProjectById(parseInt(id));
@@ -1389,36 +1388,9 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Get project tasks (still raw SQL - pending tasks repository)
-            const [tasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.*,
-                    aa.name as agent_name,
-                    aa.role as agent_role
-                FROM tasks t
-                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                WHERE t.project_id = ?
-                ORDER BY t.created_at DESC
-            `, [id]);
-
-            // Get assigned agents (still raw SQL - pending tasks repository)
-            const [agents] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT DISTINCT
-                    aa.*,
-                    COUNT(t.id) as tasks_assigned,
-                    COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as tasks_completed
-                FROM ai_agents aa
-                INNER JOIN tasks t ON aa.id = t.assigned_agent_id
-                WHERE t.project_id = ?
-                GROUP BY aa.id
-            `, [id]);
-
-            // Get project alerts (still raw SQL - pending alerts repository)
-            const [alerts] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT * FROM alerts
-                WHERE project_id = ? AND status = 'active'
-                ORDER BY severity DESC, created_at DESC
-            `, [id]);
+            const [tasks] = await tasksRepo.getProjectTasks(parseInt(id));
+            const [agents] = await agentsRepo.getProjectAgents(parseInt(id));
+            const alerts = await alertsRepo.findAllAlerts({ projectId: parseInt(id), status: 'active' });
 
             res.json({
                 project,

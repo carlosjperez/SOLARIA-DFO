@@ -198,3 +198,20 @@ export async function getAgentPerformance(agentId: number, days = 7) {
         ORDER BY date DESC
     `);
 }
+
+// ============================================================================
+// Project Agents (for getProject endpoint)
+// ============================================================================
+
+export async function getProjectAgents(projectId: number) {
+    return db.execute(sql`
+        SELECT DISTINCT
+            aa.*,
+            COUNT(t.id) as tasks_assigned,
+            COUNT(CASE WHEN t.status = 'completed' THEN 1 END) as tasks_completed
+        FROM ai_agents aa
+        INNER JOIN tasks t ON aa.id = t.assigned_agent_id
+        WHERE t.project_id = ${projectId}
+        GROUP BY aa.id
+    `);
+}
