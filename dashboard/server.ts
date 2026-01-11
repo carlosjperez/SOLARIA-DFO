@@ -1444,22 +1444,17 @@ class SolariaDashboardServer {
                     return;
                 }
 
+                // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo validation methods
                 // Check if reserved
-                const [reserved] = await this.db!.execute<RowDataPacket[]>(
-                    'SELECT code FROM reserved_project_codes WHERE code = ?',
-                    [upperCode]
-                );
-                if ((reserved as any[]).length > 0) {
+                const isReserved = await projectsRepo.checkReservedProjectCode(upperCode);
+                if (isReserved) {
                     res.status(400).json({ error: `Code '${upperCode}' is reserved and cannot be used` });
                     return;
                 }
 
                 // Check if already in use
-                const [existing] = await this.db!.execute<RowDataPacket[]>(
-                    'SELECT id FROM projects WHERE code = ?',
-                    [upperCode]
-                );
-                if ((existing as any[]).length > 0) {
+                const codeExists = await projectsRepo.checkProjectCodeExists(upperCode);
+                if (codeExists) {
                     res.status(409).json({ error: `Code '${upperCode}' is already in use by another project` });
                     return;
                 }
@@ -1478,16 +1473,12 @@ class SolariaDashboardServer {
                 // Ensure uniqueness by appending a number suffix if needed
                 let candidate = baseCode;
                 let suffix = 1;
+                // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo validation methods
                 while (true) {
-                    const [existing] = await this.db!.execute<RowDataPacket[]>(
-                        'SELECT id FROM projects WHERE code = ?',
-                        [candidate]
-                    );
-                    const [reserved] = await this.db!.execute<RowDataPacket[]>(
-                        'SELECT code FROM reserved_project_codes WHERE code = ?',
-                        [candidate]
-                    );
-                    if ((existing as any[]).length === 0 && (reserved as any[]).length === 0) {
+                    const codeExists = await projectsRepo.checkProjectCodeExists(candidate);
+                    const isReserved = await projectsRepo.checkReservedProjectCode(candidate);
+
+                    if (!codeExists && !isReserved) {
                         break;
                     }
                     // Try next variant: ABC -> AB1 -> AB2 -> A12 -> etc

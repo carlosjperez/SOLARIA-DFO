@@ -48,6 +48,26 @@ export async function findProjectByCode(code: string) {
     return result[0] || null;
 }
 
+/**
+ * Check if a project code already exists in the projects table
+ */
+export async function checkProjectCodeExists(code: string): Promise<boolean> {
+    const project = await findProjectByCode(code);
+    return project !== null;
+}
+
+/**
+ * Check if a project code is reserved (in reserved_project_codes table)
+ * Note: reserved_project_codes table not in Drizzle schema, using pool.execute
+ */
+export async function checkReservedProjectCode(code: string): Promise<boolean> {
+    const [rows] = await pool.execute(
+        'SELECT code FROM reserved_project_codes WHERE code = ?',
+        [code]
+    );
+    return (rows as any[]).length > 0;
+}
+
 export async function findProjectsWithStats() {
     return db.execute(sql`
         SELECT
