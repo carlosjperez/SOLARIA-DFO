@@ -31,6 +31,21 @@ export async function findAgentById(id: number) {
     return result[0] || null;
 }
 
+export async function findAgentByName(name: string, status?: string) {
+    const conditions = [eq(aiAgents.name, name)];
+
+    if (status) {
+        conditions.push(sql`${aiAgents.status} = ${status}`);
+    }
+
+    const result = await db
+        .select()
+        .from(aiAgents)
+        .where(and(...conditions))
+        .limit(1);
+    return result[0] || null;
+}
+
 export async function findAgentsWithStats() {
     return db.execute(sql`
         SELECT

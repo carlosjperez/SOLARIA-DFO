@@ -3118,9 +3118,7 @@ class SolariaDashboardServer {
 
     private async createTask(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo.createTask()
-            // TODO: Add findAgentByName() to agents repository
-            // TODO: Add repositories for epics and sprints
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo, agentsRepo, epicsRepo, sprintsRepo
             const {
                 title,
                 description,
@@ -3136,11 +3134,9 @@ class SolariaDashboardServer {
             // Auto-assign "Claude Code" agent if not specified
             let agentId = assigned_agent_id;
             if (!agentId) {
-                const [agents] = await this.db!.execute<RowDataPacket[]>(
-                    "SELECT id FROM ai_agents WHERE name = 'Claude Code' AND status = 'active' LIMIT 1"
-                );
-                if (agents.length > 0) {
-                    agentId = agents[0].id;
+                const agent = await agentsRepo.findAgentByName('Claude Code', 'active');
+                if (agent) {
+                    agentId = agent.id;
                 }
             }
 
@@ -3163,7 +3159,7 @@ class SolariaDashboardServer {
             // Generate task_code with suffix
             let taskCode = `#${taskNumber}`;
             let suffix = '';
-            let epics: RowDataPacket[] = [];
+            let epics: any[] = [];
 
             if (project_id) {
                 // Use repository to get project code
@@ -3174,20 +3170,15 @@ class SolariaDashboardServer {
 
                     // Add suffix based on epic or sprint
                     if (epic_id) {
-                        [epics] = await this.db!.execute<RowDataPacket[]>(
-                            'SELECT epic_number FROM epics WHERE id = ?',
-                            [epic_id]
-                        );
-                        if (epics.length > 0) {
-                            suffix = `-EPIC${String(epics[0].epic_number).padStart(2, '0')}`;
+                        const epic = await epicsRepo.findEpicById(epic_id);
+                        if (epic && epic.epicNumber) {
+                            suffix = `-EPIC${String(epic.epicNumber).padStart(2, '0')}`;
+                            epics = [epic]; // Para compatibilidad con emit posterior
                         }
                     } else if (sprint_id) {
-                        const [sprints] = await this.db!.execute<RowDataPacket[]>(
-                            'SELECT sprint_number FROM sprints WHERE id = ?',
-                            [sprint_id]
-                        );
-                        if (sprints.length > 0) {
-                            suffix = `-SP${String(sprints[0].sprint_number).padStart(2, '0')}`;
+                        const sprint = await sprintsRepo.findSprintById(sprint_id);
+                        if (sprint && sprint.sprintNumber) {
+                            suffix = `-SP${String(sprint.sprintNumber).padStart(2, '0')}`;
                         }
                     }
                     taskCode += suffix;
@@ -3201,7 +3192,7 @@ class SolariaDashboardServer {
                 task_code: taskCode,
                 task_number: taskNumber,
                 epic_id: epic_id || null,
-                epic_number: epic_id && epics.length > 0 ? epics[0].epic_number : null,
+                epic_number: epic_id && epics.length > 0 ? epics[0].epicNumber : null,
                 title: title || 'Nueva tarea',
                 description: description || '',
                 projectId: project_id || null,
