@@ -3,7 +3,7 @@
  * Replaces raw SQL queries with type-safe Drizzle queries
  */
 
-import { db } from '../index.js';
+import { db, pool } from '../index.js';
 import { eq, desc, asc, sql, and } from 'drizzle-orm';
 import {
     sprints,
@@ -64,6 +64,41 @@ export async function findSprintWithStats(id: number) {
         LEFT JOIN users u ON s.created_by = u.id
         WHERE s.id = ${id}
     `);
+}
+
+export async function findAllSprintsWithStats(filters?: {
+    projectId?: number;
+    status?: string;
+}) {
+    let query = `
+        SELECT
+            s.*,
+            p.name as project_name,
+            p.code as project_code,
+            u.name as created_by_name,
+            COALESCE((SELECT COUNT(*) FROM epics e WHERE e.sprint_id = s.id), 0) as epics_count,
+            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.sprint_id = s.id), 0) as tasks_total,
+            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.sprint_id = s.id AND t.status = 'completed'), 0) as tasks_completed,
+            COALESCE((SELECT AVG(t.progress) FROM tasks t WHERE t.sprint_id = s.id), 0) as progress
+        FROM sprints s
+        LEFT JOIN projects p ON s.project_id = p.id
+        LEFT JOIN users u ON s.created_by = u.id
+        WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (filters?.projectId) {
+        query += ' AND s.project_id = ?';
+        params.push(filters.projectId);
+    }
+    if (filters?.status) {
+        query += ' AND s.status = ?';
+        params.push(filters.status);
+    }
+
+    query += ' ORDER BY s.phase_order ASC, s.updated_at DESC';
+
+    return pool.execute(query, params);
 }
 
 export async function createSprint(data: NewSprint): Promise<Sprint> {

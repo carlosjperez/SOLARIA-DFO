@@ -23,6 +23,8 @@ import {
 
 export async function findAllTasks(filters?: {
     projectId?: number;
+    epicId?: number;
+    sprintId?: number;
     status?: string;
     priority?: string;
     agentId?: number;
@@ -32,6 +34,12 @@ export async function findAllTasks(filters?: {
 
     if (filters?.projectId) {
         conditions.push(eq(tasks.projectId, filters.projectId));
+    }
+    if (filters?.epicId) {
+        conditions.push(eq(tasks.epicId, filters.epicId));
+    }
+    if (filters?.sprintId) {
+        conditions.push(eq(tasks.sprintId, filters.sprintId));
     }
     if (filters?.status) {
         conditions.push(sql`${tasks.status} = ${filters.status}`);

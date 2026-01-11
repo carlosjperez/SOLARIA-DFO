@@ -3,7 +3,7 @@
  * Replaces raw SQL queries with type-safe Drizzle queries
  */
 
-import { db } from '../index.js';
+import { db, pool } from '../index.js';
 import { eq, desc, asc, sql, and } from 'drizzle-orm';
 import {
     epics,
@@ -69,6 +69,49 @@ export async function findEpicWithStats(id: number) {
         LEFT JOIN users u ON e.created_by = u.id
         WHERE e.id = ${id}
     `);
+}
+
+export async function findAllEpicsWithStats(filters?: {
+    projectId?: number;
+    sprintId?: number;
+    status?: string;
+}) {
+    let query = `
+        SELECT
+            e.*,
+            p.name as project_name,
+            p.code as project_code,
+            s.name as sprint_name,
+            s.sprint_number,
+            s.status as sprint_status,
+            u.name as created_by_name,
+            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.epic_id = e.id), 0) as tasks_total,
+            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.epic_id = e.id AND t.status = 'completed'), 0) as tasks_completed,
+            COALESCE((SELECT AVG(t.progress) FROM tasks t WHERE t.epic_id = e.id), 0) as progress
+        FROM epics e
+        LEFT JOIN projects p ON e.project_id = p.id
+        LEFT JOIN sprints s ON e.sprint_id = s.id
+        LEFT JOIN users u ON e.created_by = u.id
+        WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (filters?.projectId) {
+        query += ' AND e.project_id = ?';
+        params.push(filters.projectId);
+    }
+    if (filters?.sprintId) {
+        query += ' AND e.sprint_id = ?';
+        params.push(filters.sprintId);
+    }
+    if (filters?.status) {
+        query += ' AND e.status = ?';
+        params.push(filters.status);
+    }
+
+    query += ' ORDER BY e.updated_at DESC';
+
+    return pool.execute(query, params);
 }
 
 export async function createEpic(data: NewEpic): Promise<Epic> {

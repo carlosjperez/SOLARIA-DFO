@@ -2186,43 +2186,15 @@ class SolariaDashboardServer {
 
     private async getProjectEpics(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.findAllEpics()
-            // TODO: Add sprint info and stats to findAllEpics or create findAllEpicsWithStats()
+            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.findAllEpicsWithStats()
             const { id } = req.params;
             const { status } = req.query;
 
             const filters: any = { projectId: parseInt(id) };
             if (status) filters.status = status as string;
 
-            const epicsRaw = await epicsRepo.findAllEpics(filters);
-
-            // Get stats via raw SQL until repository supports enriched listing
-            const statsPromises = epicsRaw.map(async (epic: any) => {
-                const [stats] = await this.db!.execute<RowDataPacket[]>(`
-                    SELECT
-                        (SELECT COUNT(*) FROM tasks WHERE epic_id = ?) as tasks_total,
-                        (SELECT COUNT(*) FROM tasks WHERE epic_id = ? AND status = 'completed') as tasks_completed,
-                        s.name as sprint_name,
-                        s.sprint_number,
-                        s.status as sprint_status
-                    FROM epics e
-                    LEFT JOIN sprints s ON e.sprint_id = s.id
-                    WHERE e.id = ?
-                `, [epic.id, epic.id, epic.id]);
-
-                const stat = stats[0] as any;
-                return {
-                    ...epic,
-                    tasks_total: stat?.tasks_total || 0,
-                    tasks_completed: stat?.tasks_completed || 0,
-                    sprint_name: stat?.sprint_name || null,
-                    sprint_number: stat?.sprint_number || null,
-                    sprint_status: stat?.sprint_status || null,
-                    progress: this.calculateProgress(stat?.tasks_completed || 0, stat?.tasks_total || 0),
-                };
-            });
-
-            const epics = await Promise.all(statsPromises);
+            const result = await epicsRepo.findAllEpicsWithStats(filters);
+            const epics = (result[0] as unknown as RowDataPacket[]);
 
             res.json({ epics });
 
@@ -2235,8 +2207,7 @@ class SolariaDashboardServer {
 
     private async getEpicById(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.findEpicWithStats()
-            // TODO: Migrate tasks query to tasksRepo.findAllTasks({ epicId })
+            // ✅ MIGRATED TO DRIZZLE ORM - Using epicsRepo.findEpicWithStats() + tasksRepo.findAllTasks()
             const { id } = req.params;
 
             const result = await epicsRepo.findEpicWithStats(parseInt(id));
@@ -2247,13 +2218,8 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Get associated tasks (SQL until tasksRepo supports epicId filter)
-            const [tasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT id, title, status, progress, priority, estimated_hours
-                FROM tasks
-                WHERE epic_id = ?
-                ORDER BY priority DESC, created_at ASC
-            `, [id]);
+            // Get associated tasks
+            const tasks = await tasksRepo.findAllTasks({ epicId: parseInt(id) });
 
             res.json({
                 epic: epics[0],
@@ -2402,49 +2368,15 @@ class SolariaDashboardServer {
 
     private async getProjectSprints(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.findAllSprints()
-            // TODO: Add stats (tasks, epics) to findAllSprints or create findAllSprintsWithStats()
+            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.findAllSprintsWithStats()
             const { id } = req.params;
             const { status } = req.query;
 
             const filters: any = { projectId: parseInt(id) };
             if (status) filters.status = status as string;
 
-            const sprintsRaw = await sprintsRepo.findAllSprints(filters);
-
-            // Get stats via raw SQL until repository supports enriched listing
-            const statsPromises = sprintsRaw.map(async (sprint: any) => {
-                const [stats] = await this.db!.execute<RowDataPacket[]>(`
-                    SELECT
-                        (
-                            SELECT COUNT(DISTINCT t.id)
-                            FROM tasks t
-                            LEFT JOIN epics e ON t.epic_id = e.id
-                            WHERE t.sprint_id = ? OR e.sprint_id = ?
-                        ) as tasks_total,
-                        (
-                            SELECT COUNT(DISTINCT t.id)
-                            FROM tasks t
-                            LEFT JOIN epics e ON t.epic_id = e.id
-                            WHERE (t.sprint_id = ? OR e.sprint_id = ?)
-                              AND t.status = 'completed'
-                        ) as tasks_completed,
-                        (SELECT COUNT(*) FROM epics WHERE sprint_id = ?) as epics_total,
-                        (SELECT COUNT(*) FROM epics WHERE sprint_id = ? AND status = 'completed') as epics_completed
-                `, [sprint.id, sprint.id, sprint.id, sprint.id, sprint.id, sprint.id]);
-
-                const stat = stats[0] as any;
-                return {
-                    ...sprint,
-                    tasks_total: stat?.tasks_total || 0,
-                    tasks_completed: stat?.tasks_completed || 0,
-                    epics_total: stat?.epics_total || 0,
-                    epics_completed: stat?.epics_completed || 0,
-                    progress: this.calculateProgress(stat?.tasks_completed || 0, stat?.tasks_total || 0),
-                };
-            });
-
-            const sprints = await Promise.all(statsPromises);
+            const result = await sprintsRepo.findAllSprintsWithStats(filters);
+            const sprints = (result[0] as unknown as RowDataPacket[]);
 
             res.json({ sprints });
 
@@ -2457,8 +2389,7 @@ class SolariaDashboardServer {
 
     private async getSprintById(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.findSprintWithStats()
-            // TODO: Migrate tasks query to tasksRepo.findAllTasks({ sprintId })
+            // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo.findSprintWithStats() + tasksRepo.findAllTasks()
             const { id } = req.params;
 
             const result = await sprintsRepo.findSprintWithStats(parseInt(id));
@@ -2469,13 +2400,8 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Get associated tasks (SQL until tasksRepo supports sprintId filter)
-            const [tasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT id, title, status, progress, priority, estimated_hours
-                FROM tasks
-                WHERE sprint_id = ?
-                ORDER BY priority DESC, created_at ASC
-            `, [id]);
+            // Get associated tasks
+            const tasks = await tasksRepo.findAllTasks({ sprintId: parseInt(id) });
 
             res.json({
                 sprint: sprints[0],
