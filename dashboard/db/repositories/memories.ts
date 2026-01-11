@@ -1,10 +1,12 @@
 /**
  * SOLARIA DFO - Memories Repository (Drizzle ORM)
  * Replaces raw SQL queries with type-safe Drizzle queries
+ *
+ * Updated: 2026-01-11 - Phase 2.3: BaseRepository pattern
  */
 
 import { db, pool } from '../index.js';
-import { eq, desc, sql, and, like, gte, lte } from 'drizzle-orm';
+import { eq, desc, sql, and, like, gte, lte, type SQL } from 'drizzle-orm';
 import {
     memories,
     memoryTags,
@@ -15,9 +17,95 @@ import {
     type MemoryTag,
     type MemoryCrossref,
 } from '../schema/index.js';
+import { BaseRepository } from './base/BaseRepository.js';
 
 // ============================================================================
-// Memories CRUD
+// Memories Repository Class
+// ============================================================================
+
+class MemoriesRepository extends BaseRepository<Memory, NewMemory, typeof memories> {
+    constructor() {
+        super(memories, 'Memory');
+    }
+
+    /**
+     * Boost memory importance by specified amount
+     */
+    async boostImportance(id: number, amount = 0.1) {
+        await db.execute(sql`
+            UPDATE memories
+            SET importance = LEAST(importance + ${amount}, 1.0)
+            WHERE id = ${id}
+        `);
+        return this.findById(id);
+    }
+
+    /**
+     * Record memory access (increment access_count, update last_accessed_at)
+     */
+    async accessMemory(id: number) {
+        await db.execute(sql`
+            UPDATE memories
+            SET access_count = access_count + 1,
+                last_accessed_at = NOW()
+            WHERE id = ${id}
+        `);
+
+        // Log event
+        await db.execute(sql`
+            INSERT INTO memory_events (memory_id, event_type, event_data, created_at)
+            VALUES (${id}, 'accessed', JSON_OBJECT('timestamp', NOW()), NOW())
+        `);
+
+        return this.findById(id);
+    }
+
+    /**
+     * Create memory with event logging
+     * Overrides BaseRepository.create to add event logging
+     */
+    async createMemory(data: NewMemory): Promise<Memory> {
+        const result = await db.insert(memories).values(data);
+        const insertId = result[0].insertId;
+
+        // Log event
+        await db.insert(memoryEvents).values({
+            memoryId: insertId,
+            eventType: 'created',
+            agentId: data.agentId || undefined,
+            projectId: data.projectId || undefined,
+        });
+
+        return this.findById(insertId) as Promise<Memory>;
+    }
+
+    /**
+     * Update memory with version tracking
+     * Overrides BaseRepository.update to add event logging
+     */
+    async updateMemory(id: number, data: Partial<NewMemory>) {
+        // Increment version
+        const updated = await db.execute(sql`
+            UPDATE memories
+            SET version = version + 1
+            WHERE id = ${id}
+        `);
+
+        // Update the memory
+        await db.update(memories).set(data).where(eq(memories.id, id));
+
+        return this.findById(id);
+    }
+}
+
+// ============================================================================
+// Singleton Instance
+// ============================================================================
+
+const memoriesRepo = new MemoriesRepository();
+
+// ============================================================================
+// Memory Search and Filters - Standalone Functions
 // ============================================================================
 
 export async function findAllMemories(filters?: {
@@ -176,15 +264,6 @@ export async function findMemoriesWithEmbeddings(filters: {
     return pool.execute(sqlQuery, params);
 }
 
-export async function findMemoryById(id: number) {
-    const result = await db
-        .select()
-        .from(memories)
-        .where(eq(memories.id, id))
-        .limit(1);
-    return result[0] || null;
-}
-
 export async function findMemoryByIdWithDetails(id: number) {
     return db.execute(sql`
         SELECT
@@ -210,68 +289,8 @@ export async function searchMemories(searchQuery: string, limit = 20) {
     `);
 }
 
-export async function createMemory(data: NewMemory): Promise<Memory> {
-    const result = await db.insert(memories).values(data);
-    const insertId = result[0].insertId;
-
-    // Log event
-    await db.insert(memoryEvents).values({
-        memoryId: insertId,
-        eventType: 'created',
-        agentId: data.agentId || undefined,
-        projectId: data.projectId || undefined,
-    });
-
-    return findMemoryById(insertId) as Promise<Memory>;
-}
-
-export async function updateMemory(id: number, data: Partial<NewMemory>) {
-    await db.update(memories).set(data).where(eq(memories.id, id));
-
-    // Log event
-    const memory = await findMemoryById(id);
-    if (memory) {
-        await db.insert(memoryEvents).values({
-            memoryId: id,
-            eventType: 'updated',
-            agentId: memory.agentId || undefined,
-            projectId: memory.projectId || undefined,
-        });
-    }
-
-    return findMemoryById(id);
-}
-
-export async function deleteMemory(id: number) {
-    return db.delete(memories).where(eq(memories.id, id));
-}
-
-export async function boostImportance(id: number, amount = 0.1) {
-    await db.update(memories).set({
-        importance: sql`LEAST(importance + ${amount}, 1.0)`,
-        accessCount: sql`access_count + 1`,
-        lastAccessed: sql`NOW()`,
-    }).where(eq(memories.id, id));
-    return findMemoryById(id);
-}
-
-export async function accessMemory(id: number) {
-    await db.update(memories).set({
-        accessCount: sql`access_count + 1`,
-        lastAccessed: sql`NOW()`,
-    }).where(eq(memories.id, id));
-
-    // Log event
-    await db.insert(memoryEvents).values({
-        memoryId: id,
-        eventType: 'accessed',
-    });
-
-    return findMemoryById(id);
-}
-
 // ============================================================================
-// Memory Tags
+// Memory Tags - Standalone Functions
 // ============================================================================
 
 export async function findAllMemoryTags() {
@@ -330,3 +349,58 @@ export async function createCrossref(
 
     return crossrefs[0];
 }
+
+// ============================================================================
+// Exported Functions (Backward Compatibility) - Memories CRUD Only
+// ============================================================================
+
+/**
+ * Find memory by ID
+ * @deprecated Use memoriesRepo.findById() directly
+ */
+export async function findMemoryById(id: number) {
+    return memoriesRepo.findById(id);
+}
+
+/**
+ * Create memory with event logging
+ * @deprecated Use memoriesRepo.createMemory() directly
+ */
+export async function createMemory(data: NewMemory): Promise<Memory> {
+    return memoriesRepo.createMemory(data);
+}
+
+/**
+ * Update memory with version tracking
+ * @deprecated Use memoriesRepo.updateMemory() directly
+ */
+export async function updateMemory(id: number, data: Partial<NewMemory>) {
+    return memoriesRepo.updateMemory(id, data);
+}
+
+/**
+ * Delete memory
+ * @deprecated Use memoriesRepo.delete() directly
+ */
+export async function deleteMemory(id: number) {
+    return memoriesRepo.delete(id);
+}
+
+/**
+ * Boost memory importance
+ * @deprecated Use memoriesRepo.boostImportance() directly
+ */
+export async function boostImportance(id: number, amount = 0.1) {
+    return memoriesRepo.boostImportance(id, amount);
+}
+
+/**
+ * Record memory access
+ * @deprecated Use memoriesRepo.accessMemory() directly
+ */
+export async function accessMemory(id: number) {
+    return memoriesRepo.accessMemory(id);
+}
+
+// Export repository instance for direct usage
+export { memoriesRepo };
