@@ -47,6 +47,7 @@ import * as usersRepo from './db/repositories/users.js';
 import * as permissionsRepo from './db/repositories/permissions.js';
 import * as dashboardRepo from './db/repositories/dashboard.js';
 import * as csuiteRepo from './db/repositories/csuite.js';
+import * as reservedCodesRepo from './db/repositories/reserved-codes.js';
 
 // Import Drizzle schema types
 import type { NewAgentMcpConfig } from './db/schema/index.js';
@@ -1796,8 +1797,7 @@ class SolariaDashboardServer {
 
     private async checkProjectCode(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using projectsRepo.findProjectByCode()
-            // TODO: Add repository for reserved_project_codes table
+            // ✅ MIGRATED TO DRIZZLE ORM - Using reservedCodesRepo, projectsRepo
             const { code } = req.params;
             const upperCode = code.toUpperCase().trim();
 
@@ -1807,17 +1807,14 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Check if reserved (SQL until repository exists)
-            const [reserved] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT code, reason FROM reserved_project_codes WHERE code = ?',
-                [upperCode]
-            );
+            // Check if reserved
+            const [reserved] = await reservedCodesRepo.findReservedProjectCode(upperCode);
             if ((reserved as any[]).length > 0) {
                 res.json({ available: false, reason: `Code '${upperCode}' is reserved: ${(reserved as any[])[0].reason}` });
                 return;
             }
 
-            // Check if already in use (via repository)
+            // Check if already in use
             const existing = await projectsRepo.findProjectByCode(upperCode);
             if (existing) {
                 res.json({ available: false, reason: `Code '${upperCode}' is used by project: ${existing.name}` });
