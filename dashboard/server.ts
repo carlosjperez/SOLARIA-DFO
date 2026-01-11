@@ -49,6 +49,7 @@ import * as dashboardRepo from './db/repositories/dashboard.js';
 import * as csuiteRepo from './db/repositories/csuite.js';
 import * as reservedCodesRepo from './db/repositories/reserved-codes.js';
 import * as activityLogsRepo from './db/repositories/activity-logs.js';
+import * as githubActionsRepo from './db/repositories/githubActions.js';
 
 // Import Drizzle schema types
 import type { NewAgentMcpConfig } from './db/schema/index.js';
@@ -3909,6 +3910,7 @@ class SolariaDashboardServer {
 
     private async getLogs(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using activityLogsRepo.findActivityLogsWithFilters() and countActivityLogs()
             const {
                 project_id,
                 agent_id,
@@ -3920,87 +3922,27 @@ class SolariaDashboardServer {
                 to_date
             } = req.query;
 
-            let query = `
-                SELECT
-                    al.id,
-                    al.project_id,
-                    al.agent_id,
-                    al.task_id,
-                    al.user_id,
-                    al.action,
-                    al.details,
-                    al.category,
-                    al.level,
-                    al.timestamp,
-                    al.created_at,
-                    p.name as project_name,
-                    p.code as project_code,
-                    aa.name as agent_name,
-                    t.title as task_title,
-                    t.task_number,
-                    u.username as user_name
-                FROM activity_logs al
-                LEFT JOIN projects p ON al.project_id = p.id
-                LEFT JOIN ai_agents aa ON al.agent_id = aa.id
-                LEFT JOIN tasks t ON al.task_id = t.id
-                LEFT JOIN users u ON al.user_id = u.id
-                WHERE 1=1
-            `;
-            const params: (string | number)[] = [];
-
-            if (project_id) {
-                query += ' AND al.project_id = ?';
-                params.push(Number(project_id));
-            }
-            if (agent_id) {
-                query += ' AND al.agent_id = ?';
-                params.push(Number(agent_id));
-            }
-            if (category) {
-                query += ' AND al.category = ?';
-                params.push(String(category));
-            }
-            if (level) {
-                query += ' AND al.level = ?';
-                params.push(String(level));
-            }
-            if (from_date) {
-                query += ' AND al.created_at >= ?';
-                params.push(String(from_date));
-            }
-            if (to_date) {
-                query += ' AND al.created_at <= ?';
-                params.push(String(to_date));
-            }
-
-            query += ' ORDER BY al.created_at DESC LIMIT ? OFFSET ?';
-            params.push(Number(limit), Number(offset));
-
-            const [logs] = await this.db!.execute<RowDataPacket[]>(query, params);
+            const result = await activityLogsRepo.findActivityLogsWithFilters({
+                projectId: project_id ? Number(project_id) : undefined,
+                agentId: agent_id ? Number(agent_id) : undefined,
+                category: category ? String(category) : undefined,
+                level: level ? String(level) : undefined,
+                fromDate: from_date ? String(from_date) : undefined,
+                toDate: to_date ? String(to_date) : undefined,
+                limit: Number(limit),
+                offset: Number(offset)
+            });
+            const logs = (result[0] as unknown as any[]);
 
             // Get total count
-            let countQuery = 'SELECT COUNT(*) as total FROM activity_logs al WHERE 1=1';
-            const countParams: (string | number)[] = [];
-
-            if (project_id) {
-                countQuery += ' AND al.project_id = ?';
-                countParams.push(Number(project_id));
-            }
-            if (agent_id) {
-                countQuery += ' AND al.agent_id = ?';
-                countParams.push(Number(agent_id));
-            }
-            if (category) {
-                countQuery += ' AND al.category = ?';
-                countParams.push(String(category));
-            }
-            if (level) {
-                countQuery += ' AND al.level = ?';
-                countParams.push(String(level));
-            }
-
-            const [countResult] = await this.db!.execute<RowDataPacket[]>(countQuery, countParams);
-            const total = countResult[0]?.total || 0;
+            const countResult = await activityLogsRepo.countActivityLogs({
+                projectId: project_id ? Number(project_id) : undefined,
+                agentId: agent_id ? Number(agent_id) : undefined,
+                category: category ? String(category) : undefined,
+                level: level ? String(level) : undefined
+            });
+            const countRows = (countResult[0] as unknown as any[]);
+            const total = countRows[0]?.total || 0;
 
             // Test expects direct array, not object with pagination
             res.json(logs);
@@ -4012,6 +3954,7 @@ class SolariaDashboardServer {
 
     private async getAuditLogs(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using activityLogsRepo.findAuditLogs() and getAuditStats()
             const {
                 project_id,
                 user_id,
@@ -4031,64 +3974,19 @@ class SolariaDashboardServer {
                 'settings_changed', 'backup_created', 'backup_restored'
             ];
 
-            let query = `
-                SELECT
-                    al.id,
-                    al.project_id,
-                    al.agent_id,
-                    al.task_id,
-                    al.user_id,
-                    al.action,
-                    al.details,
-                    al.category,
-                    al.level,
-                    al.timestamp,
-                    al.created_at,
-                    p.name as project_name,
-                    p.code as project_code,
-                    u.username as user_name,
-                    INET_NTOA(CONV(SUBSTRING(al.details, LOCATE('"ip":"', al.details) + 6,
-                        LOCATE('"', al.details, LOCATE('"ip":"', al.details) + 6) - LOCATE('"ip":"', al.details) - 6
-                    ), 10, 10)) as ip_address
-                FROM activity_logs al
-                LEFT JOIN projects p ON al.project_id = p.id
-                LEFT JOIN users u ON al.user_id = u.id
-                WHERE (al.category = 'security' OR al.action IN (${auditActions.map(() => '?').join(',')}))
-            `;
-            const params: (string | number)[] = [...auditActions];
-
-            if (project_id) {
-                query += ' AND al.project_id = ?';
-                params.push(Number(project_id));
-            }
-            if (user_id) {
-                query += ' AND al.user_id = ?';
-                params.push(Number(user_id));
-            }
-            if (action) {
-                query += ' AND al.action = ?';
-                params.push(String(action));
-            }
-
-            query += ' ORDER BY al.created_at DESC LIMIT ? OFFSET ?';
-            params.push(Number(limit), Number(offset));
-
-            const [logs] = await this.db!.execute<RowDataPacket[]>(query, params);
+            const result = await activityLogsRepo.findAuditLogs({
+                auditActions,
+                projectId: project_id ? Number(project_id) : undefined,
+                userId: user_id ? Number(user_id) : undefined,
+                action: action ? String(action) : undefined,
+                limit: Number(limit),
+                offset: Number(offset)
+            });
+            const logs = (result[0] as unknown as any[]);
 
             // Get audit summary stats
-            const [stats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total_entries,
-                    COUNT(CASE WHEN level = 'warning' THEN 1 END) as warnings,
-                    COUNT(CASE WHEN level = 'error' THEN 1 END) as errors,
-                    COUNT(CASE WHEN level = 'critical' THEN 1 END) as critical,
-                    COUNT(CASE WHEN action LIKE 'login_failed%' THEN 1 END) as failed_logins,
-                    COUNT(DISTINCT user_id) as unique_users,
-                    COUNT(DISTINCT project_id) as affected_projects
-                FROM activity_logs
-                WHERE category = 'security'
-                   OR action IN (${auditActions.map(() => '?').join(',')})
-            `, auditActions);
+            const statsResult = await activityLogsRepo.getAuditStats(auditActions);
+            const stats = (statsResult[0] as unknown as any[]);
 
             res.json({
                 logs,
@@ -6498,14 +6396,9 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Get workflow run from database to get owner/repo/github_run_id
-            const [runRows] = await this.db!.execute<RowDataPacket[]>(
-                `SELECT wr.github_run_id, w.owner, w.repo
-                 FROM github_workflow_runs wr
-                 JOIN github_workflows w ON wr.workflow_id = w.id
-                 WHERE wr.id = ?`,
-                [runId]
-            );
+            // ✅ MIGRATED TO DRIZZLE ORM - Using githubActionsRepo.findWorkflowRunById()
+            const result = await githubActionsRepo.findWorkflowRunById(runId);
+            const runRows = (result[0] as unknown as any[]);
 
             if (!runRows || runRows.length === 0) {
                 res.status(404).json({
