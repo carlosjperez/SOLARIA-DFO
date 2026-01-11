@@ -3764,8 +3764,7 @@ class SolariaDashboardServer {
 
     private async createBusiness(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.createBusiness()
-            // TODO: Migrate activity_logs to repository
+            // ✅ FULLY MIGRATED TO DRIZZLE ORM - Using businessesRepo and activityLogsRepo
             const {
                 name,
                 description,
@@ -3794,11 +3793,14 @@ class SolariaDashboardServer {
                 logoUrl: logo_url || null
             });
 
-            // Log activity (SQL until activity_logs repository exists)
-            await this.db!.execute(`
-                INSERT INTO activity_logs (action, details, category, level)
-                VALUES ('business_created', ?, 'management', 'info')
-            `, [JSON.stringify({ business_id: business.id, name })]);
+            // Log activity
+            await activityLogsRepo.createActivityLog({
+                action: 'business_created',
+                message: 'business_created',
+                category: 'management',
+                level: 'info',
+                metadata: { business_id: business.id, name }
+            });
 
             res.status(201).json({
                 id: business.id,
@@ -3812,8 +3814,7 @@ class SolariaDashboardServer {
 
     private async updateBusiness(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.updateBusiness()
-            // TODO: Migrate activity_logs to repository
+            // ✅ FULLY MIGRATED TO DRIZZLE ORM - Using businessesRepo and activityLogsRepo
             const { id } = req.params;
             const {
                 name,
@@ -3862,11 +3863,14 @@ class SolariaDashboardServer {
 
             await businessesRepo.updateBusiness(parseInt(id), updateData);
 
-            // Log activity (SQL until activity_logs repository exists)
-            await this.db!.execute(`
-                INSERT INTO activity_logs (action, details, category, level)
-                VALUES ('business_updated', ?, 'management', 'info')
-            `, [JSON.stringify({ business_id: id, updates: Object.keys(req.body) })]);
+            // Log activity
+            await activityLogsRepo.createActivityLog({
+                action: 'business_updated',
+                message: 'business_updated',
+                category: 'management',
+                level: 'info',
+                metadata: { business_id: parseInt(id), updates: Object.keys(req.body) }
+            });
 
             res.json({ message: 'Business updated successfully' });
         } catch (error) {
@@ -3877,9 +3881,8 @@ class SolariaDashboardServer {
 
     private async deleteBusiness(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.deleteBusiness()
-            // TODO: Migrate project count validation and nullify to projectsRepo
-            // TODO: Migrate activity_logs to repository
+            // ✅ PARTIALLY MIGRATED - Using businessesRepo, projectsRepo, and activityLogsRepo
+            // TODO: Migrate project count validation query to businessesRepo
             const { id } = req.params;
 
             // Check if business exists and has no active projects (SQL until projectsRepo supports filters)
@@ -3910,11 +3913,14 @@ class SolariaDashboardServer {
             // Delete business
             await businessesRepo.deleteBusiness(parseInt(id));
 
-            // Log activity (SQL until activity_logs repository exists)
-            await this.db!.execute(`
-                INSERT INTO activity_logs (action, details, category, level)
-                VALUES ('business_deleted', ?, 'management', 'warning')
-            `, [JSON.stringify({ business_id: id, name: existing[0].name })]);
+            // Log activity
+            await activityLogsRepo.createActivityLog({
+                action: 'business_deleted',
+                message: 'business_deleted',
+                category: 'management',
+                level: 'warning',
+                metadata: { business_id: parseInt(id), name: existing[0].name }
+            });
 
             res.json({ message: 'Business deleted successfully' });
         } catch (error) {
