@@ -2999,6 +2999,7 @@ class SolariaDashboardServer {
 
     private async getTasks(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.findTasksWithDetails()
             const { project_id, agent_id, status, sort_by = 'created_at', sort_order = 'desc', limit = '200' } = req.query;
 
             // Whitelist of allowed sort columns for security
@@ -3019,46 +3020,16 @@ class SolariaDashboardServer {
             const sortDirection = (sort_order as string).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
             const safeLimit = Math.min(Math.max(parseInt(limit as string) || 200, 1), 500);
 
-            let query = `
-                SELECT
-                    t.*,
-                    p.name as project_name,
-                    p.code as project_code,
-                    CONCAT(
-                        COALESCE(p.code, 'TSK'), '-',
-                        LPAD(COALESCE(t.task_number, t.id), 3, '0')
-                    ) as task_code,
-                    aa.name as agent_name,
-                    u.username as assigned_by_name,
-                    (SELECT COUNT(*) FROM task_items WHERE task_id = t.id) as items_total,
-                    (SELECT COUNT(*) FROM task_items WHERE task_id = t.id AND is_completed = 1) as items_completed
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                LEFT JOIN users u ON t.assigned_by = u.id
-                WHERE 1=1
-            `;
+            const result = await tasksRepo.findTasksWithDetails({
+                projectId: project_id ? parseInt(project_id as string) : undefined,
+                agentId: agent_id ? parseInt(agent_id as string) : undefined,
+                status: status as string | undefined,
+                sortColumn,
+                sortDirection: sortDirection as 'ASC' | 'DESC',
+                limit: safeLimit
+            });
+            const tasks = (result[0] as unknown as any[]);
 
-            const params: (string | number)[] = [];
-
-            if (project_id) {
-                query += ' AND t.project_id = ?';
-                params.push(parseInt(project_id as string));
-            }
-
-            if (agent_id) {
-                query += ' AND t.assigned_agent_id = ?';
-                params.push(parseInt(agent_id as string));
-            }
-
-            if (status) {
-                query += ' AND t.status = ?';
-                params.push(status as string);
-            }
-
-            query += ` ORDER BY ${sortColumn} ${sortDirection} LIMIT ${safeLimit}`;
-
-            const [tasks] = await this.db!.execute<RowDataPacket[]>(query, params);
             res.json(tasks);
 
         } catch (error) {
@@ -4871,6 +4842,7 @@ class SolariaDashboardServer {
 
     private async searchMemories(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.searchMemoriesFulltext()
             const { query, project_id, tags, min_importance = '0', limit = '10' } = req.query;
 
             if (!query) {
@@ -4878,29 +4850,13 @@ class SolariaDashboardServer {
                 return;
             }
 
-            let sql = `
-                SELECT m.*,
-                    MATCH(m.content, m.summary) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance,
-                    p.name as project_name
-                FROM memories m
-                LEFT JOIN projects p ON m.project_id = p.id
-                WHERE MATCH(m.content, m.summary) AGAINST(? IN NATURAL LANGUAGE MODE)
-                AND m.importance >= ?
-            `;
-            const params: (string | number)[] = [query as string, query as string, parseFloat(min_importance as string)];
-
-            if (project_id) {
-                sql += ' AND m.project_id = ?';
-                params.push(parseInt(project_id as string));
-            }
-
+            // Parse tags parameter
+            let tagList: string[] | undefined;
             if (tags && tags !== '' && tags !== '[]') {
                 try {
-                    const tagList = JSON.parse(tags as string) as string[];
-                    if (Array.isArray(tagList) && tagList.length > 0) {
-                        const tagConditions = tagList.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
-                        sql += ` AND (${tagConditions})`;
-                        tagList.forEach(tag => params.push(JSON.stringify(tag)));
+                    const parsed = JSON.parse(tags as string) as string[];
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        tagList = parsed;
                     }
                 } catch (parseError) {
                     console.warn('Invalid tags parameter in searchMemories, ignoring:', tags);
@@ -4908,9 +4864,14 @@ class SolariaDashboardServer {
                 }
             }
 
-            sql += ` ORDER BY relevance DESC, m.importance DESC LIMIT ${parseInt(limit as string)}`;
-
-            const [memories] = await this.db!.execute<RowDataPacket[]>(sql, params);
+            const result = await memoriesRepo.searchMemoriesFulltext({
+                query: query as string,
+                projectId: project_id ? parseInt(project_id as string) : undefined,
+                tags: tagList,
+                minImportance: parseFloat(min_importance as string),
+                limit: parseInt(limit as string)
+            });
+            const memories = (result[0] as unknown as any[]);
 
             memories.forEach((m: any) => {
                 m.tags = m.tags ? JSON.parse(m.tags) : [];
@@ -4947,24 +4908,13 @@ class SolariaDashboardServer {
             }
 
             // Fetch memories with embeddings
-            let sql = `
-                SELECT m.*, p.name as project_name, aa.name as agent_name,
-                       MATCH(m.content) AGAINST(? IN NATURAL LANGUAGE MODE) as fulltext_score
-                FROM memories m
-                LEFT JOIN projects p ON m.project_id = p.id
-                LEFT JOIN ai_agents aa ON m.agent_id = aa.id
-                WHERE m.embedding IS NOT NULL
-            `;
-            const params: (string | number)[] = [query];
-
-            if (project_id) {
-                sql += ' AND m.project_id = ?';
-                params.push(Number(project_id));
-            }
-
-            sql += ' ORDER BY m.importance DESC, m.created_at DESC LIMIT 100';
-
-            const [memories] = await this.db!.execute<RowDataPacket[]>(sql, params);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.findMemoriesWithEmbeddings()
+            const result = await memoriesRepo.findMemoriesWithEmbeddings({
+                query,
+                projectId: project_id ? Number(project_id) : undefined,
+                limit: 100
+            });
+            const memories = (result[0] as unknown as any[]);
 
             // Calculate hybrid scores and rank
             const scoredMemories = memories.map((memory: any) => {

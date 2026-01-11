@@ -635,6 +635,56 @@ export async function findTaskWithCode(taskId: number) {
     `, [taskId]);
 }
 
+export async function findTasksWithDetails(filters: {
+    projectId?: number;
+    agentId?: number;
+    status?: string;
+    sortColumn: string;
+    sortDirection: 'ASC' | 'DESC';
+    limit: number;
+}) {
+    let query = `
+        SELECT
+            t.*,
+            p.name as project_name,
+            p.code as project_code,
+            CONCAT(
+                COALESCE(p.code, 'TSK'), '-',
+                LPAD(COALESCE(t.task_number, t.id), 3, '0')
+            ) as task_code,
+            aa.name as agent_name,
+            u.username as assigned_by_name,
+            (SELECT COUNT(*) FROM task_items WHERE task_id = t.id) as items_total,
+            (SELECT COUNT(*) FROM task_items WHERE task_id = t.id AND is_completed = 1) as items_completed
+        FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+        LEFT JOIN users u ON t.assigned_by = u.id
+        WHERE 1=1
+    `;
+
+    const params: (string | number)[] = [];
+
+    if (filters.projectId) {
+        query += ' AND t.project_id = ?';
+        params.push(filters.projectId);
+    }
+
+    if (filters.agentId) {
+        query += ' AND t.assigned_agent_id = ?';
+        params.push(filters.agentId);
+    }
+
+    if (filters.status) {
+        query += ' AND t.status = ?';
+        params.push(filters.status);
+    }
+
+    query += ` ORDER BY ${filters.sortColumn} ${filters.sortDirection} LIMIT ${filters.limit}`;
+
+    return pool.execute(query, params);
+}
+
 // ============================================================================
 // Cascade Delete Helpers
 // ============================================================================

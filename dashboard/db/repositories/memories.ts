@@ -117,6 +117,65 @@ export async function findMemoriesWithFilters(filters: {
     return pool.execute(sqlQuery, params);
 }
 
+export async function searchMemoriesFulltext(filters: {
+    query: string;
+    projectId?: number;
+    tags?: string[];
+    minImportance: number;
+    limit: number;
+}) {
+    let sqlQuery = `
+        SELECT m.*,
+            MATCH(m.content, m.summary) AGAINST(? IN NATURAL LANGUAGE MODE) as relevance,
+            p.name as project_name
+        FROM memories m
+        LEFT JOIN projects p ON m.project_id = p.id
+        WHERE MATCH(m.content, m.summary) AGAINST(? IN NATURAL LANGUAGE MODE)
+        AND m.importance >= ?
+    `;
+    const params: (string | number)[] = [filters.query, filters.query, filters.minImportance];
+
+    if (filters.projectId) {
+        sqlQuery += ' AND m.project_id = ?';
+        params.push(filters.projectId);
+    }
+
+    if (filters.tags && filters.tags.length > 0) {
+        const tagConditions = filters.tags.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
+        sqlQuery += ` AND (${tagConditions})`;
+        filters.tags.forEach(tag => params.push(JSON.stringify(tag)));
+    }
+
+    sqlQuery += ` ORDER BY relevance DESC, m.importance DESC LIMIT ${filters.limit}`;
+
+    return pool.execute(sqlQuery, params);
+}
+
+export async function findMemoriesWithEmbeddings(filters: {
+    query: string;
+    projectId?: number;
+    limit: number;
+}) {
+    let sqlQuery = `
+        SELECT m.*, p.name as project_name, aa.name as agent_name,
+               MATCH(m.content) AGAINST(? IN NATURAL LANGUAGE MODE) as fulltext_score
+        FROM memories m
+        LEFT JOIN projects p ON m.project_id = p.id
+        LEFT JOIN ai_agents aa ON m.agent_id = aa.id
+        WHERE m.embedding IS NOT NULL
+    `;
+    const params: (string | number)[] = [filters.query];
+
+    if (filters.projectId) {
+        sqlQuery += ' AND m.project_id = ?';
+        params.push(filters.projectId);
+    }
+
+    sqlQuery += ` ORDER BY m.importance DESC, m.created_at DESC LIMIT ${filters.limit}`;
+
+    return pool.execute(sqlQuery, params);
+}
+
 export async function findMemoryById(id: number) {
     const result = await db
         .select()
