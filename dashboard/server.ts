@@ -5193,12 +5193,12 @@ class SolariaDashboardServer {
 
     private async getMemory(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using memoriesRepo
-            // TODO: Add project_name and agent_name JOINs to repository
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.findMemoryByIdWithDetails()
             const { id } = req.params;
             const { track_access } = req.query;
 
-            const memory = await memoriesRepo.findMemoryById(parseInt(id));
+            const result = await memoriesRepo.findMemoryByIdWithDetails(parseInt(id));
+            const memory = (result[0] as unknown as any[])?.[0];
 
             if (!memory) {
                 res.status(404).json({ error: 'Memory not found' });
@@ -5214,9 +5214,6 @@ class SolariaDashboardServer {
             const memoryData = memory as any;
             memoryData.tags = memoryData.tags ? JSON.parse(memoryData.tags) : [];
             memoryData.metadata = memoryData.metadata ? JSON.parse(memoryData.metadata) : {};
-
-            // TODO: Add project_name and agent_name via separate queries or enhance repository
-            // For now, returning memory without these fields
 
             res.json(memoryData);
         } catch (error) {
@@ -5338,23 +5335,12 @@ class SolariaDashboardServer {
 
     private async getMemoryStats(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using memoriesRepo
-            // TODO: Add project_id filter support to getMemoryStats() in repository
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.getMemoryStats() with project filter
             const { project_id } = req.query;
 
-            let stats: any;
-            if (project_id) {
-                // Custom query with project filter (SQL until repository supports it)
-                const [countResult] = await this.db!.execute<RowDataPacket[]>(
-                    `SELECT COUNT(*) as total_memories, AVG(importance) as avg_importance, SUM(access_count) as total_accesses FROM memories WHERE project_id = ?`,
-                    [parseInt(project_id as string)]
-                );
-                stats = countResult[0];
-            } else {
-                // Use repository for global stats
-                const result = await memoriesRepo.getMemoryStats();
-                stats = (result[0] as unknown as RowDataPacket[])[0];
-            }
+            const projectId = project_id ? parseInt(project_id as string) : undefined;
+            const result = await memoriesRepo.getMemoryStats(projectId);
+            const stats = (result[0] as unknown as any[])[0];
 
             // Get top tags via repository
             const allTags = await memoriesRepo.findAllMemoryTags();
@@ -5399,27 +5385,13 @@ class SolariaDashboardServer {
 
     private async getRelatedMemories(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using memoriesRepo
-            // TODO: Add type filter support to findRelatedMemories() in repository
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.findRelatedMemories() with type filter
             const { id } = req.params;
             const { type } = req.query;
 
-            let related: any[];
-            if (type) {
-                // Custom query with type filter (SQL until repository supports it)
-                const [results] = await this.db!.execute<RowDataPacket[]>(`
-                    SELECT m.*, mc.relationship_type, mc.strength
-                    FROM memory_crossrefs mc
-                    JOIN memories m ON mc.target_memory_id = m.id
-                    WHERE mc.source_memory_id = ? AND mc.relationship_type = ?
-                    ORDER BY mc.strength DESC, m.importance DESC
-                `, [parseInt(id), type]);
-                related = results;
-            } else {
-                // Use repository for all related memories
-                const result = await memoriesRepo.findRelatedMemories(parseInt(id));
-                related = result[0] as unknown as any[];
-            }
+            const relationshipType = type ? (type as string) : undefined;
+            const result = await memoriesRepo.findRelatedMemories(parseInt(id), relationshipType);
+            const related = result[0] as unknown as any[];
 
             // Parse JSON fields
             related.forEach((m: any) => {

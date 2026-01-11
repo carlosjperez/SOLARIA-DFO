@@ -65,6 +65,20 @@ export async function findMemoryById(id: number) {
     return result[0] || null;
 }
 
+export async function findMemoryByIdWithDetails(id: number) {
+    return db.execute(sql`
+        SELECT
+            m.*,
+            p.name as project_name,
+            aa.name as agent_name
+        FROM memories m
+        LEFT JOIN projects p ON m.project_id = p.id
+        LEFT JOIN ai_agents aa ON m.agent_id = aa.id
+        WHERE m.id = ${id}
+        LIMIT 1
+    `);
+}
+
 export async function searchMemories(searchQuery: string, limit = 20) {
     return db.execute(sql`
         SELECT *,
@@ -144,7 +158,9 @@ export async function findAllMemoryTags() {
     return db.select().from(memoryTags).orderBy(desc(memoryTags.usageCount));
 }
 
-export async function getMemoryStats() {
+export async function getMemoryStats(projectId?: number) {
+    const projectFilter = projectId ? sql`WHERE project_id = ${projectId}` : sql``;
+
     return db.execute(sql`
         SELECT
             COUNT(*) as total_memories,
@@ -153,6 +169,7 @@ export async function getMemoryStats() {
             COUNT(DISTINCT project_id) as projects_with_memories,
             COUNT(DISTINCT agent_id) as agents_with_memories
         FROM memories
+        ${projectFilter}
     `);
 }
 
@@ -160,12 +177,14 @@ export async function getMemoryStats() {
 // Memory Cross-references
 // ============================================================================
 
-export async function findRelatedMemories(memoryId: number) {
+export async function findRelatedMemories(memoryId: number, relationshipType?: string) {
+    const typeFilter = relationshipType ? sql`AND mc.relationship_type = ${relationshipType}` : sql``;
+
     return db.execute(sql`
         SELECT m.*, mc.relationship_type, mc.strength
         FROM memories m
         INNER JOIN memory_crossrefs mc ON m.id = mc.target_memory_id
-        WHERE mc.source_memory_id = ${memoryId}
+        WHERE mc.source_memory_id = ${memoryId} ${typeFilter}
         ORDER BY mc.strength DESC, m.importance DESC
     `);
 }
