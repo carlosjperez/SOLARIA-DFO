@@ -45,6 +45,7 @@ import * as inlineDocumentsRepo from './db/repositories/inlineDocuments.js';
 import * as agentMcpConfigsRepo from './db/repositories/agentMcpConfigs.js';
 import * as usersRepo from './db/repositories/users.js';
 import * as permissionsRepo from './db/repositories/permissions.js';
+import * as dashboardRepo from './db/repositories/dashboard.js';
 
 // Import Drizzle schema types
 import type { NewAgentMcpConfig } from './db/schema/index.js';
@@ -1042,56 +1043,13 @@ class SolariaDashboardServer {
 
     private async getDashboardOverview(_req: Request, res: Response): Promise<void> {
         try {
-            // Active projects with details
-            const [activeProjects] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    p.id, p.name, p.code, p.status, p.priority,
-                    p.completion_percentage, p.deadline,
-                    (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'in_progress') as active_tasks,
-                    (SELECT COUNT(*) FROM tasks WHERE project_id = p.id AND status = 'pending') as pending_tasks
-                FROM projects p
-                WHERE p.status = 'active' AND (p.archived = FALSE OR p.archived IS NULL)
-                ORDER BY p.priority DESC, p.deadline ASC
-                LIMIT 10
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using dashboardRepo functions
+            const [activeProjects] = await dashboardRepo.getActiveProjectsOverview(10);
+            const [todayTasks] = await dashboardRepo.getTodayTasksOverview(15);
+            const [agents] = await dashboardRepo.getAgentsOverview();
+            const [quickStats] = await dashboardRepo.getQuickStats();
 
-            // Today's tasks
-            const [todayTasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.id, t.title, t.status, t.priority, t.progress,
-                    p.name as project_name, p.code as project_code,
-                    aa.name as agent_name
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                WHERE DATE(t.updated_at) = CURDATE() OR t.status = 'in_progress'
-                ORDER BY t.priority DESC, t.updated_at DESC
-                LIMIT 15
-            `);
-
-            // Agent status
-            const [agents] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    id, name, role, status, last_activity,
-                    (SELECT COUNT(*) FROM tasks WHERE assigned_agent_id = ai_agents.id AND status = 'in_progress') as active_tasks
-                FROM ai_agents
-                ORDER BY status DESC, last_activity DESC
-            `);
-
-            // Quick stats
-            const [quickStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    (SELECT COUNT(*) FROM projects WHERE status = 'active' AND (archived = FALSE OR archived IS NULL)) as active_projects,
-                    (SELECT COUNT(*) FROM projects WHERE (archived = FALSE OR archived IS NULL)) as total_projects,
-                    (SELECT COUNT(*) FROM tasks WHERE status = 'in_progress') as tasks_in_progress,
-                    (SELECT COUNT(*) FROM tasks) as total_tasks,
-                    (SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND DATE(completed_at) = CURDATE()) as completed_today,
-                    (SELECT COUNT(*) FROM tasks WHERE priority = 'critical' AND status != 'completed') as critical_tasks,
-                    (SELECT COUNT(*) FROM memories WHERE DATE(created_at) = CURDATE()) as memories_today,
-                    (SELECT COUNT(*) FROM ai_agents) as total_agents
-            `);
-
-            const stats = quickStats[0] || {};
+            const stats = (quickStats as any[])[0] || {};
 
             res.json({
                 activeProjects,
@@ -1099,9 +1057,9 @@ class SolariaDashboardServer {
                 agents,
                 stats,
                 // Add top-level fields for test compatibility
-                totalProjects: (stats as any).total_projects || 0,
-                totalTasks: (stats as any).total_tasks || 0,
-                totalAgents: (stats as any).total_agents || 0,
+                totalProjects: stats.total_projects || 0,
+                totalTasks: stats.total_tasks || 0,
+                totalAgents: stats.total_agents || 0,
                 generated_at: new Date().toISOString()
             });
         } catch (error) {
@@ -1112,58 +1070,11 @@ class SolariaDashboardServer {
 
     private async getDashboardMetrics(_req: Request, res: Response): Promise<void> {
         try {
-            // Velocity metrics (last 7 days)
-            const [velocityData] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    DATE(completed_at) as date,
-                    COUNT(*) as tasks_completed,
-                    SUM(actual_hours) as hours_worked
-                FROM tasks
-                WHERE status = 'completed'
-                    AND completed_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-                GROUP BY DATE(completed_at)
-                ORDER BY date DESC
-            `);
-
-            // Project completion rates
-            const [projectRates] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    p.id, p.name, p.code,
-                    p.completion_percentage,
-                    COUNT(t.id) as total_tasks,
-                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
-                FROM projects p
-                LEFT JOIN tasks t ON t.project_id = p.id
-                WHERE p.status = 'active' AND (p.archived = FALSE OR p.archived IS NULL)
-                GROUP BY p.id
-                ORDER BY p.completion_percentage DESC
-                LIMIT 10
-            `);
-
-            // Task distribution by priority
-            const [priorityDist] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    priority,
-                    COUNT(*) as count,
-                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
-                FROM tasks
-                GROUP BY priority
-            `);
-
-            // Epic/Sprint progress
-            const [epicProgress] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    e.id, e.name, e.epic_number, e.status,
-                    COUNT(t.id) as total_tasks,
-                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
-                    AVG(t.progress) as avg_progress
-                FROM epics e
-                LEFT JOIN tasks t ON t.epic_id = e.id
-                WHERE e.status != 'completed'
-                GROUP BY e.id
-                ORDER BY e.created_at DESC
-                LIMIT 5
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using dashboardRepo functions
+            const [velocityData] = await dashboardRepo.getVelocityMetrics(7);
+            const [projectRates] = await dashboardRepo.getProjectCompletionRates(10);
+            const [priorityDist] = await dashboardRepo.getPriorityDistribution();
+            const [epicProgress] = await dashboardRepo.getEpicProgress(5);
 
             res.json({
                 velocity: velocityData,
@@ -1180,73 +1091,12 @@ class SolariaDashboardServer {
 
     private async getDashboardAlerts(_req: Request, res: Response): Promise<void> {
         try {
-            // Overdue tasks
-            const [overdueTasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.id, t.title, t.deadline, t.priority,
-                    p.name as project_name, p.code as project_code,
-                    DATEDIFF(CURDATE(), t.deadline) as days_overdue
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                WHERE t.deadline IS NOT NULL
-                    AND t.deadline < CURDATE()
-                    AND t.status NOT IN ('completed', 'cancelled')
-                ORDER BY t.deadline ASC
-                LIMIT 10
-            `);
-
-            // Blocked tasks
-            const [blockedTasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.id, t.title, t.status, t.priority,
-                    p.name as project_name, p.code as project_code,
-                    t.updated_at
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                WHERE t.status = 'blocked'
-                ORDER BY t.priority DESC, t.updated_at DESC
-                LIMIT 10
-            `);
-
-            // Stale tasks (no update in 7+ days)
-            const [staleTasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.id, t.title, t.status, t.priority,
-                    p.name as project_name,
-                    t.updated_at,
-                    DATEDIFF(CURDATE(), t.updated_at) as days_stale
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                WHERE t.status = 'in_progress'
-                    AND t.updated_at < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-                ORDER BY t.updated_at ASC
-                LIMIT 10
-            `);
-
-            // Projects approaching deadline
-            const [upcomingDeadlines] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    id, name, code, deadline, completion_percentage,
-                    DATEDIFF(deadline, CURDATE()) as days_remaining
-                FROM projects
-                WHERE deadline BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 14 DAY)
-                    AND status = 'active'
-                    AND (archived = FALSE OR archived IS NULL)
-                ORDER BY deadline ASC
-            `);
-
-            // Critical priority pending
-            const [criticalTasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.id, t.title, t.status,
-                    p.name as project_name, p.code as project_code,
-                    t.created_at
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                WHERE t.priority = 'critical'
-                    AND t.status NOT IN ('completed', 'cancelled')
-                ORDER BY t.created_at DESC
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using dashboardRepo functions
+            const [overdueTasks] = await dashboardRepo.getOverdueTasks(10);
+            const [blockedTasks] = await dashboardRepo.getBlockedTasks(10);
+            const [staleTasks] = await dashboardRepo.getStaleTasks(7, 10);
+            const [upcomingDeadlines] = await dashboardRepo.getProjectUpcomingDeadlines(14, 10);
+            const [criticalTasks] = await dashboardRepo.getCriticalTasks(10);
 
             // Return structured object with categorized alerts and summary
             res.json({
@@ -1256,10 +1106,10 @@ class SolariaDashboardServer {
                 upcomingDeadlines,
                 criticalTasks,
                 summary: {
-                    overdue_count: overdueTasks.length,
-                    blocked_count: blockedTasks.length,
-                    stale_count: staleTasks.length,
-                    critical_count: criticalTasks.length
+                    overdue_count: (overdueTasks as any[]).length,
+                    blocked_count: (blockedTasks as any[]).length,
+                    stale_count: (staleTasks as any[]).length,
+                    critical_count: (criticalTasks as any[]).length
                 },
                 generated_at: new Date().toISOString()
             });
@@ -1399,80 +1249,21 @@ class SolariaDashboardServer {
 
     private async getDashboardPublic(_req: Request, res: Response): Promise<void> {
         try {
-            // Get project stats
-            const [projectStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total,
-                    SUM(budget) as total_budget,
-                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
-                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-                    SUM(CASE WHEN status = 'on_hold' THEN 1 ELSE 0 END) as on_hold,
-                    SUM(CASE WHEN status = 'planning' THEN 1 ELSE 0 END) as planning,
-                    AVG(completion_percentage) as avg_completion
-                FROM projects
-                WHERE (archived = FALSE OR archived IS NULL)
-            `);
-
-            // Get task stats
-            const [taskStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN t.status = 'pending' THEN 1 ELSE 0 END) as pending,
-                    SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
-                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed,
-                    SUM(CASE WHEN t.status = 'blocked' THEN 1 ELSE 0 END) as blocked,
-                    SUM(CASE WHEN t.priority = 'critical' THEN 1 ELSE 0 END) as critical_count,
-                    SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as high_count
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                WHERE (p.archived = FALSE OR p.archived IS NULL)
-            `);
-
-            // Get agent stats
-            const [agentStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
-                    SUM(CASE WHEN status = 'idle' THEN 1 ELSE 0 END) as idle,
-                    SUM(CASE WHEN status = 'busy' THEN 1 ELSE 0 END) as busy
-                FROM ai_agents
-            `);
-
-            // Get memory stats
-            const [memoryStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total,
-                    AVG(importance) as avg_importance,
-                    SUM(access_count) as total_accesses
-                FROM memories
-            `);
-
-            // Get recent activity count (last 24h)
-            const [activityStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT COUNT(*) as last_24h
-                FROM activity_logs
-                WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-            `);
-
-            // Get business stats
-            const [businessStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total_businesses,
-                    SUM(revenue) as total_revenue,
-                    SUM(expenses) as total_expenses,
-                    SUM(profit) as total_profit,
-                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
-                    SUM(CASE WHEN status = 'inactive' THEN 1 ELSE 0 END) as inactive
-                FROM businesses
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using dashboardRepo functions
+            const [projectStats] = await dashboardRepo.getProjectStats();
+            const [taskStats] = await dashboardRepo.getTaskStats();
+            const [agentStats] = await dashboardRepo.getAgentStats();
+            const [memoryStats] = await dashboardRepo.getMemoryStats();
+            const [activityStats] = await dashboardRepo.getActivityStats();
+            const [businessStats] = await dashboardRepo.getBusinessStats();
 
             res.json({
-                projects: projectStats[0] || {},
-                tasks: taskStats[0] || {},
-                agents: agentStats[0] || {},
-                memories: memoryStats[0] || {},
-                activity: activityStats[0] || {},
-                businesses: businessStats[0] || {},
+                projects: (projectStats as any[])[0] || {},
+                tasks: (taskStats as any[])[0] || {},
+                agents: (agentStats as any[])[0] || {},
+                memories: (memoryStats as any[])[0] || {},
+                activity: (activityStats as any[])[0] || {},
+                businesses: (businessStats as any[])[0] || {},
                 generated_at: new Date().toISOString()
             });
         } catch (error) {
