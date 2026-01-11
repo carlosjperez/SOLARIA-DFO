@@ -1,6 +1,8 @@
 /**
  * SOLARIA DFO - Projects Repository (Drizzle ORM)
  * Replaces raw SQL queries with type-safe Drizzle queries
+ *
+ * Updated: 2026-01-11 - Phase 2.3: BaseRepository pattern
  */
 
 import { db, pool } from '../index.js';
@@ -17,139 +19,153 @@ import {
     type ProjectDocument,
     type ProjectRequest,
 } from '../schema/index.js';
+import { BaseRepository } from './base/BaseRepository.js';
 
 // ============================================================================
-// Projects CRUD
+// Projects Repository Class
 // ============================================================================
 
-export async function findAllProjects(limit = 200) {
-    return db
-        .select()
-        .from(projects)
-        .orderBy(desc(projects.updatedAt))
-        .limit(limit);
-}
-
-export async function findProjectById(id: number) {
-    const result = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.id, id))
-        .limit(1);
-    return result[0] || null;
-}
-
-export async function findProjectByCode(code: string) {
-    const result = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.code, code))
-        .limit(1);
-    return result[0] || null;
-}
-
-/**
- * Check if a project code already exists in the projects table
- */
-export async function checkProjectCodeExists(code: string): Promise<boolean> {
-    const project = await findProjectByCode(code);
-    return project !== null;
-}
-
-/**
- * Check if a project code is reserved (in reserved_project_codes table)
- * Note: reserved_project_codes table not in Drizzle schema, using pool.execute
- */
-export async function checkReservedProjectCode(code: string): Promise<boolean> {
-    const [rows] = await pool.execute(
-        'SELECT code FROM reserved_project_codes WHERE code = ?',
-        [code]
-    );
-    return (rows as any[]).length > 0;
-}
-
-export async function findProjectsWithStats() {
-    return db.execute(sql`
-        SELECT
-            p.*,
-            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id), 0) as total_tasks,
-            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'completed'), 0) as completed_tasks,
-            COALESCE((SELECT COUNT(DISTINCT a.id) FROM ai_agents a JOIN tasks t ON t.assigned_agent_id = a.id WHERE t.project_id = p.id), 0) as agents_assigned,
-            COALESCE((SELECT COUNT(*) FROM alerts al WHERE al.project_id = p.id AND al.status = 'active'), 0) as active_alerts
-        FROM projects p
-        ORDER BY p.updated_at DESC
-        LIMIT 200
-    `);
-}
-
-export async function findAllProjectsWithStats(filters?: {
-    status?: string;
-    priority?: string;
-    archived?: boolean;
-    limit?: number;
-}) {
-    let query = `
-        SELECT
-            p.*,
-            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id), 0) as task_count,
-            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'completed'), 0) as completed_tasks
-        FROM projects p
-        WHERE 1=1
-    `;
-    const params: any[] = [];
-
-    if (filters?.status) {
-        query += ' AND p.status = ?';
-        params.push(filters.status);
-    }
-    if (filters?.priority) {
-        query += ' AND p.priority = ?';
-        params.push(filters.priority);
-    }
-    if (filters?.archived !== undefined) {
-        query += ' AND p.archived = ?';
-        params.push(filters.archived);
+class ProjectsRepository extends BaseRepository<Project, NewProject, typeof projects> {
+    constructor() {
+        super(projects, 'Project');
     }
 
-    query += ' ORDER BY p.updated_at DESC';
-
-    if (filters?.limit) {
-        query += ' LIMIT ?';
-        params.push(filters.limit);
+    /**
+     * Find all projects with custom ordering and limit
+     */
+    async findAllProjects(limit = 200) {
+        return db
+            .select()
+            .from(projects)
+            .orderBy(desc(projects.updatedAt))
+            .limit(limit);
     }
 
-    return pool.execute(query, params);
-}
+    /**
+     * Find project by unique code
+     */
+    async findProjectByCode(code: string) {
+        const result = await db
+            .select()
+            .from(projects)
+            .where(eq(projects.code, code))
+            .limit(1);
+        return result[0] || null;
+    }
 
-export async function createProject(data: NewProject): Promise<Project> {
-    const result = await db.insert(projects).values(data);
-    const insertId = result[0].insertId;
-    return findProjectById(insertId) as Promise<Project>;
-}
+    /**
+     * Check if a project code already exists in the projects table
+     */
+    async checkProjectCodeExists(code: string): Promise<boolean> {
+        const project = await this.findProjectByCode(code);
+        return project !== null;
+    }
 
-export async function updateProject(id: number, data: Partial<NewProject>) {
-    await db.update(projects).set(data).where(eq(projects.id, id));
-    return findProjectById(id);
-}
+    /**
+     * Check if a project code is reserved (in reserved_project_codes table)
+     * Note: reserved_project_codes table not in Drizzle schema, using pool.execute
+     */
+    async checkReservedProjectCode(code: string): Promise<boolean> {
+        const [rows] = await pool.execute(
+            'SELECT code FROM reserved_project_codes WHERE code = ?',
+            [code]
+        );
+        return (rows as any[]).length > 0;
+    }
 
-export async function deleteProject(id: number) {
-    return db.delete(projects).where(eq(projects.id, id));
-}
+    /**
+     * Get projects with task and alert statistics
+     */
+    async findProjectsWithStats() {
+        return db.execute(sql`
+            SELECT
+                p.*,
+                COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id), 0) as total_tasks,
+                COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'completed'), 0) as completed_tasks,
+                COALESCE((SELECT COUNT(DISTINCT a.id) FROM ai_agents a JOIN tasks t ON t.assigned_agent_id = a.id WHERE t.project_id = p.id), 0) as agents_assigned,
+                COALESCE((SELECT COUNT(*) FROM alerts al WHERE al.project_id = p.id AND al.status = 'active'), 0) as active_alerts
+            FROM projects p
+            ORDER BY p.updated_at DESC
+            LIMIT 200
+        `);
+    }
 
-export async function getProjectMetrics() {
-    return db.execute(sql`
-        SELECT DATE(updated_at) as date,
-               AVG(completion_percentage) as avg_completion,
-               COUNT(*) as project_count
-        FROM projects
-        WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-        GROUP BY DATE(updated_at)
-        ORDER BY date DESC
-    `);
+    /**
+     * Find projects with filters and statistics
+     */
+    async findAllProjectsWithStats(filters?: {
+        status?: string;
+        priority?: string;
+        archived?: boolean;
+        limit?: number;
+    }) {
+        let query = `
+            SELECT
+                p.*,
+                COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id), 0) as task_count,
+                COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'completed'), 0) as completed_tasks
+            FROM projects p
+            WHERE 1=1
+        `;
+        const params: any[] = [];
+
+        if (filters?.status) {
+            query += ' AND p.status = ?';
+            params.push(filters.status);
+        }
+        if (filters?.priority) {
+            query += ' AND p.priority = ?';
+            params.push(filters.priority);
+        }
+        if (filters?.archived !== undefined) {
+            query += ' AND p.archived = ?';
+            params.push(filters.archived);
+        }
+
+        query += ' ORDER BY p.updated_at DESC';
+
+        if (filters?.limit) {
+            query += ' LIMIT ?';
+            params.push(filters.limit);
+        }
+
+        return pool.execute(query, params);
+    }
+
+    /**
+     * Create project and return the created entity
+     * Overrides BaseRepository.create to ensure proper type
+     */
+    async createProject(data: NewProject): Promise<Project> {
+        const result = await db.insert(projects).values(data);
+        const insertId = result[0].insertId;
+        return this.findById(insertId) as Promise<Project>;
+    }
+
+    /**
+     * Get project metrics aggregated over time
+     */
+    async getProjectMetrics() {
+        return db.execute(sql`
+            SELECT DATE(updated_at) as date,
+                   AVG(completion_percentage) as avg_completion,
+                   COUNT(*) as project_count
+            FROM projects
+            WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY DATE(updated_at)
+            ORDER BY date DESC
+        `);
+    }
 }
 
 // ============================================================================
-// Project Documents
+// Singleton Instance
+// ============================================================================
+
+const projectsRepo = new ProjectsRepository();
+
+// ============================================================================
+// Project Documents (Cross-table queries)
 // ============================================================================
 
 export async function getAllDocuments(limit: number = 50) {
@@ -413,3 +429,103 @@ export async function getClientFinancialSummary(clientName: string) {
 export async function clearBusinessId(businessId: number) {
     return pool.execute('UPDATE projects SET business_id = NULL WHERE business_id = ?', [businessId]);
 }
+
+// ============================================================================
+// Exported Functions (Backward Compatibility)
+// ============================================================================
+
+/**
+ * Find all projects
+ * @deprecated Use projectsRepo.findAllProjects() directly
+ */
+export async function findAllProjects(limit = 200) {
+    return projectsRepo.findAllProjects(limit);
+}
+
+/**
+ * Find project by ID
+ * @deprecated Use projectsRepo.findById() directly
+ */
+export async function findProjectById(id: number) {
+    return projectsRepo.findById(id);
+}
+
+/**
+ * Find project by code
+ * @deprecated Use projectsRepo.findProjectByCode() directly
+ */
+export async function findProjectByCode(code: string) {
+    return projectsRepo.findProjectByCode(code);
+}
+
+/**
+ * Check if project code exists
+ * @deprecated Use projectsRepo.checkProjectCodeExists() directly
+ */
+export async function checkProjectCodeExists(code: string): Promise<boolean> {
+    return projectsRepo.checkProjectCodeExists(code);
+}
+
+/**
+ * Check if project code is reserved
+ * @deprecated Use projectsRepo.checkReservedProjectCode() directly
+ */
+export async function checkReservedProjectCode(code: string): Promise<boolean> {
+    return projectsRepo.checkReservedProjectCode(code);
+}
+
+/**
+ * Find projects with statistics
+ * @deprecated Use projectsRepo.findProjectsWithStats() directly
+ */
+export async function findProjectsWithStats() {
+    return projectsRepo.findProjectsWithStats();
+}
+
+/**
+ * Find all projects with stats and filters
+ * @deprecated Use projectsRepo.findAllProjectsWithStats() directly
+ */
+export async function findAllProjectsWithStats(filters?: {
+    status?: string;
+    priority?: string;
+    archived?: boolean;
+    limit?: number;
+}) {
+    return projectsRepo.findAllProjectsWithStats(filters);
+}
+
+/**
+ * Create new project
+ * @deprecated Use projectsRepo.createProject() directly
+ */
+export async function createProject(data: NewProject): Promise<Project> {
+    return projectsRepo.createProject(data);
+}
+
+/**
+ * Update project
+ * @deprecated Use projectsRepo.update() directly
+ */
+export async function updateProject(id: number, data: Partial<NewProject>) {
+    return projectsRepo.update(id, data);
+}
+
+/**
+ * Delete project
+ * @deprecated Use projectsRepo.delete() directly
+ */
+export async function deleteProject(id: number) {
+    return projectsRepo.delete(id);
+}
+
+/**
+ * Get project metrics
+ * @deprecated Use projectsRepo.getProjectMetrics() directly
+ */
+export async function getProjectMetrics() {
+    return projectsRepo.getProjectMetrics();
+}
+
+// Export repository instance for direct usage
+export { projectsRepo };
