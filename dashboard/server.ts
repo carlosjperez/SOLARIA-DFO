@@ -5773,16 +5773,15 @@ class SolariaDashboardServer {
             console.log(`[AgentExecution] Job queued successfully: ${job.id} | Task: ${task.code} | Agent: ${agent.name}`);
 
             // Log to activity log
-            await this.db!.execute(
-                `INSERT INTO activity_logs (action, category, level, agent_id, project_id, details)
-                 VALUES (?, 'system', 'info', ?, ?, ?)`,
-                [
-                    `Agent job queued: ${task.code}`,
-                    agentId,
-                    task.project_id,
-                    JSON.stringify({ jobId: job.id, taskId, priority: metadata?.priority || 'medium' })
-                ]
-            );
+            await activityLogsRepo.createActivityLog({
+                action: `Agent job queued: ${task.code}`,
+                message: `Agent job queued: ${task.code}`,
+                category: 'system',
+                level: 'info',
+                agentId,
+                projectId: task.project_id,
+                metadata: { jobId: job.id, taskId, priority: metadata?.priority || 'medium' }
+            });
 
             res.status(201).json({
                 success: true,
@@ -5896,14 +5895,13 @@ class SolariaDashboardServer {
             console.log(`[AgentExecution] Job cancelled successfully: ${jobId}`);
 
             // Log to activity log
-            await this.db!.execute(
-                `INSERT INTO activity_logs (action, category, level, details)
-                 VALUES (?, 'system', 'info', ?)`,
-                [
-                    `Agent job cancelled: ${jobId}`,
-                    JSON.stringify({ jobId, cancelledAt: new Date().toISOString() })
-                ]
-            );
+            await activityLogsRepo.createActivityLog({
+                action: `Agent job cancelled: ${jobId}`,
+                message: `Agent job cancelled: ${jobId}`,
+                category: 'system',
+                level: 'info',
+                metadata: { jobId, cancelledAt: new Date().toISOString() }
+            });
 
             res.json({
                 success: true,
@@ -6502,20 +6500,19 @@ class SolariaDashboardServer {
             console.log(`[GitHub] Workflow triggered successfully: ${owner}/${repo}/${workflowId} | Ref: ${ref} | Run ID: ${result.githubRunId}`);
 
             // Log to activity log
-            await this.db!.execute(
-                `INSERT INTO activity_logs (action, category, level, project_id, details)
-                 VALUES (?, 'github', 'info', ?, ?)`,
-                [
-                    `GitHub workflow triggered: ${owner}/${repo}/${workflowId}`,
-                    projectId,
-                    JSON.stringify({
-                        workflowId: result.workflowId,
-                        githubRunId: result.githubRunId,
-                        ref,
-                        taskId
-                    })
-                ]
-            );
+            await activityLogsRepo.createActivityLog({
+                action: `GitHub workflow triggered: ${owner}/${repo}/${workflowId}`,
+                message: `GitHub workflow triggered: ${owner}/${repo}/${workflowId}`,
+                category: 'github',
+                level: 'info',
+                projectId,
+                metadata: {
+                    workflowId: result.workflowId,
+                    githubRunId: result.githubRunId,
+                    ref,
+                    taskId
+                }
+            });
 
             res.status(201).json({
                 success: true,
@@ -6700,20 +6697,19 @@ class SolariaDashboardServer {
             console.log(`[GitHub] Issue created successfully: ${owner}/${repo}#${result.issueNumber} | Task: ${taskId}`);
 
             // Log to activity log
-            await this.db!.execute(
-                `INSERT INTO activity_logs (action, category, level, project_id, details)
-                 VALUES (?, 'github', 'info', ?, ?)`,
-                [
-                    `GitHub issue created: ${owner}/${repo}#${result.issueNumber}`,
-                    projectId,
-                    JSON.stringify({
-                        issueNumber: result.issueNumber,
-                        issueUrl: result.issueUrl,
-                        taskId,
-                        taskLinkId: result.taskLinkId
-                    })
-                ]
-            );
+            await activityLogsRepo.createActivityLog({
+                action: `GitHub issue created: ${owner}/${repo}#${result.issueNumber}`,
+                message: `GitHub issue created: ${owner}/${repo}#${result.issueNumber}`,
+                category: 'github',
+                level: 'info',
+                projectId,
+                metadata: {
+                    issueNumber: result.issueNumber,
+                    issueUrl: result.issueUrl,
+                    taskId,
+                    taskLinkId: result.taskLinkId
+                }
+            });
 
             res.status(201).json({
                 success: true,
@@ -6806,22 +6802,21 @@ class SolariaDashboardServer {
             console.log(`[GitHub] PR created successfully: ${owner}/${repo}#${result.prNumber} | Task: ${taskId}`);
 
             // Log to activity log
-            await this.db!.execute(
-                `INSERT INTO activity_logs (action, category, level, project_id, details)
-                 VALUES (?, 'github', 'info', ?, ?)`,
-                [
-                    `GitHub PR created: ${owner}/${repo}#${result.prNumber}`,
-                    projectId,
-                    JSON.stringify({
-                        prNumber: result.prNumber,
-                        prUrl: result.prUrl,
-                        head,
-                        base,
-                        taskId,
-                        taskLinkId: result.taskLinkId
-                    })
-                ]
-            );
+            await activityLogsRepo.createActivityLog({
+                action: `GitHub PR created: ${owner}/${repo}#${result.prNumber}`,
+                message: `GitHub PR created: ${owner}/${repo}#${result.prNumber}`,
+                category: 'github',
+                level: 'info',
+                projectId,
+                metadata: {
+                    prNumber: result.prNumber,
+                    prUrl: result.prUrl,
+                    head,
+                    base,
+                    taskId,
+                    taskLinkId: result.taskLinkId
+                }
+            });
 
             res.status(201).json({
                 success: true,
