@@ -321,6 +321,47 @@ export async function getLatestMetrics() {
     `);
 }
 
+export async function upsertProjectMetrics(
+    projectId: number,
+    data: {
+        completionPercentage?: number;
+        agentEfficiency?: number;
+        codeQualityScore?: number;
+        testCoverage?: number;
+        tasksCompleted?: number;
+        tasksPending?: number;
+        tasksBlocked?: number;
+        budgetUsed?: number;
+    }
+) {
+    return pool.execute(`
+        INSERT INTO project_metrics (
+            project_id, metric_date, completion_percentage, agent_efficiency,
+            code_quality_score, test_coverage, tasks_completed, tasks_pending,
+            tasks_blocked, budget_used
+        ) VALUES (?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            completion_percentage = VALUES(completion_percentage),
+            agent_efficiency = VALUES(agent_efficiency),
+            code_quality_score = VALUES(code_quality_score),
+            test_coverage = VALUES(test_coverage),
+            tasks_completed = VALUES(tasks_completed),
+            tasks_pending = VALUES(tasks_pending),
+            tasks_blocked = VALUES(tasks_blocked),
+            budget_used = VALUES(budget_used)
+    `, [
+        projectId,
+        data.completionPercentage || 0,
+        data.agentEfficiency || 0,
+        data.codeQualityScore || 0,
+        data.testCoverage || 0,
+        data.tasksCompleted || 0,
+        data.tasksPending || 0,
+        data.tasksBlocked || 0,
+        data.budgetUsed || 0
+    ]);
+}
+
 // ============================================================================
 // Client-Specific Queries
 // ============================================================================

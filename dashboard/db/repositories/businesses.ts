@@ -69,6 +69,20 @@ export async function deleteBusiness(id: number) {
     return db.delete(businesses).where(eq(businesses.id, id));
 }
 
+export async function countBusinesses(filters?: {
+    status?: string;
+}) {
+    let query = `SELECT COUNT(*) as total FROM businesses WHERE 1=1`;
+    const params: any[] = [];
+
+    if (filters?.status && filters.status !== 'all') {
+        query += ' AND status = ?';
+        params.push(filters.status);
+    }
+
+    return pool.execute(query, params);
+}
+
 export async function findAllBusinessesWithProjectCount(filters?: {
     status?: string;
     limit?: number;

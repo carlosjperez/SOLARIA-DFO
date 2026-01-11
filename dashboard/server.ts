@@ -1518,19 +1518,19 @@ class SolariaDashboardServer {
                 officeVisible: officeVisible,
             });
 
-            // TODO: Migrate to activity_logs repository when available
-            // Log creation (still raw SQL - pending activity_logs repository)
-            await this.db!.execute(`
-                INSERT INTO activity_logs (
-                    project_id, action, details, category, level
-                ) VALUES (?, ?, ?, ?, ?)
-            `, [
-                newProject.id,
-                'project_created',
-                `Project ${name} created by ${req.user?.userId}`,
-                'management',
-                'info'
-            ]);
+            // Log creation
+            await activityLogsRepo.createActivityLog({
+                action: 'project_created',
+                message: 'project_created',
+                category: 'management',
+                level: 'info',
+                projectId: newProject.id,
+                metadata: {
+                    name,
+                    code: projectCode,
+                    created_by: req.user?.userId
+                }
+            });
 
             // Emit socket event for real-time notification
             this.io.emit('project:created', {
@@ -3701,8 +3701,7 @@ class SolariaDashboardServer {
 
     private async getBusinesses(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findAllBusinesses()
-            // TODO: Add count aggregation to repository
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findAllBusinesses() and countBusinesses()
             const { status, limit = 50, offset = 0 } = req.query;
 
             const filters: any = {
@@ -3713,15 +3712,14 @@ class SolariaDashboardServer {
 
             const businesses = await businessesRepo.findAllBusinesses(filters);
 
-            // Get total count (SQL until repository supports COUNT aggregation)
-            const [countResult] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT COUNT(*) as total FROM businesses'
-            );
+            // Get total count using repository
+            const countResult = await businessesRepo.countBusinesses({ status: filters.status });
+            const countRows = (countResult[0] as unknown as any[]);
 
             res.json({
                 businesses,
                 pagination: {
-                    total: countResult[0]?.total || 0,
+                    total: countRows[0]?.total || 0,
                     limit: Number(limit),
                     offset: Number(offset)
                 }
@@ -4887,6 +4885,7 @@ class SolariaDashboardServer {
 
     private async updateMetricsFromAgent(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.upsertProjectMetrics()
             const {
                 project_id,
                 completion_percentage,
@@ -4899,32 +4898,16 @@ class SolariaDashboardServer {
                 budget_used
             } = req.body;
 
-            await this.db!.execute(`
-                INSERT INTO project_metrics (
-                    project_id, metric_date, completion_percentage, agent_efficiency,
-                    code_quality_score, test_coverage, tasks_completed, tasks_pending,
-                    tasks_blocked, budget_used
-                ) VALUES (?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                    completion_percentage = VALUES(completion_percentage),
-                    agent_efficiency = VALUES(agent_efficiency),
-                    code_quality_score = VALUES(code_quality_score),
-                    test_coverage = VALUES(test_coverage),
-                    tasks_completed = VALUES(tasks_completed),
-                    tasks_pending = VALUES(tasks_pending),
-                    tasks_blocked = VALUES(tasks_blocked),
-                    budget_used = VALUES(budget_used)
-            `, [
-                project_id || 1,
-                completion_percentage || 0,
-                agent_efficiency || 0,
-                code_quality_score || 0,
-                test_coverage || 0,
-                tasks_completed || 0,
-                tasks_pending || 0,
-                tasks_blocked || 0,
-                budget_used || 0
-            ]);
+            await projectsRepo.upsertProjectMetrics(project_id || 1, {
+                completionPercentage: completion_percentage,
+                agentEfficiency: agent_efficiency,
+                codeQualityScore: code_quality_score,
+                testCoverage: test_coverage,
+                tasksCompleted: tasks_completed,
+                tasksPending: tasks_pending,
+                tasksBlocked: tasks_blocked,
+                budgetUsed: budget_used
+            });
 
             res.json({ success: true, message: 'Metrics updated successfully' });
         } catch (error) {
@@ -5745,17 +5728,13 @@ class SolariaDashboardServer {
 
             const task = taskRows[0];
 
-            const [agentRows] = await this.db!.execute<RowDataPacket[]>(
-                'SELECT name FROM ai_agents WHERE id = ?',
-                [agentId]
-            );
+            // Fetch agent using repository
+            const agent = await agentsRepo.findAgentById(agentId);
 
-            if (!agentRows || agentRows.length === 0) {
+            if (!agent) {
                 res.status(404).json({ error: 'Agent not found' });
                 return;
             }
-
-            const agent = agentRows[0];
 
             // Queue the job
             const job = await this.agentExecutionService.queueJob({
