@@ -1,10 +1,12 @@
 /**
  * SOLARIA DFO - Tasks Repository (Drizzle ORM)
  * Replaces raw SQL queries with type-safe Drizzle queries
+ *
+ * Updated: 2026-01-11 - Phase 2.3: BaseRepository + Query Builders pattern
  */
 
 import { db, pool } from '../index.js';
-import { eq, desc, asc, sql, and, or, isNull, isNotNull } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, or, isNull, isNotNull, type SQL } from 'drizzle-orm';
 import {
     tasks,
     taskItems,
@@ -16,122 +18,123 @@ import {
     type NewTaskItem,
     type TaskTag,
 } from '../schema/index.js';
+import { BaseRepository } from './base/BaseRepository.js';
+import { buildTaskFilters, buildWhereClause, getPaginationConfig } from './base/QueryBuilders.js';
 
 // ============================================================================
-// Tasks CRUD
+// Tasks Repository Class
 // ============================================================================
 
-export async function findAllTasks(filters?: {
-    projectId?: number;
-    epicId?: number;
-    sprintId?: number;
-    status?: string;
-    priority?: string;
-    agentId?: number;
-    limit?: number;
-}) {
-    const conditions = [];
-
-    if (filters?.projectId) {
-        conditions.push(eq(tasks.projectId, filters.projectId));
-    }
-    if (filters?.epicId) {
-        conditions.push(eq(tasks.epicId, filters.epicId));
-    }
-    if (filters?.sprintId) {
-        conditions.push(eq(tasks.sprintId, filters.sprintId));
-    }
-    if (filters?.status) {
-        conditions.push(sql`${tasks.status} = ${filters.status}`);
-    }
-    if (filters?.priority) {
-        conditions.push(sql`${tasks.priority} = ${filters.priority}`);
-    }
-    if (filters?.agentId) {
-        conditions.push(eq(tasks.assignedAgentId, filters.agentId));
+class TasksRepository extends BaseRepository<Task, NewTask, typeof tasks> {
+    constructor() {
+        super(tasks, 'Task');
     }
 
-    const query = db.select().from(tasks);
+    /**
+     * Find all tasks with filters
+     * Now uses Query Builders for consistent filtering
+     */
+    async findAllTasks(filters?: {
+        projectId?: number;
+        epicId?: number;
+        sprintId?: number;
+        status?: string;
+        priority?: string;
+        agentId?: number;
+        limit?: number;
+    }) {
+        const conditions = buildTaskFilters(tasks, {
+            projectId: filters?.projectId,
+            sprintId: filters?.sprintId,
+            epicId: filters?.epicId,
+            status: filters?.status,
+            priority: filters?.priority,
+            agentId: filters?.agentId,
+        });
 
-    if (conditions.length > 0) {
-        return query
-            .where(and(...conditions))
-            .orderBy(desc(tasks.updatedAt))
-            .limit(filters?.limit || 100);
+        const whereClause = buildWhereClause(conditions);
+        const { limit } = getPaginationConfig({ limit: filters?.limit || 100 });
+
+        const query = db.select().from(tasks);
+
+        if (whereClause) {
+            return query
+                .where(whereClause)
+                .orderBy(desc(tasks.updatedAt))
+                .limit(limit);
+        }
+
+        return query.orderBy(desc(tasks.updatedAt)).limit(limit);
     }
 
-    return query.orderBy(desc(tasks.updatedAt)).limit(filters?.limit || 100);
-}
-
-export async function findTaskById(id: number) {
-    const result = await db
-        .select()
-        .from(tasks)
-        .where(eq(tasks.id, id))
-        .limit(1);
-    return result[0] || null;
-}
-
-export async function findTaskWithDetails(id: number) {
-    return db.execute(sql`
-        SELECT
-            t.*,
-            p.name as project_name,
-            p.code as project_code,
-            CONCAT(p.code, '-', LPAD(t.task_number, 3, '0')) as task_code,
-            a.name as agent_name,
-            u.name as assigned_by_name,
-            COALESCE((SELECT COUNT(*) FROM task_items ti WHERE ti.task_id = t.id), 0) as items_total,
-            COALESCE((SELECT COUNT(*) FROM task_items ti WHERE ti.task_id = t.id AND ti.is_completed = 1), 0) as items_completed
-        FROM tasks t
-        LEFT JOIN projects p ON t.project_id = p.id
-        LEFT JOIN ai_agents a ON t.assigned_agent_id = a.id
-        LEFT JOIN users u ON t.assigned_by = u.id
-        WHERE t.id = ${id}
-    `);
-}
-
-export async function createTask(data: NewTask): Promise<Task> {
-    // Get next task number for project
-    let taskNumber = 1;
-    if (data.projectId) {
-        const result = await db.execute(sql`
-            SELECT COALESCE(MAX(task_number), 0) + 1 as next_number
-            FROM tasks WHERE project_id = ${data.projectId}
+    /**
+     * Find task with complete details (JOINs with projects, agents, users)
+     */
+    async findTaskWithDetails(id: number) {
+        return db.execute(sql`
+            SELECT
+                t.*,
+                p.name as project_name,
+                p.code as project_code,
+                CONCAT(p.code, '-', LPAD(t.task_number, 3, '0')) as task_code,
+                a.name as agent_name,
+                u.name as assigned_by_name,
+                COALESCE((SELECT COUNT(*) FROM task_items ti WHERE ti.task_id = t.id), 0) as items_total,
+                COALESCE((SELECT COUNT(*) FROM task_items ti WHERE ti.task_id = t.id AND ti.is_completed = 1), 0) as items_completed
+            FROM tasks t
+            LEFT JOIN projects p ON t.project_id = p.id
+            LEFT JOIN ai_agents a ON t.assigned_agent_id = a.id
+            LEFT JOIN users u ON t.assigned_by = u.id
+            WHERE t.id = ${id}
         `);
-        const rows = result[0] as unknown as Array<{ next_number: number }>;
-        taskNumber = rows[0]?.next_number || 1;
     }
 
-    const insertResult = await db.insert(tasks).values({
-        ...data,
-        taskNumber,
-    });
+    /**
+     * Create task with auto-generated task_number
+     * Overrides BaseRepository.create to add task_number logic
+     */
+    async createTask(data: NewTask): Promise<Task> {
+        // Get next task number for project
+        let taskNumber = 1;
+        if (data.projectId) {
+            const result = await db.execute(sql`
+                SELECT COALESCE(MAX(task_number), 0) + 1 as next_number
+                FROM tasks WHERE project_id = ${data.projectId}
+            `);
+            const rows = result[0] as unknown as Array<{ next_number: number }>;
+            taskNumber = rows[0]?.next_number || 1;
+        }
 
-    return findTaskById(insertResult[0].insertId) as Promise<Task>;
-}
+        const insertResult = await db.insert(tasks).values({
+            ...data,
+            taskNumber,
+        });
 
-export async function updateTask(id: number, data: Partial<NewTask>) {
-    await db.update(tasks).set(data).where(eq(tasks.id, id));
-    return findTaskById(id);
-}
+        return this.findById(insertResult[0].insertId) as Promise<Task>;
+    }
 
-export async function completeTask(id: number, notes?: string) {
-    await db.update(tasks).set({
-        status: 'completed',
-        progress: 100,
-        completedAt: sql`NOW()`,
-        notes: notes || undefined,
-    }).where(eq(tasks.id, id));
-    return findTaskById(id);
-}
-
-export async function deleteTask(id: number) {
-    return db.delete(tasks).where(eq(tasks.id, id));
+    /**
+     * Complete task (update status, progress, completedAt)
+     */
+    async completeTask(id: number, notes?: string) {
+        await db.update(tasks).set({
+            status: 'completed',
+            progress: 100,
+            completedAt: sql`NOW()`,
+            notes: notes || undefined,
+        }).where(eq(tasks.id, id));
+        return this.findById(id);
+    }
 }
 
 // ============================================================================
-// Task Items (Subtasks)
+// Singleton Instance
+// ============================================================================
+
+const tasksRepo = new TasksRepository();
+
+// ============================================================================
+// Task Items (Subtasks) - Standalone Functions
 // ============================================================================
 
 export async function findTaskItems(taskId: number, includeCompleted = true) {
@@ -696,3 +699,74 @@ export async function deleteTaskItems(taskId: number) {
 export async function deleteTaskTagAssignments(taskId: number) {
     return pool.execute('DELETE FROM task_tag_assignments WHERE task_id = ?', [taskId]);
 }
+
+// ============================================================================
+// Exported Functions (Backward Compatibility) - Tasks CRUD Only
+// ============================================================================
+
+/**
+ * Find all tasks with filters
+ * @deprecated Use tasksRepo.findAllTasks() directly
+ */
+export async function findAllTasks(filters?: {
+    projectId?: number;
+    epicId?: number;
+    sprintId?: number;
+    status?: string;
+    priority?: string;
+    agentId?: number;
+    limit?: number;
+}) {
+    return tasksRepo.findAllTasks(filters);
+}
+
+/**
+ * Find task by ID
+ * @deprecated Use tasksRepo.findById() directly
+ */
+export async function findTaskById(id: number) {
+    return tasksRepo.findById(id);
+}
+
+/**
+ * Find task with complete details
+ * @deprecated Use tasksRepo.findTaskWithDetails() directly
+ */
+export async function findTaskWithDetails(id: number) {
+    return tasksRepo.findTaskWithDetails(id);
+}
+
+/**
+ * Create new task
+ * @deprecated Use tasksRepo.createTask() directly
+ */
+export async function createTask(data: NewTask): Promise<Task> {
+    return tasksRepo.createTask(data);
+}
+
+/**
+ * Update task
+ * @deprecated Use tasksRepo.update() directly
+ */
+export async function updateTask(id: number, data: Partial<NewTask>) {
+    return tasksRepo.update(id, data);
+}
+
+/**
+ * Complete task
+ * @deprecated Use tasksRepo.completeTask() directly
+ */
+export async function completeTask(id: number, notes?: string) {
+    return tasksRepo.completeTask(id, notes);
+}
+
+/**
+ * Delete task
+ * @deprecated Use tasksRepo.delete() directly
+ */
+export async function deleteTask(id: number) {
+    return tasksRepo.delete(id);
+}
+
+// Export repository instance for direct usage
+export { tasksRepo };
