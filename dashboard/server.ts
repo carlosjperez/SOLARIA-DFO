@@ -3747,8 +3747,7 @@ class SolariaDashboardServer {
 
     private async getBusiness(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findBusinessById()
-            // TODO: Migrate projects and financials queries to projectsRepo
+            // ✅ FULLY MIGRATED TO DRIZZLE ORM - Using businessesRepo and projectsRepo
             const { id } = req.params;
 
             const business = await businessesRepo.findBusinessById(parseInt(id));
@@ -3758,32 +3757,17 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Get associated projects (SQL until projectsRepo supports client filter)
-            const [projects] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    id, name, code, status, description,
-                    start_date, deadline, completion_percentage,
-                    budget, actual_cost
-                FROM projects
-                WHERE client = ?
-                ORDER BY created_at DESC
-            `, [business.name]);
+            // Get associated projects via repository
+            const [projects] = await projectsRepo.findProjectsByClient(business.name);
 
-            // Get financial summary (SQL until projectsRepo supports aggregations)
-            const [financials] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    SUM(budget) as total_budget,
-                    SUM(actual_cost) as total_spent,
-                    COUNT(*) as total_projects,
-                    AVG(completion_percentage) as avg_progress
-                FROM projects
-                WHERE client = ?
-            `, [business.name]);
+            // Get financial summary via repository
+            const [financialsData] = await projectsRepo.getClientFinancialSummary(business.name);
+            const financials = (financialsData as any[])[0] || {};
 
             res.json({
                 business,
                 projects,
-                financials: financials[0] || {}
+                financials
             });
         } catch (error) {
             console.error('Error fetching business:', error);
@@ -3933,8 +3917,8 @@ class SolariaDashboardServer {
                 return;
             }
 
-            // Nullify business_id in related projects (SQL until projectsRepo supports bulk update)
-            await this.db!.execute('UPDATE projects SET business_id = NULL WHERE business_id = ?', [id]);
+            // Nullify business_id in related projects via repository
+            await projectsRepo.clearBusinessId(parseInt(id));
 
             // Delete business
             await businessesRepo.deleteBusiness(parseInt(id));

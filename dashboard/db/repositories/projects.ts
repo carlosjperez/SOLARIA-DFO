@@ -320,3 +320,35 @@ export async function getLatestMetrics() {
         ) latest ON pm.project_id = latest.project_id AND pm.metric_date = latest.max_date
     `);
 }
+
+// ============================================================================
+// Client-Specific Queries
+// ============================================================================
+
+export async function findProjectsByClient(clientName: string) {
+    return pool.execute(`
+        SELECT
+            id, name, code, status, description,
+            start_date, deadline, completion_percentage,
+            budget, actual_cost
+        FROM projects
+        WHERE client = ?
+        ORDER BY created_at DESC
+    `, [clientName]);
+}
+
+export async function getClientFinancialSummary(clientName: string) {
+    return pool.execute(`
+        SELECT
+            SUM(budget) as total_budget,
+            SUM(actual_cost) as total_spent,
+            COUNT(*) as total_projects,
+            AVG(completion_percentage) as avg_progress
+        FROM projects
+        WHERE client = ?
+    `, [clientName]);
+}
+
+export async function clearBusinessId(businessId: number) {
+    return pool.execute('UPDATE projects SET business_id = NULL WHERE business_id = ?', [businessId]);
+}
