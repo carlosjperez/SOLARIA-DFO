@@ -2222,58 +2222,26 @@ class SolariaDashboardServer {
     private async getSprintFullHierarchy(req: Request, res: Response): Promise<void> {
         try {
             // ✅ MIGRATED TO DRIZZLE ORM - Using sprintsRepo, epicsRepo, tasksRepo
-            // TODO: Add project_name to sprintsRepo.findSprintById() or use JOIN helper
-            // TODO: Add task counts to epicsRepo (tasks_total, tasks_completed)
-            // TODO: Add epicId filter support to tasksRepo
             const { id } = req.params;
             const sprintId = parseInt(id);
 
-            // 1. Get sprint details (SQL until sprintsRepo supports project join)
-            const [sprints] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT s.*, p.name as project_name
-                FROM sprints s
-                LEFT JOIN projects p ON s.project_id = p.id
-                WHERE s.id = ?
-            `, [id]);
+            // 1. Get sprint details with project and stats
+            const [sprintData] = await sprintsRepo.findSprintWithStats(sprintId);
+            const sprint = (sprintData as any)?.[0];
 
-            if (sprints.length === 0) {
+            if (!sprint) {
                 res.status(404).json({ error: 'Sprint not found' });
                 return;
             }
 
-            const sprint = sprints[0];
+            // 2. Get epics with task counts (single query, no N+1)
+            const [epicsData] = await epicsRepo.findAllEpicsWithStats({ sprintId });
+            const epicsWithCounts = epicsData as any[];
 
-            // 2. Get epics in this sprint
-            const epicsRaw = await epicsRepo.findAllEpics({ sprintId });
-
-            // Enrich epics with task counts via Promise.all (SQL until epicsRepo supports)
-            const epicsWithCounts = await Promise.all(
-                epicsRaw.map(async (epic: any) => {
-                    const [counts] = await this.db!.execute<RowDataPacket[]>(`
-                        SELECT
-                            COUNT(*) as tasks_total,
-                            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as tasks_completed
-                        FROM tasks WHERE epic_id = ?
-                    `, [epic.id]);
-
-                    const count = counts[0] as any;
-                    return {
-                        ...epic,
-                        tasks_total: count?.tasks_total || 0,
-                        tasks_completed: count?.tasks_completed || 0
-                    };
-                })
-            );
-
-            // 3. Get tasks for each epic (SQL until tasksRepo supports epicId filter)
+            // 3. Get tasks for each epic (batch query)
             const epicsWithTasks = await Promise.all(
                 epicsWithCounts.map(async (epic: any) => {
-                    const [tasks] = await this.db!.execute<RowDataPacket[]>(`
-                        SELECT id, task_number, title, status, progress, priority, estimated_hours
-                        FROM tasks
-                        WHERE epic_id = ?
-                        ORDER BY priority DESC, task_number ASC
-                    `, [epic.id]);
+                    const [tasks] = await tasksRepo.getEpicTasks(epic.id);
 
                     return {
                         ...epic,
@@ -2284,18 +2252,12 @@ class SolariaDashboardServer {
             );
 
             // 4. Get standalone tasks (direct sprint assignment, no epic)
-            // SQL until tasksRepo supports composite filters (sprint_id AND epic_id IS NULL)
-            const [standaloneTasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT id, task_number, title, status, progress, priority, estimated_hours
-                FROM tasks
-                WHERE sprint_id = ? AND epic_id IS NULL
-                ORDER BY priority DESC, task_number ASC
-            `, [id]);
+            const [standaloneTasks] = await tasksRepo.getStandaloneSprintTasks(sprintId);
 
             // 5. Calculate sprint progress
-            const totalTasks = epicsWithTasks.reduce((sum, e) => sum + e.tasks_total, 0) + standaloneTasks.length;
+            const totalTasks = epicsWithTasks.reduce((sum, e) => sum + e.tasks_total, 0) + (standaloneTasks as any[]).length;
             const completedTasks = epicsWithTasks.reduce((sum, e) => sum + e.tasks_completed, 0) +
-                standaloneTasks.filter((t: any) => t.status === 'completed').length;
+                (standaloneTasks as any[]).filter((t: any) => t.status === 'completed').length;
 
             res.json({
                 sprint: {

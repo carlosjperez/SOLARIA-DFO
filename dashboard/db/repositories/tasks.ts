@@ -459,6 +459,24 @@ export async function getProjectTasks(projectId: number) {
     `, [projectId]);
 }
 
+export async function getEpicTasks(epicId: number) {
+    return pool.execute(`
+        SELECT id, task_number, title, status, progress, priority, estimated_hours
+        FROM tasks
+        WHERE epic_id = ?
+        ORDER BY priority DESC, task_number ASC
+    `, [epicId]);
+}
+
+export async function getStandaloneSprintTasks(sprintId: number) {
+    return pool.execute(`
+        SELECT id, task_number, title, status, progress, priority, estimated_hours
+        FROM tasks
+        WHERE sprint_id = ? AND epic_id IS NULL
+        ORDER BY priority DESC, task_number ASC
+    `, [sprintId]);
+}
+
 // ============================================================================
 // Kanban Aggregations
 // ============================================================================
