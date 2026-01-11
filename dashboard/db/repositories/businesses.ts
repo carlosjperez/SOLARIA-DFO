@@ -69,6 +69,34 @@ export async function deleteBusiness(id: number) {
     return db.delete(businesses).where(eq(businesses.id, id));
 }
 
+export async function findAllBusinessesWithProjectCount(filters?: {
+    status?: string;
+    limit?: number;
+}) {
+    let query = `
+        SELECT
+            b.*,
+            COALESCE((SELECT COUNT(*) FROM projects p WHERE p.client = b.name), 0) as project_count
+        FROM businesses b
+        WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (filters?.status && filters.status !== 'all') {
+        query += ' AND b.status = ?';
+        params.push(filters.status);
+    }
+
+    query += ' ORDER BY b.name ASC';
+
+    if (filters?.limit) {
+        query += ' LIMIT ?';
+        params.push(filters.limit);
+    }
+
+    return pool.execute(query, params);
+}
+
 export async function findBusinessWithStats(id: number) {
     return db.execute(sql`
         SELECT

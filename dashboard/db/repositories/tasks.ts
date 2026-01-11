@@ -3,7 +3,7 @@
  * Replaces raw SQL queries with type-safe Drizzle queries
  */
 
-import { db } from '../index.js';
+import { db, pool } from '../index.js';
 import { eq, desc, asc, sql, and, or, isNull, isNotNull } from 'drizzle-orm';
 import {
     tasks,
@@ -338,6 +338,108 @@ export async function removeTagFromTask(taskId: number, tagId: number): Promise<
     }
 
     return deleted;
+}
+
+// ============================================================================
+// Public API Queries
+// ============================================================================
+
+export async function findAllTasksPublic(filters?: {
+    status?: string;
+    priority?: string;
+    projectId?: number;
+    limit?: number;
+}) {
+    let query = `
+        SELECT
+            t.id, t.task_number,
+            CONCAT(
+                COALESCE(p.code, 'TSK'), '-',
+                LPAD(COALESCE(t.task_number, t.id), 3, '0')
+            ) as task_code,
+            t.title, t.description, t.status, t.priority, t.progress,
+            t.estimated_hours, t.actual_hours,
+            t.deadline, t.completed_at,
+            t.created_at, t.updated_at,
+            p.id as project_id, p.name as project_name, p.code as project_code,
+            aa.id as agent_id, aa.name as agent_name
+        FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+        WHERE (p.archived = FALSE OR p.archived IS NULL)
+    `;
+    const params: any[] = [];
+
+    if (filters?.status && filters.status !== 'all') {
+        query += ' AND t.status = ?';
+        params.push(filters.status);
+    }
+
+    if (filters?.priority && filters.priority !== 'all') {
+        query += ' AND t.priority = ?';
+        params.push(filters.priority);
+    }
+
+    if (filters?.projectId) {
+        query += ' AND t.project_id = ?';
+        params.push(filters.projectId);
+    }
+
+    query += ' ORDER BY t.updated_at DESC';
+
+    if (filters?.limit) {
+        query += ' LIMIT ?';
+        params.push(filters.limit);
+    }
+
+    return pool.execute(query, params);
+}
+
+export async function getRecentTasksByProject(filters?: {
+    days?: number;
+    limit?: number;
+}) {
+    const days = filters?.days || 7;
+    const limit = filters?.limit || 30;
+
+    return pool.execute(`
+        SELECT
+            t.id,
+            t.task_number,
+            CONCAT(
+                COALESCE(p.code, 'TSK'), '-',
+                LPAD(COALESCE(t.task_number, t.id), 3, '0'),
+                CASE
+                    WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
+                    WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
+                    WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
+                    WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
+                    ELSE ''
+                END
+            ) as task_code,
+            t.title,
+            t.status,
+            t.priority,
+            t.progress,
+            t.created_at,
+            t.updated_at,
+            p.id as project_id,
+            p.name as project_name,
+            p.code as project_code,
+            e.epic_number, e.name as epic_name,
+            sp.sprint_number, sp.name as sprint_name,
+            aa.id as agent_id,
+            aa.name as agent_name,
+            aa.role as agent_role
+        FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        LEFT JOIN epics e ON t.epic_id = e.id
+        LEFT JOIN sprints sp ON t.sprint_id = sp.id
+        LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+        WHERE t.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+        ORDER BY t.created_at DESC
+        LIMIT ?
+    `, [days, limit]);
 }
 
 // ============================================================================

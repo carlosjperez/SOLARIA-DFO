@@ -1158,37 +1158,15 @@ class SolariaDashboardServer {
 
     private async getBusinessesPublic(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findAllBusinesses()
-            // TODO: Add project count aggregation to repository
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo.findAllBusinessesWithProjectCount()
             const { status, limit = '50' } = req.query;
 
-            const filters: any = {
+            const [businesses] = await businessesRepo.findAllBusinessesWithProjectCount({
+                status: status as string,
                 limit: parseInt(limit as string, 10)
-            };
-
-            if (status && status !== 'all') {
-                filters.status = status as string;
-            }
-
-            const businessesRaw = await businessesRepo.findAllBusinesses(filters);
-
-            // Enrich with project counts via Promise.all (SQL until projectsRepo supports client filter)
-            const statsPromises = businessesRaw.map(async (business: any) => {
-                const [stats] = await this.db!.execute<RowDataPacket[]>(`
-                    SELECT COUNT(*) as project_count
-                    FROM projects WHERE client = ?
-                `, [business.name]);
-
-                const stat = stats[0] as any;
-                return {
-                    ...business,
-                    project_count: stat?.project_count || 0
-                };
             });
 
-            const businesses = await Promise.all(statsPromises);
-
-            res.json({ businesses, count: businesses.length });
+            res.json({ businesses, count: (businesses as any[]).length });
         } catch (error) {
             console.error('Error in getBusinessesPublic:', error);
             res.status(500).json({ error: 'Failed to fetch businesses' });
@@ -1197,51 +1175,17 @@ class SolariaDashboardServer {
 
     private async getTasksPublic(req: Request, res: Response): Promise<void> {
         try {
-            // ⚠️ PARTIAL MIGRATION - Uses SQL for JOIN with archived filter
-            // TODO: Add archived filter to tasksRepo or implement via projectsRepo integration
-            // NOTE: Full migration requires JOIN support with projects.archived filter
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.findAllTasksPublic()
             const { status, priority, project_id, limit = '100' } = req.query;
 
-            let query = `
-                SELECT
-                    t.id, t.task_number,
-                    CONCAT(
-                        COALESCE(p.code, 'TSK'), '-',
-                        LPAD(COALESCE(t.task_number, t.id), 3, '0')
-                    ) as task_code,
-                    t.title, t.description, t.status, t.priority, t.progress,
-                    t.estimated_hours, t.actual_hours,
-                    t.deadline, t.completed_at,
-                    t.created_at, t.updated_at,
-                    p.id as project_id, p.name as project_name, p.code as project_code,
-                    aa.id as agent_id, aa.name as agent_name
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                WHERE (p.archived = FALSE OR p.archived IS NULL)
-            `;
-            const params: (string | number)[] = [];
+            const [tasks] = await tasksRepo.findAllTasksPublic({
+                status: status as string,
+                priority: priority as string,
+                projectId: project_id ? parseInt(project_id as string, 10) : undefined,
+                limit: parseInt(limit as string, 10)
+            });
 
-            if (status && status !== 'all') {
-                query += ` AND t.status = ?`;
-                params.push(status as string);
-            }
-
-            if (priority && priority !== 'all') {
-                query += ` AND t.priority = ?`;
-                params.push(priority as string);
-            }
-
-            if (project_id) {
-                query += ` AND t.project_id = ?`;
-                params.push(parseInt(project_id as string, 10));
-            }
-
-            query += ` ORDER BY t.updated_at DESC LIMIT ${parseInt(limit as string, 10)}`;
-
-            const [tasks] = await this.db!.execute<RowDataPacket[]>(query, params);
-
-            res.json({ tasks, count: tasks.length });
+            res.json({ tasks, count: (tasks as any[]).length });
         } catch (error) {
             console.error('Error in getTasksPublic:', error);
             res.status(500).json({ error: 'Failed to fetch tasks' });
@@ -1291,47 +1235,11 @@ class SolariaDashboardServer {
 
     private async getRecentTasksByProject(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.getRecentTasksByProject()
             const limit = parseInt(req.query.limit as string) || 30;
             const days = parseInt(req.query.days as string) || 7;
 
-            const [tasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    t.id,
-                    t.task_number,
-                    CONCAT(
-                        COALESCE(p.code, 'TSK'), '-',
-                        LPAD(COALESCE(t.task_number, t.id), 3, '0'),
-                        CASE
-                            WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
-                            WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
-                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
-                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
-                            ELSE ''
-                        END
-                    ) as task_code,
-                    t.title,
-                    t.status,
-                    t.priority,
-                    t.progress,
-                    t.created_at,
-                    t.updated_at,
-                    p.id as project_id,
-                    p.name as project_name,
-                    p.code as project_code,
-                    e.epic_number, e.name as epic_name,
-                    sp.sprint_number, sp.name as sprint_name,
-                    aa.id as agent_id,
-                    aa.name as agent_name,
-                    aa.role as agent_role
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                LEFT JOIN epics e ON t.epic_id = e.id
-                LEFT JOIN sprints sp ON t.sprint_id = sp.id
-                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                WHERE t.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
-                ORDER BY t.created_at DESC
-                LIMIT ?
-            `, [days, limit]);
+            const [tasks] = await tasksRepo.getRecentTasksByProject({ days, limit });
 
             // Group tasks by project
             const projectsMap = new Map<number, any>();
