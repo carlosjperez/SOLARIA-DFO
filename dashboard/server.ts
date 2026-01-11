@@ -48,6 +48,7 @@ import * as permissionsRepo from './db/repositories/permissions.js';
 import * as dashboardRepo from './db/repositories/dashboard.js';
 import * as csuiteRepo from './db/repositories/csuite.js';
 import * as reservedCodesRepo from './db/repositories/reserved-codes.js';
+import * as activityLogsRepo from './db/repositories/activity-logs.js';
 
 // Import Drizzle schema types
 import type { NewAgentMcpConfig } from './db/schema/index.js';
@@ -1320,22 +1321,20 @@ class SolariaDashboardServer {
         metadata?: Record<string, unknown>;
     }): Promise<void> {
         try {
-            const [result] = await this.db!.execute<ResultSetHeader>(`
-                INSERT INTO activity_logs (action, message, category, level, project_id, agent_id, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [
-                data.action,
-                data.message || data.action,
-                data.category || 'system',
-                data.level || 'info',
-                data.project_id || null,
-                data.agent_id || null,
-                data.metadata ? JSON.stringify(data.metadata) : null
-            ]);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using activityLogsRepo.createActivityLog()
+            const result = await activityLogsRepo.createActivityLog({
+                action: data.action,
+                message: data.message,
+                category: data.category,
+                level: data.level,
+                projectId: data.project_id || null,
+                agentId: data.agent_id || null,
+                metadata: data.metadata
+            });
 
             // Emit Socket.IO event for real-time updates
             const activityEvent = {
-                id: result.insertId,
+                id: (result as any).insertId,
                 action: data.action,
                 message: data.message || data.action,
                 category: data.category || 'system',
