@@ -3081,8 +3081,7 @@ class SolariaDashboardServer {
 
     private async getTask(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo
-            // TODO: Add completed_by_name JOIN to findTaskItems() in repository
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.findTaskWithDetails(), tasksRepo.findTaskItems()
             const { id } = req.params;
 
             // Get task with details (JOINs project, agent, user)
@@ -3231,7 +3230,7 @@ class SolariaDashboardServer {
 
     private async updateTask(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED TO DRIZZLE ORM - Using tasksRepo.updateTask()
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.updateTask(), tasksRepo.findTaskWithDetails()
             const { id } = req.params;
             const updates = req.body;
 
@@ -3269,14 +3268,8 @@ class SolariaDashboardServer {
             }
 
             // Fetch task data for WebSocket notification
-            const [taskDataForEmit] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT t.id, t.task_number, t.title, t.status, t.priority, t.progress, t.project_id,
-                       p.code as project_code, p.name as project_name
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                WHERE t.id = ?
-            `, [id]);
-            const taskForEmit: any = taskDataForEmit[0] || {};
+            const taskResult = await tasksRepo.findTaskWithDetails(parseInt(id));
+            const taskForEmit: any = (taskResult[0] as unknown as any[])?.[0] || {};
             let taskCode = taskForEmit.project_code && taskForEmit.task_number
                 ? `${taskForEmit.project_code}-${String(taskForEmit.task_number).padStart(3, '0')}`
                 : `TASK-${id}`;
@@ -3298,15 +3291,8 @@ class SolariaDashboardServer {
 
             // Emit task_completed notification if status changed to completed
             if (updates.status === 'completed') {
-                const [taskData] = await this.db!.execute<RowDataPacket[]>(`
-                    SELECT t.*, p.name as project_name, p.code as project_code, aa.name as agent_name
-                    FROM tasks t
-                    LEFT JOIN projects p ON t.project_id = p.id
-                    LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                    WHERE t.id = ?
-                `, [id]);
-
-                const task: any = taskData[0] || {};
+                const completedTaskResult = await tasksRepo.findTaskWithDetails(parseInt(id));
+                const task: any = (completedTaskResult[0] as unknown as any[])?.[0] || {};
 
                 // Generate task_code
                 let completedTaskCode = task.project_code && task.task_number
