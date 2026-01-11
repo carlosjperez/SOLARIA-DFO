@@ -46,6 +46,7 @@ import * as agentMcpConfigsRepo from './db/repositories/agentMcpConfigs.js';
 import * as usersRepo from './db/repositories/users.js';
 import * as permissionsRepo from './db/repositories/permissions.js';
 import * as dashboardRepo from './db/repositories/dashboard.js';
+import * as csuiteRepo from './db/repositories/csuite.js';
 
 // Import Drizzle schema types
 import type { NewAgentMcpConfig } from './db/schema/index.js';
@@ -4769,39 +4770,20 @@ class SolariaDashboardServer {
 
     private async getCEODashboard(_req: Request, res: Response): Promise<void> {
         try {
-            const [projects] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    p.*,
-                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id) as total_tasks,
-                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'completed') as completed_tasks,
-                    (SELECT COUNT(*) FROM alerts a WHERE a.project_id = p.id AND a.status = 'active') as active_alerts
-                FROM projects p
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using csuiteRepo functions
+            const [projectsData] = await csuiteRepo.getCEOProjectsWithStats();
+            const [budgetData] = await csuiteRepo.getCEOBudgetSummary();
+            const [alertsData] = await csuiteRepo.getCEOCriticalAlerts();
+            const [tasksData] = await csuiteRepo.getCEOTopTasks(5);
 
-            const [budgetSummary] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    SUM(budget) as total_budget,
-                    SUM(actual_cost) as total_spent,
-                    SUM(budget) - SUM(actual_cost) as remaining,
-                    AVG(completion_percentage) as avg_completion
-                FROM projects
-            `);
-
-            const [criticalAlerts] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT * FROM alerts WHERE severity = 'critical' AND status = 'active'
-            `);
-
-            const [topTasks] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT title, status, priority, project_id, progress, created_at
-                FROM tasks
-                WHERE status <> 'completed'
-                ORDER BY priority DESC, created_at DESC
-                LIMIT 5
-            `);
+            const projects = projectsData as any[];
+            const budgetSummary = budgetData as any[];
+            const criticalAlerts = alertsData as any[];
+            const topTasks = tasksData as any[];
 
             const akademateProject = projects.find(p => p.name && p.name.toLowerCase().includes('akademate'));
             const mainProject = akademateProject || projects[0];
-            const executiveSummary = `${mainProject?.name || 'Proyecto'}: ${Math.round(mainProject?.completion_percentage || 0)}% completado; ${criticalAlerts.length} alertas críticas activas; presupuesto utilizado ${(budgetSummary[0].total_spent || 0)} / ${(budgetSummary[0].total_budget || 0)}.`;
+            const executiveSummary = `${mainProject?.name || 'Proyecto'}: ${Math.round(mainProject?.completion_percentage || 0)}% completado; ${criticalAlerts.length} alertas críticas activas; presupuesto utilizado ${(budgetSummary[0]?.total_spent || 0)} / ${(budgetSummary[0]?.total_budget || 0)}.`;
 
             res.json({
                 role: 'CEO',
@@ -4809,12 +4791,12 @@ class SolariaDashboardServer {
                 focus: ['ROI', 'Budget', 'Critical Alerts', 'Tareas clave'],
                 kpis: {
                     totalProjects: projects.length,
-                    totalBudget: budgetSummary[0].total_budget || 0,
-                    totalSpent: budgetSummary[0].total_spent || 0,
-                    budgetRemaining: budgetSummary[0].remaining || 0,
-                    avgCompletion: Math.round(budgetSummary[0].avg_completion || 0),
-                    roi: budgetSummary[0].total_budget > 0
-                        ? Math.round(((budgetSummary[0].total_budget - budgetSummary[0].total_spent) / budgetSummary[0].total_budget) * 100)
+                    totalBudget: budgetSummary[0]?.total_budget || 0,
+                    totalSpent: budgetSummary[0]?.total_spent || 0,
+                    budgetRemaining: budgetSummary[0]?.remaining || 0,
+                    avgCompletion: Math.round(budgetSummary[0]?.avg_completion || 0),
+                    roi: (budgetSummary[0]?.total_budget || 0) > 0
+                        ? Math.round((((budgetSummary[0]?.total_budget || 0) - (budgetSummary[0]?.total_spent || 0)) / (budgetSummary[0]?.total_budget || 0)) * 100)
                         : 0
                 },
                 projects,
@@ -4836,19 +4818,10 @@ class SolariaDashboardServer {
 
     private async getCTODashboard(_req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIAL MIGRATION - Using agentsRepo.findAllAgents() and projectsRepo.findAllProjects()
-            // TODO: Migrate techMetrics and techDebt queries when metrics/stats repos available
+            // ✅ MIGRATED TO DRIZZLE ORM - Using csuiteRepo, agentsRepo, and projectsRepo
             const agents = await agentsRepo.findAllAgents();
-            const [techMetrics] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    AVG(code_quality_score) as avg_quality,
-                    AVG(test_coverage) as avg_coverage,
-                    AVG(agent_efficiency) as avg_efficiency
-                FROM project_metrics WHERE metric_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-            `);
-            const [techDebt] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT COUNT(*) as count FROM tasks WHERE status = 'blocked' OR priority = 'critical'
-            `);
+            const [techMetrics] = await csuiteRepo.getCTOTechMetrics(7);
+            const [techDebt] = await csuiteRepo.getCTOTechDebt();
             const projects = await projectsRepo.findAllProjects();
 
             res.json({
@@ -4883,25 +4856,10 @@ class SolariaDashboardServer {
 
     private async getCOODashboard(_req: Request, res: Response): Promise<void> {
         try {
-            const [tasks] = await this.db!.execute<RowDataPacket[]>(`SELECT * FROM tasks ORDER BY created_at DESC LIMIT 20`);
-            const [taskStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-                    SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
-                    SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) as blocked,
-                    SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
-                FROM tasks
-            `);
-            const [agentWorkload] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    aa.name, aa.role, aa.status,
-                    COUNT(t.id) as assigned_tasks,
-                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
-                FROM ai_agents aa
-                LEFT JOIN tasks t ON aa.id = t.assigned_agent_id
-                GROUP BY aa.id
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using csuiteRepo functions
+            const [tasks] = await csuiteRepo.getCOORecentTasks(20);
+            const [taskStats] = await csuiteRepo.getCOOTaskStats();
+            const [agentWorkload] = await csuiteRepo.getCOOAgentWorkload();
 
             res.json({
                 role: 'COO',
@@ -4932,27 +4890,10 @@ class SolariaDashboardServer {
 
     private async getCFODashboard(_req: Request, res: Response): Promise<void> {
         try {
-            const [financials] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    SUM(budget) as total_budget,
-                    SUM(actual_cost) as total_cost,
-                    SUM(budget) - SUM(actual_cost) as remaining_budget
-                FROM projects
-            `);
-            const [costByProject] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT name, budget, actual_cost,
-                    (actual_cost / budget * 100) as burn_rate
-                FROM projects
-            `);
-            const [monthlySpend] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    DATE_FORMAT(metric_date, '%Y-%m') as month,
-                    SUM(budget_used) as monthly_spend
-                FROM project_metrics
-                GROUP BY DATE_FORMAT(metric_date, '%Y-%m')
-                ORDER BY month DESC
-                LIMIT 6
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using csuiteRepo functions
+            const [financials] = await csuiteRepo.getCFOFinancials();
+            const [costByProject] = await csuiteRepo.getCFOCostByProject();
+            const [monthlySpend] = await csuiteRepo.getCFOMonthlySpend(6);
 
             res.json({
                 role: 'CFO',
@@ -7186,42 +7127,11 @@ class SolariaDashboardServer {
 
     private async getOfficeDashboard(_req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
-            // Get client stats
-            const [clientStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
-                    SUM(CASE WHEN status = 'lead' THEN 1 ELSE 0 END) as leads,
-                    SUM(CASE WHEN status = 'prospect' THEN 1 ELSE 0 END) as prospects,
-                    SUM(lifetime_value) as total_ltv
-                FROM office_clients
-            `);
-
-            // Get project stats (office visible only)
-            const [projectStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'development' THEN 1 ELSE 0 END) as in_development,
-                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-                    SUM(budget) as total_budget
-                FROM projects WHERE office_visible = 1
-            `);
-
-            // Get payment stats
-            const [paymentStats] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'received' THEN amount ELSE 0 END) as received,
-                    SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) as pending
-                FROM office_payments
-            `);
-
-            // Recent activity
-            const [recentClients] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT id, name, status, created_at
-                FROM office_clients
-                ORDER BY created_at DESC LIMIT 5
-            `);
+            // ✅ MIGRATED TO DRIZZLE ORM - Using csuiteRepo functions
+            const [clientStats] = await csuiteRepo.getOfficeClientStats();
+            const [projectStats] = await csuiteRepo.getOfficeProjectStats();
+            const [paymentStats] = await csuiteRepo.getOfficePaymentStats();
+            const [recentClients] = await csuiteRepo.getOfficeRecentClients(5);
 
             res.json({
                 success: true,
