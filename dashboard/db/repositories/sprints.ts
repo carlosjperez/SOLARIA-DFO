@@ -1,6 +1,8 @@
 /**
  * SOLARIA DFO - Sprints Repository (Drizzle ORM)
  * Replaces raw SQL queries with type-safe Drizzle queries
+ *
+ * Updated: 2026-01-11 - Phase 1 Optimization: Standardized filter types
  */
 
 import { db, pool } from '../index.js';
@@ -10,15 +12,13 @@ import {
     type Sprint,
     type NewSprint,
 } from '../schema/index.js';
+import type { SprintFilters, SprintStatus } from './types/filters.js';
 
 // ============================================================================
 // Sprints CRUD
 // ============================================================================
 
-export async function findAllSprints(filters?: {
-    projectId?: number;
-    status?: string;
-}) {
+export async function findAllSprints(filters?: SprintFilters) {
     const conditions = [];
 
     if (filters?.projectId) {
