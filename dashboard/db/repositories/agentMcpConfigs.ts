@@ -83,3 +83,28 @@ export async function deleteAgentMcpConfig(id: number, agentId: number) {
             )
         );
 }
+
+// ============================================================================
+// Connection Status Updates
+// ============================================================================
+
+export async function updateConnectionSuccess(id: number) {
+    return db
+        .update(agentMcpConfigs)
+        .set({
+            connectionStatus: 'connected',
+            lastConnectedAt: new Date(),
+            lastError: null
+        })
+        .where(eq(agentMcpConfigs.id, id));
+}
+
+export async function updateConnectionError(id: number, errorMessage: string) {
+    return db
+        .update(agentMcpConfigs)
+        .set({
+            connectionStatus: 'error',
+            lastError: errorMessage
+        })
+        .where(eq(agentMcpConfigs.id, id));
+}

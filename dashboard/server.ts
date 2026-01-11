@@ -2892,8 +2892,7 @@ class SolariaDashboardServer {
 
     private async testAgentMcpConnection(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIAL MIGRATION - GET config uses agentMcpConfigsRepo
-            // TODO: Create updateConnectionStatus() method in repository for status updates
+            // ✅ MIGRATED TO DRIZZLE ORM - Using agentMcpConfigsRepo for all operations
             const { id, configId } = req.params;
 
             // Get config using repository
@@ -2939,14 +2938,8 @@ class SolariaDashboardServer {
                 // Get tools list
                 const tools = manager.listTools(config.serverName);
 
-                // Update connection status (TODO: Move to repository method)
-                await this.db!.execute(`
-                    UPDATE agent_mcp_configs
-                    SET connection_status = 'connected',
-                        last_connected_at = NOW(),
-                        last_error = NULL
-                    WHERE id = ?
-                `, [configId]);
+                // Update connection status
+                await agentMcpConfigsRepo.updateConnectionSuccess(parseInt(configId));
 
                 // Disconnect test connection
                 await manager.disconnect(config.serverName);
@@ -2965,12 +2958,7 @@ class SolariaDashboardServer {
                 const errorMessage = connError instanceof Error ? connError.message : 'Unknown error';
 
                 // Update error status
-                await this.db!.execute(`
-                    UPDATE agent_mcp_configs
-                    SET connection_status = 'error',
-                        last_error = ?
-                    WHERE id = ?
-                `, [errorMessage, configId]);
+                await agentMcpConfigsRepo.updateConnectionError(parseInt(configId), errorMessage);
 
                 res.status(400).json({
                     success: false,
