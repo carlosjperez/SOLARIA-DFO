@@ -3,7 +3,7 @@
  * Replaces raw SQL queries with type-safe Drizzle queries
  */
 
-import { db } from '../index.js';
+import { db, pool } from '../index.js';
 import { eq, desc, sql, and, like, gte, lte } from 'drizzle-orm';
 import {
     memories,
@@ -54,6 +54,67 @@ export async function findAllMemories(filters?: {
     return query
         .orderBy(desc(memories.importance), desc(memories.createdAt))
         .limit(filters?.limit || 50);
+}
+
+export async function findMemoriesWithFilters(filters: {
+    projectId?: number;
+    agentId?: number;
+    tags?: string[];
+    searchQuery?: string;
+    minImportance?: number;
+    sortBy?: string;
+    limit?: number;
+    offset?: number;
+}) {
+    let sqlQuery = `
+        SELECT m.*, p.name as project_name, aa.name as agent_name
+        FROM memories m
+        LEFT JOIN projects p ON m.project_id = p.id
+        LEFT JOIN ai_agents aa ON m.agent_id = aa.id
+        WHERE 1=1
+    `;
+    const params: (string | number)[] = [];
+
+    if (filters.projectId) {
+        sqlQuery += ' AND m.project_id = ?';
+        params.push(filters.projectId);
+    }
+
+    if (filters.agentId) {
+        sqlQuery += ' AND m.agent_id = ?';
+        params.push(filters.agentId);
+    }
+
+    if (filters.searchQuery) {
+        sqlQuery += ' AND (m.content LIKE ? OR m.summary LIKE ?)';
+        params.push(`%${filters.searchQuery}%`, `%${filters.searchQuery}%`);
+    }
+
+    if (filters.minImportance !== undefined) {
+        sqlQuery += ' AND m.importance >= ?';
+        params.push(filters.minImportance);
+    }
+
+    if (filters.tags && filters.tags.length > 0) {
+        const tagConditions = filters.tags.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
+        sqlQuery += ` AND (${tagConditions})`;
+        filters.tags.forEach(tag => params.push(JSON.stringify(tag)));
+    }
+
+    // Sort order
+    const sortMap: Record<string, string> = {
+        'importance': 'm.importance DESC, m.created_at DESC',
+        'created_at': 'm.created_at DESC',
+        'updated_at': 'm.updated_at DESC',
+        'access_count': 'm.access_count DESC'
+    };
+    sqlQuery += ` ORDER BY ${sortMap[filters.sortBy || 'importance'] || sortMap['importance']}`;
+
+    sqlQuery += ` LIMIT ? OFFSET ?`;
+    params.push(filters.limit || 50);
+    params.push(filters.offset || 0);
+
+    return pool.execute(sqlQuery, params);
 }
 
 export async function findMemoryById(id: number) {

@@ -339,6 +339,41 @@ export async function removeTagFromTask(taskId: number, tagId: number): Promise<
     return deleted;
 }
 
+export async function findTasksByTag(filters: {
+    tagName: string;
+    projectId?: number;
+    status?: string;
+    limit?: number;
+}) {
+    let query = `
+        SELECT t.*,
+               p.name as project_name,
+               aa.name as agent_name,
+               CONCAT('PROJ-', LPAD(t.project_id, 2, '0'), '-', LPAD(t.task_number, 3, '0')) as code
+        FROM tasks t
+        JOIN task_tag_assignments tta ON t.id = tta.task_id
+        JOIN task_tags tt ON tta.tag_id = tt.id
+        LEFT JOIN projects p ON t.project_id = p.id
+        LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
+        WHERE tt.name = ?
+    `;
+    const params: (string | number)[] = [filters.tagName.toLowerCase()];
+
+    if (filters.projectId) {
+        query += ' AND t.project_id = ?';
+        params.push(filters.projectId);
+    }
+    if (filters.status) {
+        query += ' AND t.status = ?';
+        params.push(filters.status);
+    }
+
+    query += ` ORDER BY t.created_at DESC LIMIT ?`;
+    params.push(filters.limit || 50);
+
+    return pool.execute(query, params);
+}
+
 // ============================================================================
 // Public API Queries
 // ============================================================================
@@ -583,6 +618,21 @@ export async function getRecentCompletedTasks(limit = 20) {
         ORDER BY COALESCE(t.completed_at, t.updated_at) DESC
         LIMIT ${limit}
     `);
+}
+
+export async function findTaskWithCode(taskId: number) {
+    return pool.execute(`
+        SELECT
+            t.id,
+            t.project_id,
+            CONCAT(
+                COALESCE(p.code, 'TSK'), '-',
+                LPAD(COALESCE(t.task_number, t.id), 3, '0')
+            ) as code
+        FROM tasks t
+        LEFT JOIN projects p ON t.project_id = p.id
+        WHERE t.id = ?
+    `, [taskId]);
 }
 
 // ============================================================================

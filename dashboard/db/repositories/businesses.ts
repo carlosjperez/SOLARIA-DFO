@@ -83,6 +83,16 @@ export async function countBusinesses(filters?: {
     return pool.execute(query, params);
 }
 
+export async function findBusinessWithProjectCount(id: number) {
+    return pool.execute(`
+        SELECT b.id, b.name, COUNT(p.id) as project_count
+        FROM businesses b
+        LEFT JOIN projects p ON p.business_id = b.id AND p.status IN ('active', 'planning')
+        WHERE b.id = ?
+        GROUP BY b.id
+    `, [id]);
+}
+
 export async function findAllBusinessesWithProjectCount(filters?: {
     status?: string;
     limit?: number;

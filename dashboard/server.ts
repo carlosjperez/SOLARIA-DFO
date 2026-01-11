@@ -3652,37 +3652,19 @@ class SolariaDashboardServer {
 
     private async getTasksByTag(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.findTasksByTag()
             const { tagName } = req.params;
             const { project_id, status, limit = '50' } = req.query;
             const safeLimit = Math.min(Math.max(parseInt(limit as string) || 50, 1), 200);
 
-            let query = `
-                SELECT t.*,
-                       p.name as project_name,
-                       aa.name as agent_name,
-                       CONCAT('PROJ-', LPAD(t.project_id, 2, '0'), '-', LPAD(t.task_number, 3, '0')) as code
-                FROM tasks t
-                JOIN task_tag_assignments tta ON t.id = tta.task_id
-                JOIN task_tags tt ON tta.tag_id = tt.id
-                LEFT JOIN projects p ON t.project_id = p.id
-                LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                WHERE tt.name = ?
-            `;
-            const params: (string | number)[] = [tagName.toLowerCase()];
+            const result = await tasksRepo.findTasksByTag({
+                tagName,
+                projectId: project_id ? parseInt(project_id as string) : undefined,
+                status: status as string | undefined,
+                limit: safeLimit
+            });
 
-            if (project_id) {
-                query += ' AND t.project_id = ?';
-                params.push(parseInt(project_id as string));
-            }
-            if (status) {
-                query += ' AND t.status = ?';
-                params.push(status as string);
-            }
-
-            query += ` ORDER BY t.created_at DESC LIMIT ?`;
-            params.push(safeLimit);
-
-            const [rows] = await this.db!.execute<RowDataPacket[]>(query, params);
+            const rows = (result[0] as unknown as any[]);
 
             res.json({
                 tag: tagName,
@@ -3879,18 +3861,12 @@ class SolariaDashboardServer {
 
     private async deleteBusiness(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ PARTIALLY MIGRATED - Using businessesRepo, projectsRepo, and activityLogsRepo
-            // TODO: Migrate project count validation query to businessesRepo
+            // ✅ MIGRATED TO DRIZZLE ORM - Using businessesRepo, projectsRepo, and activityLogsRepo
             const { id } = req.params;
 
-            // Check if business exists and has no active projects (SQL until projectsRepo supports filters)
-            const [existing] = await this.db!.execute<RowDataPacket[]>(`
-                SELECT b.id, b.name, COUNT(p.id) as project_count
-                FROM businesses b
-                LEFT JOIN projects p ON p.business_id = b.id AND p.status IN ('active', 'planning')
-                WHERE b.id = ?
-                GROUP BY b.id
-            `, [id]);
+            // Check if business exists and has no active projects using repository
+            const result = await businessesRepo.findBusinessWithProjectCount(parseInt(id));
+            const existing = (result[0] as unknown as any[]);
 
             if (existing.length === 0) {
                 res.status(404).json({ error: 'Business not found' });
@@ -4955,53 +4931,32 @@ class SolariaDashboardServer {
 
     private async getMemories(req: Request, res: Response): Promise<void> {
         try {
+            // ✅ MIGRATED TO DRIZZLE ORM - Using memoriesRepo.findMemoriesWithFilters()
             const { project_id, query, tags, limit = '20', offset = '0', sort_by = 'importance' } = req.query;
 
-            let sql = `
-                SELECT m.*, p.name as project_name, aa.name as agent_name
-                FROM memories m
-                LEFT JOIN projects p ON m.project_id = p.id
-                LEFT JOIN ai_agents aa ON m.agent_id = aa.id
-                WHERE 1=1
-            `;
-            const params: (string | number)[] = [];
-
-            if (project_id) {
-                sql += ' AND m.project_id = ?';
-                params.push(parseInt(project_id as string));
-            }
-
-            if (query) {
-                sql += ' AND (m.content LIKE ? OR m.summary LIKE ?)';
-                params.push(`%${query}%`, `%${query}%`);
-            }
-
+            // Parse tags
+            let tagList: string[] | undefined;
             if (tags && tags !== '' && tags !== '[]') {
                 try {
-                    const tagList = JSON.parse(tags as string) as string[];
-                    if (Array.isArray(tagList) && tagList.length > 0) {
-                        const tagConditions = tagList.map(() => 'JSON_CONTAINS(m.tags, ?)').join(' OR ');
-                        sql += ` AND (${tagConditions})`;
-                        tagList.forEach(tag => params.push(JSON.stringify(tag)));
+                    const parsed = JSON.parse(tags as string);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        tagList = parsed;
                     }
                 } catch (parseError) {
                     console.warn('Invalid tags parameter in getMemories, ignoring:', tags);
-                    // Continue without tag filtering
                 }
             }
 
-            // Sort order
-            const sortMap: Record<string, string> = {
-                'importance': 'm.importance DESC, m.created_at DESC',
-                'created_at': 'm.created_at DESC',
-                'updated_at': 'm.updated_at DESC',
-                'access_count': 'm.access_count DESC'
-            };
-            sql += ` ORDER BY ${sortMap[sort_by as string] || sortMap['importance']}`;
+            const result = await memoriesRepo.findMemoriesWithFilters({
+                projectId: project_id ? parseInt(project_id as string) : undefined,
+                searchQuery: query as string | undefined,
+                tags: tagList,
+                sortBy: sort_by as string,
+                limit: parseInt(limit as string),
+                offset: parseInt(offset as string)
+            });
 
-            sql += ` LIMIT ${parseInt(limit as string)} OFFSET ${parseInt(offset as string)}`;
-
-            const [memories] = await this.db!.execute<RowDataPacket[]>(sql, params);
+            const memories = (result[0] as unknown as any[]);
 
             // Parse JSON fields
             memories.forEach((m: any) => {
@@ -5705,21 +5660,9 @@ class SolariaDashboardServer {
 
             const { taskId, agentId, metadata, context, mcpConfigs } = validation.data;
 
-            // Fetch task and agent info from database
-            // Generate task_code dynamically (no code column exists)
-            const [taskRows] = await this.db!.execute<RowDataPacket[]>(
-                `SELECT
-                    t.id,
-                    t.project_id,
-                    CONCAT(
-                        COALESCE(p.code, 'TSK'), '-',
-                        LPAD(COALESCE(t.task_number, t.id), 3, '0')
-                    ) as code
-                FROM tasks t
-                LEFT JOIN projects p ON t.project_id = p.id
-                WHERE t.id = ?`,
-                [taskId]
-            );
+            // ✅ MIGRATED TO DRIZZLE ORM - Using tasksRepo.findTaskWithCode()
+            const result = await tasksRepo.findTaskWithCode(taskId);
+            const taskRows = (result[0] as unknown as any[]);
 
             if (!taskRows || taskRows.length === 0) {
                 res.status(404).json({ error: 'Task not found' });
