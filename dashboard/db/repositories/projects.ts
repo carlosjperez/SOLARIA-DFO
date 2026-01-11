@@ -3,7 +3,7 @@
  * Replaces raw SQL queries with type-safe Drizzle queries
  */
 
-import { db } from '../index.js';
+import { db, pool } from '../index.js';
 import { eq, desc, sql, and, like, or } from 'drizzle-orm';
 import {
     projects,
@@ -60,6 +60,45 @@ export async function findProjectsWithStats() {
         ORDER BY p.updated_at DESC
         LIMIT 200
     `);
+}
+
+export async function findAllProjectsWithStats(filters?: {
+    status?: string;
+    priority?: string;
+    archived?: boolean;
+    limit?: number;
+}) {
+    let query = `
+        SELECT
+            p.*,
+            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id), 0) as task_count,
+            COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.status = 'completed'), 0) as completed_tasks
+        FROM projects p
+        WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (filters?.status) {
+        query += ' AND p.status = ?';
+        params.push(filters.status);
+    }
+    if (filters?.priority) {
+        query += ' AND p.priority = ?';
+        params.push(filters.priority);
+    }
+    if (filters?.archived !== undefined) {
+        query += ' AND p.archived = ?';
+        params.push(filters.archived);
+    }
+
+    query += ' ORDER BY p.updated_at DESC';
+
+    if (filters?.limit) {
+        query += ' LIMIT ?';
+        params.push(filters.limit);
+    }
+
+    return pool.execute(query, params);
 }
 
 export async function createProject(data: NewProject): Promise<Project> {

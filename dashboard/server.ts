@@ -1284,8 +1284,7 @@ class SolariaDashboardServer {
 
     private async getProjectsPublic(req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.findAllProjects()
-            // TODO: Add task counts to repository (currently SQL for aggregation)
+            // ✅ MIGRATED TO DRIZZLE ORM - Using projectsRepo.findAllProjectsWithStats()
             const { status, priority, limit = '50' } = req.query;
 
             const filters: any = {
@@ -1296,26 +1295,8 @@ class SolariaDashboardServer {
             if (status) filters.status = status as string;
             if (priority) filters.priority = priority as string;
 
-            const projectsRaw = await projectsRepo.findAllProjects(filters);
-
-            // Enrich with task counts via Promise.all (SQL until tasksRepo supports aggregations)
-            const statsPromises = projectsRaw.map(async (project: any) => {
-                const [stats] = await this.db!.execute<RowDataPacket[]>(`
-                    SELECT
-                        COUNT(*) as task_count,
-                        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
-                    FROM tasks WHERE project_id = ?
-                `, [project.id]);
-
-                const stat = stats[0] as any;
-                return {
-                    ...project,
-                    task_count: stat?.task_count || 0,
-                    completed_tasks: stat?.completed_tasks || 0
-                };
-            });
-
-            const projects = await Promise.all(statsPromises);
+            const result = await projectsRepo.findAllProjectsWithStats(filters);
+            const projects = (result[0] as unknown as RowDataPacket[]);
 
             res.json({ projects, count: projects.length });
         } catch (error) {
