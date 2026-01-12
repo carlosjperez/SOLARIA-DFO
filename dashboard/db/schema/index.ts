@@ -39,3 +39,9 @@ export * from './agent-execution.js';
 
 // GitHub Workflows (workflows, runs, task links)
 export * from './github-workflows.js';
+
+// Reserved Project Codes
+export * from './reserved-project-codes.js';
+
+// Inline Documents (markdown documents with versioning)
+export * from './inline-documents.js';
