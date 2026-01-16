@@ -11,17 +11,12 @@
 
 import { get_context_tool } from './src/endpoints/get-context.js';
 import { run_code_tool } from './src/endpoints/run-code.js';
+import { set_project_context_tool } from './src/endpoints/set-project-context.js';
 
 export const toolDefinitions = [
-  // SKETCH PATTERN CORE TOOL 1: get_context
-  // Unified endpoint to get system state in a single call
-  // Replaces: get_dashboard_overview, get_stats, get_health, list_projects, etc.
   get_context_tool,
-
-  // SKETCH PATTERN CORE TOOL 2: run_code
-  // Executes arbitrary JavaScript/TypeScript code in secure sandbox with DFO API access
-  // Replaces: All 70+ old tools - users write custom scripts instead
   run_code_tool,
+  set_project_context_tool,
 ];
 
 export const resourceDefinitions = [

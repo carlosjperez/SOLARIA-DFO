@@ -18,6 +18,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import 'dotenv/config';
 import { z } from 'zod';
 
@@ -979,29 +980,175 @@ class SolariaDashboardServer {
 
     private async healthCheck(_req: Request, res: Response): Promise<void> {
         try {
-            // ✅ MIGRATED TO DRIZZLE ORM - Using db.execute for health check
-            // Check database connectivity
-            if (this.db) {
-                await this.db.execute('SELECT 1');
+            const checks: {
+                database: { status: string; latency_ms?: number; error?: string };
+                redis: { status: string; latency_ms?: number; error?: string };
+                filesystem: { free_space_gb: number; used_percent: number; path: string };
+                memory: { used_percent: number; available_mb: number; total_mb: number };
+                cpu: { load_avg: number[]; usage_percent?: number };
+                uptime: { seconds: number; human: string };
+            } = {
+                database: { status: 'disconnected' },
+                redis: { status: 'disconnected' },
+                filesystem: { free_space_gb: 0, used_percent: 0, path: '/' },
+                memory: { used_percent: 0, available_mb: 0, total_mb: 0 },
+                cpu: { load_avg: [0, 0, 0] },
+                uptime: { seconds: process.uptime(), human: '' }
+            };
+
+            let unhealthyCount = 0;
+            let degradedCount = 0;
+
+            const dbStart = Date.now();
+            try {
+                if (this.db) {
+                    await this.db.execute('SELECT 1');
+                    checks.database = {
+                        status: 'healthy',
+                        latency_ms: Date.now() - dbStart
+                    };
+                } else {
+                    checks.database = { status: 'disconnected', error: 'No database connection' };
+                    unhealthyCount++;
+                }
+            } catch (dbError) {
+                checks.database = {
+                    status: 'unhealthy',
+                    error: dbError instanceof Error ? dbError.message : 'Unknown database error'
+                };
+                unhealthyCount++;
             }
 
-            // Check Redis (via AgentExecutionService)
-            const redisStatus = this.agentExecutionService ? 'connected' : 'disconnected';
+            const redisStart = Date.now();
+            try {
+                if (this.agentExecutionService && this.redis) {
+                    await this.redis.ping();
+                    checks.redis = {
+                        status: 'healthy',
+                        latency_ms: Date.now() - redisStart
+                    };
+                } else if (!this.agentExecutionService) {
+                    checks.redis = { status: 'disconnected', error: 'AgentExecutionService not initialized' };
+                    degradedCount++;
+                } else {
+                    checks.redis = { status: 'disconnected', error: 'No Redis connection' };
+                    unhealthyCount++;
+                }
+            } catch (redisError) {
+                checks.redis = {
+                    status: 'unhealthy',
+                    error: redisError instanceof Error ? redisError.message : 'Unknown Redis error'
+                };
+                unhealthyCount++;
+            }
+
+            try {
+                const stats = fs.statSync('/');
+                const space = process.platform === 'win32' ? process.env.SystemDrive || 'C:' : '/';
+                try {
+                    const { execSync } = await import('child_process');
+                    const dfOutput = execSync('df -k /').toString();
+                    const lines = dfOutput.split('\n');
+                    if (lines.length > 1) {
+                        const parts = lines[1].split(/\s+/).filter(p => p);
+                        if (parts.length >= 4) {
+                            const totalKb = parseInt(parts[1], 10);
+                            const usedKb = parseInt(parts[2], 10);
+                            const freeKb = totalKb - usedKb;
+                            checks.filesystem = {
+                                free_space_gb: Number((freeKb / 1024 / 1024).toFixed(2)),
+                                used_percent: Number(((usedKb / totalKb) * 100).toFixed(2)),
+                                path: '/'
+                            };
+                        }
+                    }
+                } catch {
+                    checks.filesystem = {
+                        free_space_gb: 0,
+                        used_percent: 0,
+                        path: '/'
+                    };
+                }
+            } catch (fsError) {
+                checks.filesystem = {
+                    free_space_gb: 0,
+                    used_percent: 100,
+                    path: '/'
+                };
+                degradedCount++;
+            }
+
+            const totalMem = os.totalmem();
+            const freeMem = os.freemem();
+            const usedMem = totalMem - freeMem;
+            checks.memory = {
+                used_percent: Number(((usedMem / totalMem) * 100).toFixed(2)),
+                available_mb: Number((freeMem / 1024 / 1024).toFixed(2)),
+                total_mb: Number((totalMem / 1024 / 1024).toFixed(2))
+            };
+
+            const cpus = os.cpus();
+            const loadAvg = os.loadavg();
+            checks.cpu = {
+                load_avg: [Number(loadAvg[0].toFixed(2)), Number(loadAvg[1].toFixed(2)), Number(loadAvg[2].toFixed(2))],
+                usage_percent: undefined
+            };
+            
+            try {
+                const cpuTimes = cpus.reduce((acc, cpu) => ({
+                    user: acc.user + cpu.times.user,
+                    nice: acc.nice + cpu.times.nice,
+                    sys: acc.sys + cpu.times.sys,
+                    idle: acc.idle + cpu.times.idle,
+                    irq: acc.irq + cpu.times.irq
+                }), { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 });
+                
+                const totalCpuTime = cpuTimes.user + cpuTimes.nice + cpuTimes.sys + cpuTimes.idle + cpuTimes.irq;
+                const cpuUsage = totalCpuTime > 0 ? (((totalCpuTime - cpuTimes.idle) / totalCpuTime) * 100) : 0;
+                checks.cpu.usage_percent = Number(cpuUsage.toFixed(2));
+            } catch {
+            }
+
+            const uptimeSeconds = process.uptime();
+            const uptimeHours = Math.floor(uptimeSeconds / 3600);
+            const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
+            const uptimeDays = Math.floor(uptimeHours / 24);
+            const hours = uptimeHours % 24;
+            
+            let humanUptime = '';
+            if (uptimeDays > 0) {
+                humanUptime = `${uptimeDays}d ${hours}h ${uptimeMinutes}m`;
+            } else if (uptimeHours > 0) {
+                humanUptime = `${uptimeHours}h ${uptimeMinutes}m`;
+            } else {
+                humanUptime = `${uptimeMinutes}m`;
+            }
+            
+            checks.uptime = {
+                seconds: Math.floor(uptimeSeconds),
+                human: humanUptime
+            };
+
+            let overallStatus: 'healthy' | 'degraded' | 'unhealthy';
+            if (unhealthyCount > 0) {
+                overallStatus = 'unhealthy';
+            } else if (degradedCount > 0 || checks.memory.used_percent > 90 || checks.filesystem.used_percent > 90) {
+                overallStatus = 'degraded';
+            } else {
+                overallStatus = 'healthy';
+            }
 
             res.json({
-                status: 'healthy',
-                database: this.db ? 'connected' : 'disconnected',
-                redis: redisStatus,
-                agentExecution: this.agentExecutionService ? 'available' : 'unavailable',
+                status: overallStatus,
                 timestamp: new Date().toISOString(),
-                uptime: process.uptime()
+                checks,
+                agentExecution: this.agentExecutionService ? 'available' : 'unavailable'
             });
         } catch (error) {
             res.status(503).json({
                 status: 'unhealthy',
-                database: 'error',
-                redis: 'unknown',
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                error: error instanceof Error ? error.message : 'Unknown health check error'
             });
         }
     }

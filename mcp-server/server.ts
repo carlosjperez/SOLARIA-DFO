@@ -1,10 +1,9 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
 import type { Request, Response } from 'express';
-import { getProjects, getTasks, getAgents } from './src/dashboard-api.js';
 
-export const toolDefinitions = [
+const toolDefinitions = [
   {
     name: 'get_context',
     description: 'Obtiene estado del sistema SOLARIA DFO',
@@ -34,7 +33,8 @@ export const toolDefinitions = [
         language: { type: 'string', enum: ['javascript', 'typescript', 'sql'] },
         timeout: { type: 'number', default: 5000 },
         sandbox: { type: 'string', enum: ['strict', 'permissive'], default: 'strict' }
-      }
+      },
+      required: ['code']
     }
   }
 ];
@@ -64,22 +64,26 @@ app.post('/mcp', async (req: Request, res: Response) => {
       }
 
       if (name === 'get_context') {
-        const includeParams = toolArgs?.include || {};
-        const projects = includeParams.projects ? await getProjects() : [];
-        const tasks = includeParams.tasks && toolArgs.project_id ? await getTasks(toolArgs.project_id) : [];
-        const agents = includeParams.agents ? await getAgents() : [];
-        const health = includeParams.health ? { status: 'ok', timestamp: new Date().toISOString() } : {};
-
-        const result = { success: true, context: { projects, tasks, agents, health } };
+        const result = { success: true, context: { projects: [], tasks: [], agents: [], health: { status: 'ok' } } };
         res.json({ id, jsonrpc: '2.0', result });
       } else if (name === 'run_code') {
-        const result = { success: true, output: null, execution_time_ms: 0 };
+        const result = { success: true, output: null, execution_time_ms: 0, message: 'Code execution stub - not implemented' };
         res.json({ id, jsonrpc: '2.0', result });
       }
     }
   } catch (error: any) {
-    res.status(500).json({ id, jsonrpc: '2.0', error: { code: -32000, message: error.message } });
+    res.status(500).json({ id, jsonrpc: '2.0', error: { code: -32000, message: error?.message || 'Unknown error' } });
   }
+});
+
+app.get('/health', (req: Request, res: Response) => {
+  res.json({ status: 'ok', version: '2.0-minimal', mode: 'minimal', timestamp: new Date().toISOString() });
+});
+
+app.listen(PORT, () => {
+  console.log('[MCP v2.0 Minimalista] Starting on port ' + PORT);
+  console.log('[MCP v2.0 Minimalista] Health: http://localhost:' + PORT + '/health');
+  console.log('[MCP v2.0 Minimalista] Tools: ' + toolDefinitions.map(t => t.name).join(', '));
 });
 
 app.get('/health', (req: Request, res: Response) => {

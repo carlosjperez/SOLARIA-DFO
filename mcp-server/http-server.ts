@@ -60,11 +60,20 @@ interface MCPRequestBody extends JSONRPCRequest {
 }
 
 interface HealthResponse {
-  status: "ok" | "degraded" | "error";
+  status: "healthy" | "degraded" | "unhealthy" | "ok" | "error";
   timestamp: string;
   dashboard?: string;
   sessions?: number;
+  checks?: {
+    database: { status: string; latency_ms?: number; error?: string };
+    redis: { status: string; latency_ms?: number; error?: string };
+    filesystem: { free_space_gb: number; used_percent: number; path: string };
+    memory: { used_percent: number; available_mb: number; total_mb: number };
+    cpu: { load_avg: number[]; usage_percent?: number };
+    uptime: { seconds: number; human: string };
+  };
   error?: string;
+  agentExecution?: string;
 }
 
 interface ServerInfoResponse {
@@ -302,19 +311,31 @@ app.get("/", (_req: Request, res: Response<ServerInfoResponse>) => {
  */
 async function healthHandler(_req: Request, res: Response<HealthResponse>): Promise<void> {
   try {
-    // Check dashboard connectivity
     const response = await fetch(`${DASHBOARD_API}/health`);
     const dashboardOk = response.ok;
-
-    res.json({
-      status: dashboardOk ? "ok" : "degraded",
-      timestamp: new Date().toISOString(),
-      dashboard: dashboardOk ? "connected" : "disconnected",
-      sessions: sessions.size,
-    });
+    
+    if (dashboardOk) {
+      const dashboardHealth = await response.json();
+      
+      res.json({
+        status: dashboardHealth.status || "ok",
+        timestamp: dashboardHealth.timestamp || new Date().toISOString(),
+        dashboard: "connected",
+        sessions: sessions.size,
+        checks: dashboardHealth.checks,
+        agentExecution: dashboardHealth.agentExecution
+      });
+    } else {
+      res.json({
+        status: "degraded",
+        timestamp: new Date().toISOString(),
+        dashboard: "disconnected",
+        sessions: sessions.size,
+      });
+    }
   } catch (error) {
     res.status(503).json({
-      status: "error",
+      status: "unhealthy",
       error: error instanceof Error ? error.message : "Unknown error",
       timestamp: new Date().toISOString(),
     });
