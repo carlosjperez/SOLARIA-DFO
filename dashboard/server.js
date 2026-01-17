@@ -238,6 +238,7 @@ class SolariaDashboardServer {
         this.app.get('/api/dashboard/overview', this.getDashboardOverview.bind(this));
         this.app.get('/api/dashboard/metrics', this.getDashboardMetrics.bind(this));
         this.app.get('/api/dashboard/alerts', this.getDashboardAlerts.bind(this));
+        this.app.get('/api/stats', this.getStats.bind(this));
         this.app.get('/api/docs', this.getDocs.bind(this));
         // Projects
         this.app.get('/api/projects', this.getProjects.bind(this));
@@ -578,6 +579,251 @@ class SolariaDashboardServer {
             });
         }
     }
+    // ========================================================================
+    // Stats Endpoint
+    // ========================================================================
+    async getStats(req, res) {
+        try {
+            const { project_id, sprint_id, date_from, date_to, format } = req.query;
+
+            const projectFilter = project_id ? `AND t.project_id = ${this.db.escape(project_id)}` : '';
+            const sprintFilter = sprint_id ? `AND t.sprint_id = ${this.db.escape(sprint_id)}` : '';
+            const dateFromFilter = date_from ? `AND t.created_at >= ${this.db.escape(date_from)}` : '';
+            const dateToFilter = date_to ? `AND t.created_at <= ${this.db.escape(date_to)}` : '';
+            const filters = `${projectFilter} ${sprintFilter} ${dateFromFilter} ${dateToFilter}`;
+
+            const [taskStats] = await this.db.execute(`
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN t.status = 'pending' THEN 1 ELSE 0 END) as pending,
+                    SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN t.status = 'blocked' THEN 1 ELSE 0 END) as blocked,
+                    SUM(CASE WHEN t.priority = 'critical' THEN 1 ELSE 0 END) as critical,
+                    SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as high,
+                    SUM(CASE WHEN t.priority = 'medium' THEN 1 ELSE 0 END) as medium,
+                    SUM(CASE WHEN t.priority = 'low' THEN 1 ELSE 0 END) as low
+                FROM tasks t
+                WHERE 1=1 ${filters}
+            `);
+
+            const total = taskStats[0].total || 0;
+            const completionRate = total > 0 ? Math.round((taskStats[0].completed / total) * 100) : 0;
+
+            const [velocityData] = await this.db.execute(`
+                SELECT
+                    COALESCE(SUM(t.estimated_hours), 0) as current_sprint_points
+                FROM tasks t
+                JOIN sprints s ON t.sprint_id = s.id
+                WHERE t.status = 'completed'
+                    AND (s.status = 'active' OR ${sprint_id ? `s.id = ${this.db.escape(sprint_id)}` : '1=1'})
+                    ${projectFilter}
+            `);
+
+            const [velocityHistory] = await this.db.execute(`
+                SELECT
+                    s.id as sprint_id,
+                    s.sprint_number,
+                    COALESCE(SUM(t.estimated_hours), 0) as points
+                FROM sprints s
+                LEFT JOIN tasks t ON t.sprint_id = s.id AND t.status = 'completed'
+                WHERE s.status IN ('completed', 'active')
+                    ${project_id ? `AND s.project_id = ${this.db.escape(project_id)}` : ''}
+                GROUP BY s.id, s.sprint_number
+                ORDER BY s.end_date DESC
+                LIMIT 5
+            `);
+
+            const historyPoints = velocityHistory.map(h => h.points);
+            const averageVelocity = historyPoints.length > 0
+                ? Math.round(historyPoints.reduce((a, b) => a + b, 0) / historyPoints.length)
+                : 0;
+
+            let velocityTrend = 'stable';
+            if (historyPoints.length >= 2) {
+                const diff = historyPoints[0] - historyPoints[1];
+                const threshold = averageVelocity * 0.1;
+                if (diff > threshold) velocityTrend = 'up';
+                else if (diff < -threshold) velocityTrend = 'down';
+            }
+
+            const [agentWorkload] = await this.db.execute(`
+                SELECT
+                    aa.id as agent_id,
+                    aa.name as agent_name,
+                    aa.status as agent_status,
+                    COUNT(t.id) as tasks_assigned,
+                    SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as tasks_completed
+                FROM ai_agents aa
+                LEFT JOIN tasks t ON t.assigned_agent_id = aa.id ${projectFilter}
+                GROUP BY aa.id, aa.name, aa.status
+            `);
+
+            const workload = agentWorkload.map(agent => ({
+                agent_id: agent.agent_id,
+                agent_name: agent.agent_name,
+                tasks_assigned: agent.tasks_assigned || 0,
+                tasks_completed: agent.tasks_completed || 0,
+                efficiency: agent.tasks_assigned > 0
+                    ? Math.round((agent.tasks_completed / agent.tasks_assigned) * 100)
+                    : 0
+            }));
+
+            const activeAgents = workload.filter(a => a.agent_status === 'active').length;
+
+            const tasksByStatus = {
+                pending: taskStats[0].pending || 0,
+                in_progress: taskStats[0].in_progress || 0,
+                completed: taskStats[0].completed || 0,
+                blocked: taskStats[0].blocked || 0
+            };
+
+            const completionScore = (tasksByStatus.completed / total) * 100 * 0.30;
+            const blockedRatio = tasksByStatus.blocked / total;
+            const blockedScore = (1 - blockedRatio) * 100 * 0.20;
+            const velocityScore = velocityTrend === 'up' ? 80 * 0.20 :
+                             velocityTrend === 'down' ? 30 * 0.20 : 50 * 0.20;
+            const inProgressRatio = tasksByStatus.in_progress / total;
+            const utilizationScore = Math.min(inProgressRatio * 2, 1) * 100 * 0.15;
+            const pendingRatio = tasksByStatus.pending / total;
+            const progressScore = (1 - pendingRatio) * 100 * 0.15;
+
+            const healthScore = Math.round(
+                completionScore + blockedScore + velocityScore + utilizationScore + progressScore
+            );
+
+            let projectName = undefined;
+            if (project_id) {
+                const [project] = await this.db.execute('SELECT name FROM projects WHERE id = ?', [project_id]);
+                projectName = project[0]?.name;
+            }
+
+            const response = {
+                project_id: project_id ? parseInt(project_id) : undefined,
+                project_name: projectName,
+                period: {
+                    from: date_from || 'all time',
+                    to: date_to || new Date().toISOString()
+                },
+                tasks: {
+                    total,
+                    by_status: {
+                        pending: tasksByStatus.pending,
+                        in_progress: tasksByStatus.in_progress,
+                        completed: tasksByStatus.completed,
+                        blocked: tasksByStatus.blocked
+                    },
+                    by_priority: {
+                        critical: taskStats[0].critical || 0,
+                        high: taskStats[0].high || 0,
+                        medium: taskStats[0].medium || 0,
+                        low: taskStats[0].low || 0
+                    },
+                    completion_rate: completionRate
+                },
+                velocity: {
+                    current_sprint: velocityData[0]?.current_sprint_points || 0,
+                    average: averageVelocity,
+                    trend: velocityTrend,
+                    history: velocityHistory
+                },
+                agents: {
+                    total: workload.length,
+                    active: activeAgents,
+                    workload
+                },
+                health_score: total === 0 ? 100 : healthScore,
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    version: '1.0.0'
+                }
+            };
+
+            if (format === 'human') {
+                const formatted = this.formatStatsHuman(response);
+                res.json({
+                    success: true,
+                    data: response,
+                    formatted,
+                    metadata: response.metadata
+                });
+            } else {
+                res.json({
+                    success: true,
+                    data: response,
+                    metadata: response.metadata
+                });
+            }
+        }
+        catch (error) {
+            console.error('Error in getStats:', error);
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to fetch stats'
+            });
+        }
+    }
+
+    formatStatsHuman(stats) {
+        const { tasks, velocity, agents, health_score } = stats;
+
+        const createProgressBar = (value, max = 100) => {
+            const percentage = Math.min((value / max) * 100, 100);
+            const filled = Math.round(percentage / 5);
+            const bar = '[' + '█'.repeat(filled) + ' '.repeat(20 - filled) + ']';
+            return `${bar} ${percentage.toFixed(0)}%`;
+        };
+
+        const priorityIcons = {
+            critical: '🔴',
+            high: '🟠',
+            medium: '🟡',
+            low: '🔵'
+        };
+
+        const trendArrows = {
+            up: '↑',
+            down: '↓',
+            stable: '→'
+        };
+
+        return `
+╔═════════════════════════════════════════════════════════════╗
+║                    📊 SOLARIA DFO - STATISTICS                  ║
+╚═════════════════════════════════════════════════════════════╝
+
+📋 Task Distribution
+  Total:        ${tasks.total}
+  Pending:      ${tasks.by_status.pending}  ${createProgressBar(tasks.by_status.pending, tasks.total || 1)}
+  In Progress:  ${tasks.by_status.in_progress}  ${createProgressBar(tasks.by_status.in_progress, tasks.total || 1)}
+  Completed:    ${tasks.by_status.completed}  ${createProgressBar(tasks.by_status.completed, tasks.total || 1)}
+  Blocked:      ${tasks.by_status.blocked}  ${createProgressBar(tasks.by_status.blocked, tasks.total || 1)}
+
+  Completion Rate: ${tasks.completion_rate}%
+
+🎯 Priority Distribution
+  ${priorityIcons.critical} Critical: ${tasks.by_priority.critical}
+  ${priorityIcons.high} High:     ${tasks.by_priority.high}
+  ${priorityIcons.medium} Medium:   ${tasks.by_priority.medium}
+  ${priorityIcons.low} Low:      ${tasks.by_priority.low}
+
+ ⚡ Velocity
+  Current Sprint: ${velocity.current_sprint} points
+  Average:        ${velocity.average} points
+  Trend:          ${trendArrows[velocity.trend]}
+
+👥 Agents
+  Total:    ${agents.total}
+  Active:    ${agents.active}
+
+🏥 Health Score: ${health_score}/100
+
+${'═'.repeat(63)}
+Generated at: ${new Date().toISOString()}
+        `.trim();
+    }
+
     // ========================================================================
     // Helper Methods
     // ========================================================================
