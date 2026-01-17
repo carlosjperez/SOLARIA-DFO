@@ -1,0 +1,120 @@
+# Task US-003: Implement Stats Dashboard Endpoint
+
+## Contexto
+
+You are working on the SOLARIA-DFO v4.0 project.
+- Project root: /Users/carlosjperez/Documents/GitHub/SOLARIA-DFO
+- Backend framework: Node.js + Express
+- Database: MariaDB + Drizzle ORM
+
+## Objetivo
+
+Implementar endpoint `/stats` para métricas agregadas del sistema que permita decisiones basadas en datos.
+
+## Requerimientos Técnicos
+
+1. **Crear archivo**: `mcp-server/src/endpoints/stats.ts`
+2. **Endpoint**: `/api/stats`
+3. **Método**: GET
+4. **Filtros opcionales**:
+   - `project_id` (number) - Filtrar por proyecto específico
+   - `sprint_id` (number) - Filtrar por sprint
+   - `date_from` (string ISO 8601) - Fecha inicio rango
+   - `date_to` (string ISO 8601) - Fecha fin rango
+   - `format` ('json' | 'human') - Formato de respuesta
+
+5. **Estructura de respuesta JSON**:
+
+```json
+{
+  "tasks": {
+    "total": number,
+    "by_status": {
+      "pending": number,
+      "in_progress": number,
+      "completed": number
+    },
+    "by_priority": {
+      "critical": number,
+      "high": number,
+      "medium": number,
+      "low": number
+    },
+    "avg_completion_hours": number
+  },
+  "projects": {
+    "active": number,
+    "completed": number,
+    "archived": number,
+    "total_budget": string
+  },
+  "agents": {
+    "active": number,
+    "total_tasks_assigned": number,
+    "avg_tasks_per_agent": number
+  },
+  "velocity": {
+    "last_7_days": number,
+    "last_30_days": number,
+    "trend": "increasing" | "stable" | "decreasing"
+  },
+  "sprints": {
+    "active": {
+      "id": number,
+      "name": string,
+      "progress_percent": number
+    }
+  }
+}
+```
+
+6. **Estructura de respuesta Human-Readable**:
+   - Usar ascii art para métricas
+   - Colores para diferentes secciones
+   - Formato tabular cuando aplique
+
+## Dependencias
+
+- Base de datos: Tablas `tasks`, `projects`, `agents`, `sprints`
+- Drizzle ORM: `db/schema/`
+- Express: `server.ts`
+- Utilidades: `utils/formatters.ts`
+
+## Validaciones
+
+- Validar tipos de parámetros con Zod
+- Manejo de errores contry/catch
+- Códigos HTTP apropiados (200, 400, 500)
+
+## Tests Requeridos
+
+1. GET /api/stats sin filtros → Todas las métricas
+2. GET /api/stats?project_id=2 → Métricas de proyecto 2
+3. GET /api/stats?sprint_id=5 → Métricas de sprint 5
+4. GET /api/stats?date_from=2026-01-01&date_to=2026-01-31 → Métricas del rango
+5. GET /api/stats?format=human → Formato legible
+6. Filtros inválidos → 400 Bad Request
+7. Error de base de datos → 500 Internal Server Error
+
+## Implementación
+
+1. Crear esquema Zod para validación de query params
+2. Crear función helper `formatStats()` en `utils/formatters.ts`
+3. Implementar queries a DB con Drizzle
+4. Calcular agregaciones (COUNT, AVG, GROUP BY)
+5. Detectar tendencias de velocity
+6. Formatear respuesta según parámetro `format`
+
+## Criterios de Aceptación
+
+- ✅ Endpoint returns comprehensive statistics
+- ✅ Supports filtering by project_id, sprint_id, date range
+- ✅ Returns task, project, agent, velocity, and sprint metrics
+- ✅ Supports JSON and human-readable formats
+- ✅ Tests covering all filter combinations
+
+## Archivos a Crear/Modificar
+
+- ✅ `mcp-server/src/endpoints/stats.ts` (NEW)
+- ✅ `utils/formatters.ts` (ADD formatStats function)
+- ✅ `mcp-server/src/__tests__/stats.test.ts` (NEW)

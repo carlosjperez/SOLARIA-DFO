@@ -342,10 +342,17 @@ Tarea creada en proyecto PRILABSA Website (aislado de otros proyectos)
 
 ### Gestión de Tareas
 - `list_tasks` - Listar tareas (filtrable por proyecto, estado, prioridad)
-- `get_ready_tasks` - **🆕 [DFN-004]** Tareas listas para trabajar (sin bloqueadores, con scoring inteligente)
-- `create_task` - Crear nueva tarea
-- `update_task` - Actualizar tarea
-- `complete_task` - Marcar tarea como completada
+  - `get_ready_tasks` - **🆕 [DFN-004]** Tareas listas para trabajar (sin bloqueadores, con scoring inteligente)
+  - `create_task` - Crear nueva tarea
+  - `update_task` - Actualizar tarea
+  - `complete_task` - Marcar tarea como completada
+  - `get_tags` - **🆕 [DFN-036]** Listar todos los tags disponibles
+  - `create_tag` - Crear nuevo tag con validación
+  - `update_tag` - Actualizar tag existente
+  - `delete_tag` - Eliminar tag (protección para tags de sistema)
+  - `add_tag_to_task` - Asignar tag a tarea
+  - `remove_tag_from_task` - Remover tag de tarea
+  - `replace_task_tags` - Reemplazar todos los tags de una tarea
 
 ### Agentes IA
 - `list_agents` - Listar agentes SOLARIA

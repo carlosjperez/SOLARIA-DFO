@@ -1,0 +1,510 @@
+{
+  "name": "SOLARIA Digital Field Operations - Complete Implementation Plan",
+  "description": "Complete implementation of SOLARIA Digital Field Operations v4.0 - Project management system with executive supervision and AI agent integration via MCP. Total effort: 229h across 4 phases.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Fix MCP Server - DB + set_project_context",
+      "description": "Fix MCP server to function correctly so that AI agents can establish project context and execute operations reliably.",
+      "passes": true,
+      "priority": "critical",
+      "effort_hours": 24,
+      "epic": "PHASE-1",
+      "acceptance_criteria": [
+        "MCP server returns healthy status",
+        "set_project_context endpoint operates without errors",
+        "Database connection is stable",
+        "Integration tests pass",
+        "Health check endpoint returns valid JSON"
+      ],
+      "blocks": ["US-002", "US-003", "US-004"]
+    },
+    {
+      "id": "US-002",
+      "title": "Implement Health Check Endpoint",
+      "description": "Implement /health endpoint to monitor infrastructure status for proactive issue identification.",
+      "passes": true,
+      "priority": "high",
+      "effort_hours": 4,
+      "epic": "PHASE-1",
+      "acceptance_criteria": [
+        "Endpoint returns health status for all services",
+        "Includes database, Redis, filesystem, memory, CPU, and uptime checks",
+        "Response includes latency metrics where applicable",
+        "Endpoint returns structured JSON",
+        "Tests covering all check scenarios"
+      ],
+      "depends_on": "US-001"
+    },
+    {
+      "id": "US-003",
+      "title": "Implement Stats Dashboard Endpoint",
+      "description": "Implement /stats endpoint for aggregated system metrics to enable data-driven decisions.",
+      "passes": false,
+      "priority": "high",
+      "effort_hours": 6,
+      "epic": "PHASE-1",
+      "acceptance_criteria": [
+        "Endpoint returns comprehensive statistics",
+        "Supports filtering by project_id, sprint_id, date range",
+        "Returns task, project, agent, velocity, and sprint metrics",
+        "Supports JSON and human-readable formats",
+        "Tests covering all filter combinations"
+      ],
+      "depends_on": "US-001"
+    },
+    {
+      "id": "US-004",
+      "title": "Fix Inline Documents Endpoint",
+      "description": "Fix inline documents endpoint to handle long documents correctly for reliable retrieval.",
+      "passes": false,
+      "priority": "high",
+      "effort_hours": 2,
+      "epic": "PHASE-1",
+      "acceptance_criteria": [
+        "Endpoint handles long documents without serialization errors",
+        "Strict input validation with Zod schemas",
+        "Consistent error handling",
+        "Support for both JSON and human-readable formats",
+        "Tests covering edge cases"
+      ],
+      "depends_on": "US-001"
+    },
+    {
+      "id": "US-005",
+      "title": "Add Task Codes to Notifications",
+      "description": "Add task codes (e.g., DFO-155) to notifications for quick identification and navigation.",
+      "passes": false,
+      "priority": "high",
+      "effort_hours": 2,
+      "epic": "PHASE-1",
+      "acceptance_criteria": [
+        "Socket.IO events include task_number and epic_number",
+        "ActivityFeed renders formatted task codes as clickable links",
+        "Types TypeScript updated with new fields",
+        "Tests verify notification formatting"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Standardize ProjectsPage with Metrics",
+      "description": "Standardize Projects page with consistent metrics and visual selectors.",
+      "passes": false,
+      "priority": "high",
+      "effort_hours": 3,
+      "epic": "PHASE-1",
+      "acceptance_criteria": [
+        "Projects page uses standard layout components",
+        "Consistent metrics display",
+        "Visual selectors for views (list/grid/kanban)",
+        "88% completion → 100% completion",
+        "Regression tests pass"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Design and Implement MCP v2.0 Architecture",
+      "description": "Design and implement MCP v2.0 using Sketch pattern to reduce complexity from 70+ tools to 2 main endpoints.",
+      "passes": false,
+      "priority": "critical",
+      "effort_hours": 8,
+      "epic": "PHASE-2",
+      "acceptance_criteria": [
+        "Design document for MCP v2.0 architecture",
+        "Branch feature/mcp-refactoring-v2 created",
+        "Full backup of current MCP server",
+        "Documentation of current tool behavior",
+        "Test suite for functional equivalence"
+      ],
+      "blocks": ["US-008", "US-009", "US-010"]
+    },
+    {
+      "id": "US-008",
+      "title": "Implement get_context Endpoint",
+      "description": "Implement get_context endpoint that returns complete system state in a single call.",
+      "passes": false,
+      "priority": "critical",
+      "effort_hours": 10,
+      "epic": "PHASE-2",
+      "acceptance_criteria": [
+        "Endpoint returns project, tasks, agents, stats, health, sprints, memories",
+        "Supports optional includes for each data type",
+        "Returns both JSON and human-readable formats",
+        "Validates input parameters",
+        "Tests covering all include combinations"
+      ],
+      "depends_on": "US-007"
+    },
+    {
+      "id": "US-009",
+      "title": "Implement run_code Endpoint with Sandbox",
+      "description": "Implement run_code endpoint that executes JavaScript/TypeScript code in a secure sandbox.",
+      "passes": false,
+      "priority": "critical",
+      "effort_hours": 10,
+      "epic": "PHASE-2",
+      "acceptance_criteria": [
+        "Endpoint executes arbitrary JS/TS code",
+        "Secure sandbox using vm2",
+        "Timeout configured (max 30s)",
+        "Provides apiCall helper with JWT auth",
+        "Includes utility functions",
+        "Tests covering code execution, errors, timeouts, and security"
+      ],
+      "depends_on": "US-007"
+    },
+    {
+      "id": "US-010",
+      "title": "Migrate All MCP Tools to run_code Scripts",
+      "description": "Migrate all 70+ MCP tools to run_code scripts to maintain a minimal codebase.",
+      "passes": false,
+      "priority": "high",
+      "effort_hours": 12,
+      "epic": "PHASE-2",
+      "acceptance_criteria": [
+        "All project operations use run_code",
+        "All task operations use run_code",
+        "All memory operations use run_code",
+        "All agent operations use run_code",
+        "Usage examples for each category",
+        "Functional equivalence tests pass"
+      ],
+      "depends_on": ["US-008", "US-009"]
+    },
+    {
+      "id": "US-011",
+      "title": "Deploy and Monitor MCP v2.0",
+      "description": "Deploy MCP v2.0 with dual operation for safe transition without downtime.",
+      "passes": false,
+      "priority": "high",
+      "effort_hours": 4,
+      "epic": "PHASE-2",
+      "acceptance_criteria": [
+        "MCP v2.0 deployed to staging",
+        "Dual operation (v1 + v2) for 48 hours",
+        "Metrics comparison (tokens, latency, errors)",
+        "Cut-over to v2.0 if metrics green",
+        "Lessons learned documented"
+      ],
+      "depends_on": "US-010"
+    },
+    {
+      "id": "US-012",
+      "title": "Configure Storybook",
+      "description": "Configure Storybook for isolated component development and documentation.",
+      "passes": false,
+      "priority": "high",
+      "effort_hours": 8,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Storybook with Vite + React + TS preset",
+        "Addons: a11y, viewport, controls",
+        "Stories for existing components",
+        "Props documentation and usage examples",
+        "Build configured for deployment"
+      ],
+      "blocks": ["US-013", "US-014", "US-015", "US-016"]
+    },
+    {
+      "id": "US-013",
+      "title": "Implement ContentGrid and ContentGroup Components",
+      "description": "Implement responsive layout components to eliminate grid code duplication.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 5,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "ContentGrid.tsx with columns, gap, loading, emptyState",
+        "ContentGroup.tsx with wrapper and optional title",
+        "Responsive behavior",
+        "Rendering and responsive tests",
+        "Storybook stories"
+      ],
+      "depends_on": "US-012"
+    },
+    {
+      "id": "US-014",
+      "title": "Implement SearchAndFilterBar Component",
+      "description": "Implement unified search and filter component to standardize UX across all listing pages.",
+      "passes": false,
+      "priority": "critical",
+      "effort_hours": 6,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Interface with SearchInput + multiple FilterDropdown",
+        "Composition pattern",
+        "Controlled/uncontrolled state management",
+        "Integration with design tokens",
+        "Exhaustive tests",
+        "Storybook with real usage examples"
+      ],
+      "depends_on": "US-012"
+    },
+    {
+      "id": "US-015",
+      "title": "Implement SortBar Component",
+      "description": "Implement visual sorting component for consistent sorting across pages.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 5,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Sorting criteria dropdown",
+        "Visual asc/desc toggle with icons",
+        "onChange callback",
+        "Complete accessibility",
+        "Interaction tests",
+        "Storybook stories"
+      ],
+      "depends_on": "US-012"
+    },
+    {
+      "id": "US-016",
+      "title": "Implement ViewSelector Component",
+      "description": "Implement view selector (Grid/List/Kanban) for consistent view switching.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 3,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Component with Lucide icons",
+        "Hover/focus/active states",
+        "localStorage persistence",
+        "View change tests",
+        "Storybook stories"
+      ],
+      "depends_on": "US-012"
+    },
+    {
+      "id": "US-017",
+      "title": "Refactor Office Page as Reference",
+      "description": "Refactor Office page first to serve as a template for other page migrations.",
+      "passes": false,
+      "priority": "critical",
+      "effort_hours": 6,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Office page migrated to StandardPageLayout",
+        "Integrated PageHeader, SearchAndFilterBar, ContentGrid",
+        "Filters migrated to FilterDropdown components",
+        "Comprehensive regression tests",
+        "Pattern documented in PATTERNS.md"
+      ],
+      "depends_on": ["US-013", "US-014", "US-015", "US-016"],
+      "blocks": ["US-018", "US-019", "US-020"]
+    },
+    {
+      "id": "US-018",
+      "title": "Refactor Businesses Page",
+      "description": "Refactor Businesses page following Office page pattern.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 5,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Follows pattern established by Office page",
+        "Custom components replaced with standard ones",
+        "Filters, search, and sorting verified",
+        "Regression tests pass",
+        "Code review comparing with Office"
+      ],
+      "depends_on": "US-017"
+    },
+    {
+      "id": "US-019",
+      "title": "Refactor Memories Page",
+      "description": "Refactor Memories page with special attention to semantic search and tags.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 5,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Follows migration pattern",
+        "Semantic search and tags properly handled",
+        "Boost system and related memories verified",
+        "Full-text and vector search tests",
+        "Regression tests pass"
+      ],
+      "depends_on": "US-017"
+    },
+    {
+      "id": "US-020",
+      "title": "Configure Visual Regression Tests",
+      "description": "Configure visual regression tests to prevent UI regressions in page migrations.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 4,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Percy.io or Chromatic configured",
+        "Snapshots for Office, Businesses, Memories pages",
+        "States captured: empty, loading, with data, active filters",
+        "Integrated in CI/CD",
+        "Baseline established for comparisons"
+      ],
+      "depends_on": ["US-017", "US-018", "US-019"]
+    },
+    {
+      "id": "US-021",
+      "title": "Refactor Projects Page",
+      "description": "Refactor Projects page (most used) for consistent and performant experience.",
+      "passes": false,
+      "priority": "critical",
+      "effort_hours": 8,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Complex filter logic migrated to standard components",
+        "Creation/editing modals preserved",
+        "Navigation to ProjectDetailPage maintained",
+        "Exhaustive multiple filter tests",
+        "Performance testing for large lists"
+      ],
+      "depends_on": ["US-013", "US-014", "US-015", "US-016"]
+    },
+    {
+      "id": "US-022",
+      "title": "Refactor Infrastructure Page",
+      "description": "Refactor Infrastructure page for monitoring health checks, connections, and system status.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 6,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Migrated to standard components",
+        "Health check functionality preserved",
+        "Real-time status indicators maintained",
+        "Connection and monitoring tests",
+        "Regression tests pass"
+      ],
+      "depends_on": ["US-013", "US-014", "US-015", "US-016"]
+    },
+    {
+      "id": "US-023",
+      "title": "Refactor Archived Projects Page",
+      "description": "Refactor Archived Projects page for efficient archive management.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 5,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Follows established pattern",
+        "Archive search functional",
+        "Restore functionality verified",
+        "Archive date filters working",
+        "Archive/restore tests pass"
+      ],
+      "depends_on": ["US-013", "US-014", "US-015", "US-016"]
+    },
+    {
+      "id": "US-024",
+      "title": "Conduct Accessibility Audit",
+      "description": "Conduct WCAG 2.1 AA compliance audit on all migrated pages.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 6,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "axe DevTools run on all pages",
+        "Lighthouse accessibility audit completed",
+        "ARIA labels and keyboard navigation verified",
+        "Screen reader testing",
+        "All issues fixed",
+        "Accessibility standards documented"
+      ],
+      "depends_on": ["US-017", "US-018", "US-019", "US-021", "US-022", "US-023"]
+    },
+    {
+      "id": "US-025",
+      "title": "Implement Integration Tests",
+      "description": "Implement integration tests for critical business flows.",
+      "passes": false,
+      "priority": "medium",
+      "effort_hours": 8,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Test suite with React Testing Library",
+        "Flows: create project → edit → archive → restore",
+        "Multiple simultaneous filter tests",
+        "Page navigation tests",
+        "Integrated in CI/CD"
+      ],
+      "depends_on": ["US-017", "US-018", "US-019", "US-021", "US-022", "US-023"]
+    },
+    {
+      "id": "US-026",
+      "title": "Refactor Dashboard Page",
+      "description": "Refactor main Dashboard page with stats, charts, and real-time updates.",
+      "passes": false,
+      "priority": "critical",
+      "effort_hours": 10,
+      "epic": "PHASE-3",
+      "acceptance_criteria": [
+        "Exhaustive analysis of current Dashboard",
+        "Section-by-section incremental migration",
+        "Real-time functionality (WebSocket) preserved",
+        "Stats, charts, activity feed migrated",
+        "Comprehensive tests for each section",
+        "Performance testing (no regression)"
+      ],
+      "depends_on": ["US-013", "US-014", "US-015", "US-016", "US-017", "US-018", "US-019", "US-021", "US-022", "US-023"]
+    },
+    {
+      "id": "US-027",
+      "title": "Complete Final Polish and Launch Preparation",
+      "description": "Complete system production-ready with security, documentation, monitoring, and QA.",
+      "passes": false,
+      "priority": "high",
+      "effort_hours": 26,
+      "epic": "PHASE-4",
+      "acceptance_criteria": [
+        "Security Audit: OWASP Top 10 review, input sanitization, JWT verification, rate limiting, RBAC review, penetration testing, all vulnerabilities fixed",
+        "Final Documentation: API docs, user guide, MCP guide, troubleshooting guide, architecture overview, deployment guide, onboarding guide",
+        "Performance Optimization: Lighthouse audit, bundle optimization (<500KB), code splitting, lazy loading, memoization, virtualization, score >90",
+        "Load Testing: k6/Artillery configured, concurrent user tests, bottleneck identification, query optimization, caching, limits documented",
+        "Backup & DR Plan: Automated daily backups, offsite storage (S3), config backups, restore procedure, testing, RPO/RTO documented",
+        "Monitoring & Alerting: Grafana dashboards, alerts (Slack/PagerDuty), error monitoring (Sentry), uptime monitoring, APM, centralized logging, thresholds documented",
+        "Final QA & UAT: Manual QA, stakeholder UAT, feedback collection, issue fixes, all tests passing, metrics verified, project sign-off"
+      ],
+      "depends_on": ["US-012", "US-013", "US-014", "US-015", "US-016", "US-017", "US-018", "US-019", "US-020", "US-021", "US-022", "US-023", "US-024", "US-025", "US-026"]
+    }
+  ],
+  "metadata": {
+    "updatedAt": "2026-01-17T08:00:00.000Z",
+    "totalTasks": 27,
+    "totalEffortHours": 229,
+    "estimatedWeeks": 15,
+    "completionPercentage": 7.4,
+    "epics": [
+      {
+        "id": "PHASE-1",
+        "title": "PHASE 1: Critical Fixes",
+        "description": "Fix MCP server and complete Sprint 1 (41h)",
+        "effort_hours": 41,
+        "priority": "critical"
+      },
+      {
+        "id": "PHASE-2",
+        "title": "PHASE 2: MCP Refactoring",
+        "description": "Implement MCP v2.0 with Sketch pattern (44h)",
+        "effort_hours": 44,
+        "priority": "critical"
+      },
+      {
+        "id": "PHASE-3",
+        "title": "PHASE 3: Frontend Migration",
+        "description": "Complete design system and migrate all pages (118h)",
+        "effort_hours": 118,
+        "priority": "high"
+      },
+      {
+        "id": "PHASE-4",
+        "title": "PHASE 4: Polish & Launch",
+        "description": "Security, docs, monitoring, and final QA (26h)",
+        "effort_hours": 26,
+        "priority": "high"
+      }
+    ],
+    "author": "Sisyphus (AI Architect)",
+    "version": "1.0"
+  }
+}

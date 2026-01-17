@@ -271,6 +271,93 @@ test.describe('C-Suite Dashboards', () => {
   });
 });
 
+test.describe('Stats API', () => {
+  test.beforeAll(async () => {
+    if (!authToken) {
+      apiContext = await playwrightRequest.newContext();
+      const loginRes = await apiContext.post(`${apiBase}/auth/login`, {
+        data: { userId: user, password: pass }
+      });
+      const body = await loginRes.json();
+      authToken = body.token;
+    }
+  });
+
+  test('get stats returns comprehensive statistics', async () => {
+    const res = await apiContext.get(`${apiBase}/stats`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('tasks');
+    expect(body).toHaveProperty('projects');
+    expect(body).toHaveProperty('agents');
+    expect(body).toHaveProperty('velocity');
+    expect(body).toHaveProperty('sprints');
+    expect(body).toHaveProperty('epics');
+    expect(body).toHaveProperty('generated_at');
+  });
+
+  test('get stats with project_id filter', async () => {
+    const res = await apiContext.get(`${apiBase}/stats?project_id=1`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('tasks');
+    expect(body).toHaveProperty('projects');
+  });
+
+  test('get stats with sprint_id filter', async () => {
+    const res = await apiContext.get(`${apiBase}/stats?sprint_id=1`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('tasks');
+  });
+
+  test('get stats with date range filter', async () => {
+    const res = await apiContext.get(`${apiBase}/stats?start_date=2024-01-01&end_date=2024-12-31`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('tasks');
+  });
+
+  test('get stats with multiple filters', async () => {
+    const res = await apiContext.get(`${apiBase}/stats?project_id=1&start_date=2024-01-01`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('tasks');
+    expect(body).toHaveProperty('projects');
+  });
+
+  test('get stats in human format', async () => {
+    const res = await apiContext.get(`${apiBase}/stats?format=human`, {
+      headers: { Authorization: `Bearer ${authToken}` }
+    });
+
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('stats');
+    expect(body).toHaveProperty('format', 'human');
+    expect(body).toHaveProperty('generated_at');
+    expect(typeof body.stats).toBe('string');
+    expect(body.stats).toContain('TASK METRICS');
+    expect(body.stats).toContain('PROJECT METRICS');
+    expect(body.stats).toContain('AGENT METRICS');
+  });
+});
+
 test.describe('Error Handling', () => {
   test('protected routes require authentication', async ({ request }) => {
     const res = await request.get(`${apiBase}/projects`);

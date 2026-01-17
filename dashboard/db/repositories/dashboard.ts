@@ -318,3 +318,145 @@ export async function getBusinessStats() {
         FROM businesses
     `);
 }
+
+export interface StatsFilters {
+    project_id?: number;
+    sprint_id?: number;
+    start_date?: string;
+    end_date?: string;
+}
+
+export async function getComprehensiveStats(filters: StatsFilters = {}) {
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (filters.project_id) {
+        conditions.push('t.project_id = ?');
+        params.push(filters.project_id);
+    }
+
+    if (filters.sprint_id) {
+        conditions.push('t.sprint_id = ?');
+        params.push(filters.sprint_id);
+    }
+
+    if (filters.start_date) {
+        conditions.push('DATE(t.created_at) >= ?');
+        params.push(filters.start_date);
+    }
+
+    if (filters.end_date) {
+        conditions.push('DATE(t.created_at) <= ?');
+        params.push(filters.end_date);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const whereClauseNoProject = conditions.filter(c => !c.startsWith('t.project_id')).length > 0
+        ? `WHERE ${conditions.filter(c => !c.startsWith('t.project_id')).join(' AND ')}`
+        : '';
+
+    const projectFilterWhere = filters.project_id ? `WHERE p.id = ${filters.project_id}` : '';
+
+    const [
+        [taskStats],
+        [projectStats],
+        [agentStats],
+        [velocityStats],
+        [sprintStats],
+        [epicStats]
+    ] = await Promise.all([
+        pool.execute(`
+            SELECT
+                COUNT(*) as total_tasks,
+                SUM(CASE WHEN t.status = 'pending' THEN 1 ELSE 0 END) as pending_tasks,
+                SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_tasks,
+                SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
+                SUM(CASE WHEN t.status = 'blocked' THEN 1 ELSE 0 END) as blocked_tasks,
+                SUM(CASE WHEN t.priority = 'critical' THEN 1 ELSE 0 END) as critical_tasks,
+                SUM(CASE WHEN t.priority = 'high' THEN 1 ELSE 0 END) as high_priority_tasks,
+                SUM(CASE WHEN t.priority = 'medium' THEN 1 ELSE 0 END) as medium_priority_tasks,
+                SUM(CASE WHEN t.priority = 'low' THEN 1 ELSE 0 END) as low_priority_tasks,
+                AVG(t.progress) as avg_progress,
+                SUM(t.estimated_hours) as total_estimated_hours,
+                SUM(t.actual_hours) as total_actual_hours
+            FROM tasks t
+            ${whereClause}
+        `, params),
+
+        pool.execute(`
+            SELECT
+                COUNT(*) as total_projects,
+                SUM(CASE WHEN p.status = 'active' THEN 1 ELSE 0 END) as active_projects,
+                SUM(CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END) as completed_projects,
+                SUM(CASE WHEN p.status = 'on_hold' THEN 1 ELSE 0 END) as on_hold_projects,
+                SUM(CASE WHEN p.status = 'planning' THEN 1 ELSE 0 END) as planning_projects,
+                AVG(p.completion_percentage) as avg_completion_percentage,
+                SUM(p.budget) as total_budget
+            FROM projects p
+            ${projectFilterWhere}
+        `),
+
+        pool.execute(`
+            SELECT
+                COUNT(*) as total_agents,
+                SUM(CASE WHEN aa.status = 'active' THEN 1 ELSE 0 END) as active_agents,
+                SUM(CASE WHEN aa.status = 'idle' THEN 1 ELSE 0 END) as idle_agents,
+                SUM(CASE WHEN aa.status = 'busy' THEN 1 ELSE 0 END) as busy_agents
+            FROM ai_agents aa
+        `),
+
+        pool.execute(`
+            SELECT
+                DATE(t.completed_at) as date,
+                COUNT(*) as tasks_completed,
+                SUM(t.actual_hours) as hours_completed
+            FROM tasks t
+            WHERE t.status = 'completed'
+                ${filters.start_date ? `AND DATE(t.completed_at) >= '${filters.start_date}'` : ''}
+                ${filters.end_date ? `AND DATE(t.completed_at) <= '${filters.end_date}'` : ''}
+            GROUP BY DATE(t.completed_at)
+            ORDER BY date DESC
+            LIMIT 30
+        `),
+
+        pool.execute(`
+            SELECT
+                s.id,
+                s.name,
+                s.status,
+                COUNT(t.id) as total_tasks,
+                SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
+                ROUND((SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) / COUNT(t.id)) * 100, 2) as completion_percentage
+            FROM sprints s
+            LEFT JOIN tasks t ON t.sprint_id = s.id
+            ${filters.project_id ? `WHERE s.project_id = ${filters.project_id}` : ''}
+            GROUP BY s.id
+            ORDER BY s.start_date DESC
+        `),
+
+        pool.execute(`
+            SELECT
+                e.id,
+                e.name,
+                e.status,
+                COUNT(t.id) as total_tasks,
+                SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) as completed_tasks,
+                ROUND((SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) / COUNT(t.id)) * 100, 2) as completion_percentage
+            FROM epics e
+            LEFT JOIN tasks t ON t.epic_id = e.id
+            ${filters.project_id ? `WHERE e.project_id = ${filters.project_id}` : ''}
+            GROUP BY e.id
+            ORDER BY e.created_at DESC
+        `)
+    ]);
+
+    return {
+        tasks: taskStats,
+        projects: projectStats,
+        agents: agentStats,
+        velocity: velocityStats,
+        sprints: sprintStats,
+        epics: epicStats,
+        generated_at: new Date().toISOString()
+    };
+}

@@ -496,6 +496,7 @@ class SolariaDashboardServer {
         this.app.get('/api/dashboard/overview', this.getDashboardOverview.bind(this));
         this.app.get('/api/dashboard/metrics', this.getDashboardMetrics.bind(this));
         this.app.get('/api/dashboard/alerts', this.getDashboardAlerts.bind(this));
+        this.app.get('/api/stats', this.getStats.bind(this));
         this.app.get('/api/docs', this.getDocs.bind(this));
 
         // Projects
@@ -1268,6 +1269,115 @@ class SolariaDashboardServer {
             console.error('Error in getDashboardAlerts:', error);
             res.status(500).json({ error: 'Failed to fetch dashboard alerts' });
         }
+    }
+
+    private async getStats(req: Request, res: Response): Promise<void> {
+        try {
+            const { project_id, sprint_id, start_date, end_date, format } = req.query;
+
+            const filters: dashboardRepo.StatsFilters = {};
+            if (project_id) filters.project_id = parseInt(project_id as string, 10);
+            if (sprint_id) filters.sprint_id = parseInt(sprint_id as string, 10);
+            if (start_date) filters.start_date = start_date as string;
+            if (end_date) filters.end_date = end_date as string;
+
+            const stats = await dashboardRepo.getComprehensiveStats(filters);
+
+            if (format === 'human') {
+                const humanReadable = this.formatStatsHuman(stats);
+                res.json({ stats: humanReadable, format: 'human', generated_at: stats.generated_at });
+            } else {
+                res.json(stats);
+            }
+        } catch (error) {
+            console.error('Error in getStats:', error);
+            res.status(500).json({ error: 'Failed to fetch stats' });
+        }
+    }
+
+    private formatStatsHuman(stats: any): string {
+        const lines: string[] = [];
+        lines.push('╔══════════════════════════════════════════════════════════╗');
+        lines.push('║              SOLARIA DFO - SYSTEM STATISTICS                 ║');
+        lines.push('╚══════════════════════════════════════════════════════════╝');
+        lines.push('');
+
+        lines.push('📊 TASK METRICS');
+        lines.push('─────────────────────────────────────────────────────────────────');
+        if (stats.tasks) {
+            lines.push(`Total Tasks:      ${stats.tasks.total_tasks || 0}`);
+            lines.push(`Pending:          ${stats.tasks.pending_tasks || 0}`);
+            lines.push(`In Progress:      ${stats.tasks.in_progress_tasks || 0}`);
+            lines.push(`Completed:        ${stats.tasks.completed_tasks || 0}`);
+            lines.push(`Blocked:          ${stats.tasks.blocked_tasks || 0}`);
+            lines.push('');
+            lines.push('Priority Distribution:');
+            lines.push(`  Critical:       ${stats.tasks.critical_tasks || 0}`);
+            lines.push(`  High:           ${stats.tasks.high_priority_tasks || 0}`);
+            lines.push(`  Medium:         ${stats.tasks.medium_priority_tasks || 0}`);
+            lines.push(`  Low:            ${stats.tasks.low_priority_tasks || 0}`);
+            lines.push('');
+            lines.push(`Avg Progress:     ${stats.tasks.avg_progress ? stats.tasks.avg_progress.toFixed(1) + '%' : 'N/A'}`);
+            lines.push(`Est. Hours:      ${stats.tasks.total_estimated_hours || 0}`);
+            lines.push(`Actual Hours:     ${stats.tasks.total_actual_hours || 0}`);
+        }
+        lines.push('');
+
+        lines.push('🏗️ PROJECT METRICS');
+        lines.push('─────────────────────────────────────────────────────────────────');
+        if (stats.projects) {
+            lines.push(`Total Projects:   ${stats.projects.total_projects || 0}`);
+            lines.push(`Active:          ${stats.projects.active_projects || 0}`);
+            lines.push(`Completed:        ${stats.projects.completed_projects || 0}`);
+            lines.push(`On Hold:         ${stats.projects.on_hold_projects || 0}`);
+            lines.push(`Planning:        ${stats.projects.planning_projects || 0}`);
+            lines.push('');
+            lines.push(`Avg Completion:  ${stats.projects.avg_completion_percentage ? stats.projects.avg_completion_percentage.toFixed(1) + '%' : 'N/A'}`);
+            lines.push(`Total Budget:     $${(stats.projects.total_budget || 0).toLocaleString()}`);
+        }
+        lines.push('');
+
+        lines.push('🤖 AGENT METRICS');
+        lines.push('─────────────────────────────────────────────────────────────────');
+        if (stats.agents) {
+            lines.push(`Total Agents:     ${stats.agents.total_agents || 0}`);
+            lines.push(`Active:          ${stats.agents.active_agents || 0}`);
+            lines.push(`Idle:            ${stats.agents.idle_agents || 0}`);
+            lines.push(`Busy:            ${stats.agents.busy_agents || 0}`);
+        }
+        lines.push('');
+
+        if (stats.velocity && stats.velocity.length > 0) {
+            lines.push('⚡ VELOCITY (Last 30 Days)');
+            lines.push('─────────────────────────────────────────────────────────────────');
+            stats.velocity.slice(0, 7).forEach((v: any) => {
+                lines.push(`${v.date}: ${v.tasks_completed} tasks, ${v.hours_completed?.toFixed(1) || 0}h`);
+            });
+            lines.push('');
+        }
+
+        if (stats.sprints && stats.sprints.length > 0) {
+            lines.push('🔄 SPRINTS');
+            lines.push('─────────────────────────────────────────────────────────────────');
+            stats.sprints.slice(0, 5).forEach((s: any) => {
+                lines.push(`${s.name} (${s.status}): ${s.completed_tasks}/${s.total_tasks} (${s.completion_percentage}%)`);
+            });
+            lines.push('');
+        }
+
+        if (stats.epics && stats.epics.length > 0) {
+            lines.push('📖 EPICS');
+            lines.push('─────────────────────────────────────────────────────────────────');
+            stats.epics.slice(0, 5).forEach((e: any) => {
+                lines.push(`${e.name} (${e.status}): ${e.completed_tasks}/${e.total_tasks} (${e.completion_percentage}%)`);
+            });
+        }
+
+        lines.push('─────────────────────────────────────────────────────────────────');
+        lines.push(`Generated: ${stats.generated_at}`);
+        lines.push('─────────────────────────────────────────────────────────────────');
+
+        return lines.join('\n');
     }
 
     private async getDocs(_req: Request, res: Response): Promise<void> {

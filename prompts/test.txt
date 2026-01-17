@@ -1,0 +1,8 @@
+Test prompt: Say "Hello! GLM-4 model is working correctly." in JSON format.
+
+Response format:
+{
+  "status": "success",
+  "message": "string",
+  "model": "glm-4"
+}

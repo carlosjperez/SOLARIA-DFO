@@ -1,0 +1,16 @@
+{
+  "agent": "claude-code",
+  "agent_path": "/opt/homebrew/bin/claude",
+  "issue_tracker": "json",
+  "prd_file": "prd.json",
+  "project_root": "/Users/carlosjperez/Documents/GitHub/SOLARIA-DFO",
+  "auto_commit": true,
+  "auto_push": false,
+  "max_iterations": 100,
+  "completion_promise": "DONE",
+  "smart_selection": false,
+  "error_handling": "retry",
+  "max_retries": 3,
+  "log_level": "info",
+  "save_logs": true
+}

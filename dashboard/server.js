@@ -292,8 +292,12 @@ class SolariaDashboardServer {
         this.app.put('/api/tasks/:id/items/:itemId/complete', this.toggleTaskItemComplete.bind(this));
         // Task Tags
         this.app.get('/api/tags', this.getTaskTags.bind(this));
+        this.app.post('/api/tags', this.createTag.bind(this));
+        this.app.put('/api/tags/:id', this.updateTag.bind(this));
+        this.app.delete('/api/tags/:id', this.deleteTag.bind(this));
         this.app.get('/api/tasks/:id/tags', this.getTaskTagAssignments.bind(this));
         this.app.post('/api/tasks/:id/tags', this.addTaskTag.bind(this));
+        this.app.put('/api/tasks/:id/tags', this.replaceTaskTags.bind(this));
         this.app.delete('/api/tasks/:id/tags/:tagId', this.removeTaskTag.bind(this));
         this.app.get('/api/tasks/by-tag/:tagName', this.getTasksByTag.bind(this));
         // Businesses
@@ -1405,14 +1409,37 @@ Generated at: ${new Date().toISOString()}
             res.status(500).json({ error: 'Failed to fetch recent tasks by project' });
         }
     }
-    async getTaskTags(_req, res) {
+    async getTaskTags(req, res) {
         try {
-            const [rows] = await this.db.execute(`
-                SELECT id, name, description, color, icon, usage_count, created_at
+            const { type, predefined, is_active } = req.query;
+            let query = `
+                SELECT id, tag_name, display_name, color, icon, description, tag_type, is_active, is_system, sort_order, created_at, updated_at
                 FROM task_tags
-                ORDER BY usage_count DESC, name ASC
-            `);
-            res.json({ tags: rows });
+                WHERE 1=1
+            `;
+            const params = [];
+            if (type) {
+                query += ' AND tag_type = ?';
+                params.push(type);
+            }
+            if (predefined === 'true' || predefined === '1') {
+                query += ' AND is_system = TRUE';
+            }
+            if (is_active !== undefined && is_active !== 'all') {
+                query += ' AND is_active = ?';
+                params.push(is_active === 'true' || is_active === '1');
+            }
+            query += ' ORDER BY sort_order ASC, display_name ASC';
+            const [rows] = await this.db.execute(query, params);
+            res.json({
+                success: true,
+                data: { tags: rows },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
+            });
         }
         catch (error) {
             console.error('Error fetching task tags:', error);
@@ -2613,8 +2640,8 @@ Generated at: ${new Date().toISOString()}
                         CASE
                             WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
                             WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
-                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
-                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.tag_name = 'bug') THEN '-BUG'
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.tag_name = 'hotfix') THEN '-HOT'
                             ELSE ''
                         END
                     ) as task_code,
@@ -2645,6 +2672,16 @@ Generated at: ${new Date().toISOString()}
             }
             query += ` ORDER BY ${sortColumn} ${sortDirection} LIMIT ${safeLimit}`;
             const [tasks] = await this.db.execute(query, params);
+            for (const task of tasks) {
+                const [tags] = await this.db.execute(`
+                    SELECT tt.id, tt.tag_name, tt.display_name, tt.color, tt.icon, tt.tag_type
+                    FROM task_tag_assignments tta
+                    JOIN task_tags tt ON tta.tag_id = tt.id
+                    WHERE tta.task_id = ? AND tt.is_active = TRUE
+                    ORDER BY tta.assigned_at ASC
+                `, [task.id]);
+                task.tags = tags;
+            }
             res.json(tasks);
         }
         catch (error) {
@@ -2668,8 +2705,8 @@ Generated at: ${new Date().toISOString()}
                         CASE
                             WHEN t.epic_id IS NOT NULL THEN CONCAT('-EPIC', LPAD(e.epic_number, 2, '0'))
                             WHEN t.sprint_id IS NOT NULL THEN CONCAT('-SP', LPAD(sp.sprint_number, 2, '0'))
-                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'bug') THEN '-BUG'
-                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.name = 'hotfix') THEN '-HOT'
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.tag_name = 'bug') THEN '-BUG'
+                            WHEN EXISTS (SELECT 1 FROM task_tag_assignments tta JOIN task_tags tt ON tta.tag_id = tt.id WHERE tta.task_id = t.id AND tt.tag_name = 'hotfix') THEN '-HOT'
                             ELSE ''
                         END
                     ) as task_code,
@@ -2687,6 +2724,27 @@ Generated at: ${new Date().toISOString()}
                 res.status(404).json({ error: 'Task not found' });
                 return;
             }
+            const [items] = await this.db.execute(`
+                SELECT ti.*, a.name as completed_by_name
+                FROM task_items ti
+                LEFT JOIN ai_agents a ON ti.completed_by_agent_id = a.id
+                WHERE ti.task_id = ?
+                ORDER BY ti.sort_order ASC, ti.created_at ASC
+            `, [id]);
+            const [tags] = await this.db.execute(`
+                SELECT tt.id, tt.tag_name, tt.display_name, tt.color, tt.icon, tt.tag_type
+                FROM task_tag_assignments tta
+                JOIN task_tags tt ON tta.tag_id = tt.id
+                WHERE tta.task_id = ? AND tt.is_active = TRUE
+                ORDER BY tta.assigned_at ASC
+            `, [id]);
+            const result = task[0];
+            result.items = items;
+            result.items_total = items.length;
+            result.items_completed = items.filter((i) => i.is_completed).length;
+            result.tags = tags;
+            res.json(result);
+        }
             // Fetch task items (subtasks/checklist)
             const [items] = await this.db.execute(`
                 SELECT ti.*, a.name as completed_by_name
@@ -3126,15 +3184,26 @@ Generated at: ${new Date().toISOString()}
         try {
             const taskId = parseInt(req.params.id);
             const [rows] = await this.db.execute(`
-                SELECT tt.id, tt.name, tt.description, tt.color, tt.icon,
+                SELECT tt.id, tt.tag_name, tt.display_name, tt.description, tt.color, tt.icon, tt.tag_type,
                        tta.assigned_at, u.name as assigned_by_name
                 FROM task_tag_assignments tta
                 JOIN task_tags tt ON tta.tag_id = tt.id
                 LEFT JOIN users u ON tta.assigned_by = u.id
-                WHERE tta.task_id = ?
+                WHERE tta.task_id = ? AND tt.is_active = TRUE
                 ORDER BY tta.assigned_at ASC
             `, [taskId]);
-            res.json({ task_id: taskId, tags: rows });
+            res.json({
+                success: true,
+                data: {
+                    task_id: taskId,
+                    tags: rows
+                },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
+            });
         }
         catch (error) {
             console.error('Error fetching task tag assignments:', error);
@@ -3147,13 +3216,49 @@ Generated at: ${new Date().toISOString()}
             const { tag_id, tag_name } = req.body;
             const userId = req.user?.userId || null;
             let tagIdToAssign = tag_id;
-            // If tag_name provided instead of tag_id, look up the tag
             if (!tagIdToAssign && tag_name) {
-                const [tagRows] = await this.db.execute('SELECT id FROM task_tags WHERE name = ?', [tag_name.toLowerCase()]);
+                const [tagRows] = await this.db.execute('SELECT id FROM task_tags WHERE tag_name = ?', [tag_name.toLowerCase()]);
                 if (tagRows.length === 0) {
                     res.status(404).json({ error: `Tag '${tag_name}' not found` });
                     return;
                 }
+                tagIdToAssign = tagRows[0].id;
+            }
+            if (!tagIdToAssign) {
+                res.status(400).json({ error: 'tag_id or tag_name required' });
+                return;
+            }
+            await this.db.execute(`
+                INSERT INTO task_tag_assignments (task_id, tag_id, assigned_by)
+                VALUES (?, ?, ?)
+            `, [taskId, tagIdToAssign, userId]);
+            const [tagInfo] = await this.db.execute(`
+                SELECT id, tag_name, display_name, color, icon, tag_type
+                FROM task_tags WHERE id = ?
+            `, [tagIdToAssign]);
+            this.io.emit('task_tag_added', {
+                task_id: taskId,
+                tag: tagInfo[0]
+            });
+            res.json({
+                success: true,
+                data: { task_id: taskId, tag: tagInfo[0] },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
+            });
+        }
+        catch (error) {
+            if (error.code === 'ER_DUP_ENTRY') {
+                res.status(409).json({ error: 'Tag already assigned to this task' });
+                return;
+            }
+            console.error('Error adding task tag:', error);
+            res.status(500).json({ error: 'Failed to add tag to task' });
+        }
+    }
                 tagIdToAssign = tagRows[0].id;
             }
             if (!tagIdToAssign) {
@@ -3197,14 +3302,19 @@ Generated at: ${new Date().toISOString()}
                 res.status(404).json({ error: 'Tag assignment not found' });
                 return;
             }
-            // Decrement usage count
-            await this.db.execute('UPDATE task_tags SET usage_count = GREATEST(usage_count - 1, 0) WHERE id = ?', [tagId]);
-            // Emit WebSocket event
             this.io.emit('task_tag_removed', {
                 task_id: taskId,
                 tag_id: tagId
             });
-            res.json({ success: true, task_id: taskId, tag_id: tagId });
+            res.json({
+                success: true,
+                data: { task_id: taskId, tag_id: tagId },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
+            });
         }
         catch (error) {
             console.error('Error removing task tag:', error);
@@ -3226,7 +3336,7 @@ Generated at: ${new Date().toISOString()}
                 JOIN task_tags tt ON tta.tag_id = tt.id
                 LEFT JOIN projects p ON t.project_id = p.id
                 LEFT JOIN ai_agents aa ON t.assigned_agent_id = aa.id
-                WHERE tt.name = ?
+                WHERE tt.tag_name = ? AND tt.is_active = TRUE
             `;
             const params = [tagName.toLowerCase()];
             if (project_id) {
@@ -3241,14 +3351,259 @@ Generated at: ${new Date().toISOString()}
             params.push(safeLimit);
             const [rows] = await this.db.execute(query, params);
             res.json({
-                tag: tagName,
-                count: rows.length,
-                tasks: rows
+                success: true,
+                data: {
+                    tag: tagName,
+                    count: rows.length,
+                    tasks: rows
+                },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
             });
         }
         catch (error) {
             console.error('Error fetching tasks by tag:', error);
             res.status(500).json({ error: 'Failed to fetch tasks by tag' });
+        }
+    }
+    async createTag(req, res) {
+        try {
+            const { tag_name, display_name, color, icon, description, tag_type, is_system, sort_order } = req.body;
+            const userId = req.user?.userId || null;
+            if (!tag_name || !display_name) {
+                res.status(400).json({ error: 'tag_name and display_name are required' });
+                return;
+            }
+            const normalizedName = tag_name.toLowerCase().trim();
+            if (!/^[a-z0-9-]+$/.test(normalizedName)) {
+                res.status(400).json({ error: 'tag_name must be lowercase alphanumeric with hyphens only' });
+                return;
+            }
+            if (!/^#[0-9A-Fa-f]{6}$/.test(color || '')) {
+                res.status(400).json({ error: 'color must be a valid hex color (e.g., #3b82f6)' });
+                return;
+            }
+            const validTypes = ['bug', 'feature', 'improvement', 'refactor', 'docs', 'test', 'other', 'system', 'priority-critical', 'priority-high', 'priority-medium', 'priority-low'];
+            if (tag_type && !validTypes.includes(tag_type)) {
+                res.status(400).json({ error: `Invalid tag_type. Must be one of: ${validTypes.join(', ')}` });
+                return;
+            }
+            const [result] = await this.db.execute(`
+                INSERT INTO task_tags (tag_name, display_name, color, icon, description, tag_type, is_system, sort_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                normalizedName,
+                display_name,
+                color || '#3b82f6',
+                icon || 'tag',
+                description || null,
+                tag_type || 'feature',
+                is_system || false,
+                sort_order || 100
+            ]);
+            const [newTag] = await this.db.execute('SELECT * FROM task_tags WHERE id = ?', [result.insertId]);
+            this.logActivity({
+                action: 'tag_created',
+                message: `Tag '${display_name}' created`,
+                category: 'tags',
+                project_id: null,
+                agent_id: userId,
+                metadata: { tag_id: result.insertId, tag_name: normalizedName }
+            });
+            res.json({
+                success: true,
+                data: { tag: newTag[0] },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
+            });
+        }
+        catch (error) {
+            if (error.code === 'ER_DUP_ENTRY') {
+                res.status(409).json({ error: 'Tag name already exists' });
+                return;
+            }
+            console.error('Error creating tag:', error);
+            res.status(500).json({ error: 'Failed to create tag' });
+        }
+    }
+    async updateTag(req, res) {
+        try {
+            const { id } = req.params;
+            const { display_name, color, icon, description, tag_type, is_active, sort_order } = req.body;
+            const userId = req.user?.userId || null;
+            const [existingTags] = await this.db.execute('SELECT * FROM task_tags WHERE id = ?', [id]);
+            if (existingTags.length === 0) {
+                res.status(404).json({ error: 'Tag not found' });
+                return;
+            }
+            const existingTag = existingTags[0];
+            if (color && !/^#[0-9A-Fa-f]{6}$/.test(color)) {
+                res.status(400).json({ error: 'color must be a valid hex color (e.g., #3b82f6)' });
+                return;
+            }
+            const validTypes = ['bug', 'feature', 'improvement', 'refactor', 'docs', 'test', 'other', 'system', 'priority-critical', 'priority-high', 'priority-medium', 'priority-low'];
+            if (tag_type && !validTypes.includes(tag_type)) {
+                res.status(400).json({ error: `Invalid tag_type. Must be one of: ${validTypes.join(', ')}` });
+                return;
+            }
+            await this.db.execute(`
+                UPDATE task_tags
+                SET display_name = COALESCE(?, display_name),
+                    color = COALESCE(?, color),
+                    icon = COALESCE(?, icon),
+                    description = COALESCE(?, description),
+                    tag_type = COALESCE(?, tag_type),
+                    is_active = COALESCE(?, is_active),
+                    sort_order = COALESCE(?, sort_order)
+                WHERE id = ?
+            `, [
+                display_name || null,
+                color || null,
+                icon || null,
+                description !== undefined ? description : null,
+                tag_type || null,
+                is_active !== undefined ? is_active : null,
+                sort_order || null,
+                id
+            ]);
+            const [updatedTag] = await this.db.execute('SELECT * FROM task_tags WHERE id = ?', [id]);
+            this.logActivity({
+                action: 'tag_updated',
+                message: `Tag '${existingTag.display_name}' updated`,
+                category: 'tags',
+                project_id: null,
+                agent_id: userId,
+                metadata: { tag_id: id, changes: { display_name, color, icon, description, tag_type, is_active, sort_order } }
+            });
+            res.json({
+                success: true,
+                data: { tag: updatedTag[0] },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
+            });
+        }
+        catch (error) {
+            console.error('Error updating tag:', error);
+            res.status(500).json({ error: 'Failed to update tag' });
+        }
+    }
+    async deleteTag(req, res) {
+        try {
+            const { id } = req.params;
+            const userId = req.user?.userId || null;
+            const [existingTags] = await this.db.execute('SELECT * FROM task_tags WHERE id = ?', [id]);
+            if (existingTags.length === 0) {
+                res.status(404).json({ error: 'Tag not found' });
+                return;
+            }
+            const tag = existingTags[0];
+            if (tag.is_system) {
+                res.status(403).json({ error: 'Cannot delete system tags' });
+                return;
+            }
+            await this.db.execute('DELETE FROM task_tags WHERE id = ?', [id]);
+            this.logActivity({
+                action: 'tag_deleted',
+                message: `Tag '${tag.display_name}' deleted`,
+                category: 'tags',
+                project_id: null,
+                agent_id: userId,
+                metadata: { tag_id: id, tag_name: tag.tag_name }
+            });
+            res.json({
+                success: true,
+                data: { tag_id: parseInt(id) },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
+            });
+        }
+        catch (error) {
+            console.error('Error deleting tag:', error);
+            res.status(500).json({ error: 'Failed to delete tag' });
+        }
+    }
+    async replaceTaskTags(req, res) {
+        try {
+            const taskId = parseInt(req.params.id);
+            const { tag_ids } = req.body;
+            const userId = req.user?.userId || null;
+            if (!Array.isArray(tag_ids)) {
+                res.status(400).json({ error: 'tag_ids must be an array' });
+                return;
+            }
+            const [taskCheck] = await this.db.execute('SELECT id FROM tasks WHERE id = ?', [taskId]);
+            if (taskCheck.length === 0) {
+                res.status(404).json({ error: 'Task not found' });
+                return;
+            }
+            const [oldAssignments] = await this.db.execute(`
+                SELECT tt.id, tt.tag_name, tt.display_name, tt.color, tt.icon
+                FROM task_tag_assignments tta
+                JOIN task_tags tt ON tta.tag_id = tt.id
+                WHERE tta.task_id = ?
+            `, [taskId]);
+            await this.db.execute('DELETE FROM task_tag_assignments WHERE task_id = ?', [taskId]);
+            if (tag_ids.length > 0) {
+                const insertPromises = tag_ids.map(tagId => 
+                    this.db.execute(`
+                        INSERT IGNORE INTO task_tag_assignments (task_id, tag_id, assigned_by)
+                        VALUES (?, ?, ?)
+                    `, [taskId, tagId, userId])
+                );
+                await Promise.all(insertPromises);
+            }
+            const [newAssignments] = await this.db.execute(`
+                SELECT tt.id, tt.tag_name, tt.display_name, tt.color, tt.icon
+                FROM task_tag_assignments tta
+                JOIN task_tags tt ON tta.tag_id = tt.id
+                WHERE tta.task_id = ?
+                ORDER BY tta.assigned_at ASC
+            `, [taskId]);
+            await this.db.execute(`
+                INSERT INTO task_tag_assignments_history (task_id, old_value, new_value, changed_by)
+                VALUES (?, ?, ?, ?)
+            `, [taskId, JSON.stringify(oldAssignments), JSON.stringify(newAssignments), userId]);
+            this.logActivity({
+                action: 'task_tags_replaced',
+                message: `Tags replaced for task #${taskId}`,
+                category: 'tasks',
+                project_id: taskCheck[0]?.project_id || null,
+                agent_id: userId,
+                metadata: { task_id: taskId, old_tags: oldAssignments, new_tags: newAssignments }
+            });
+            this.io.emit('task_tags_replaced', {
+                task_id: taskId,
+                tags: newAssignments
+            });
+            res.json({
+                success: true,
+                data: {
+                    task_id: taskId,
+                    tag_ids: tag_ids,
+                    tags: newAssignments
+                },
+                metadata: {
+                    timestamp: new Date().toISOString(),
+                    request_id: req.id || null,
+                    execution_time_ms: null
+                }
+            });
+        }
+        catch (error) {
+            console.error('Error replacing task tags:', error);
+            res.status(500).json({ error: 'Failed to replace task tags' });
         }
     }
     // ========================================================================

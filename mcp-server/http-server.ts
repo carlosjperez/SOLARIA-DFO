@@ -577,11 +577,43 @@ app.post("/mcp", async (req: Request<{}, {}, MCPRequestBody>, res: Response) => 
   } catch (error) {
     console.error("MCP Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    res.status(errorMessage.includes("Authorization") ? 401 : 500).json({
+
+    // Determine specific HTTP status code and JSON-RPC error code
+    let statusCode = 500;
+    let errorCode = -32000;
+
+    if (errorMessage.includes("Authorization") ||
+        errorMessage.includes("Invalid or expired token") ||
+        errorMessage.includes("Invalid JWT token")) {
+      statusCode = 401;
+      errorCode = -32601; // Unauthorized
+    } else if (errorMessage.includes("Forbidden") ||
+               errorMessage.includes("ACCESS DENIED")) {
+      statusCode = 403;
+      errorCode = -32603; // Forbidden
+    } else if (errorMessage.includes("Not found") ||
+               errorMessage.includes("Project not found") ||
+               errorMessage.includes("not found")) {
+      statusCode = 404;
+      errorCode = -32604; // Not found
+    } else if (errorMessage.includes("Database connection failed") ||
+               errorMessage.includes("Service unavailable")) {
+      statusCode = 503;
+      errorCode = -32602; // Service unavailable
+    } else if (errorMessage.includes("status code:")) {
+      // Try to parse JSON-RPC error code
+      const match = errorMessage.match(/status code: (-?\d+)/);
+      if (match) {
+        errorCode = parseInt(match[1]);
+        statusCode = 400; // Bad request for JSON-RPC errors
+      }
+    }
+
+    res.status(statusCode).json({
       jsonrpc: "2.0",
       id: req.body?.id,
       error: {
-        code: -32000,
+        code: errorCode,
         message: errorMessage,
       },
     });

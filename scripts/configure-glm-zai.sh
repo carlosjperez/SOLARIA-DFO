@@ -40,46 +40,30 @@ update_opencode_config() {
 
     backup_file "$OPENCODE_CONFIG"
 
-    # Agregar proveedor zai usando jq si existe
+    # Agregar proveedor zai-coding-plan usando jq si existe
     if command -v jq >/dev/null 2>&1; then
         # jq disponible - usarlo
-        if ! jq -e '.provider.zai' "$OPENCODE_CONFIG" >/dev/null 2>&1; then
-            echo "Agregando proveedor Z.AI a opencode.json..."
+        if ! jq -e '.provider."zai-coding-plan"' "$OPENCODE_CONFIG" >/dev/null 2>&1; then
+            echo "Agregando proveedor Z.AI Coding Plan a opencode.json..."
             jq '
-                .provider.zai = {
-                    "name": "Z.AI",
-                    "baseURL": "https://api.z.ai/v1",
+                .provider."zai-coding-plan" = {
+                    "npm": "@ai-sdk/openai-compatible",
+                    "name": "zai-coding-plan",
+                    "options": {
+                        "baseURL": "https://api.z.ai/api/coding/paas/v4"
+                    },
                     "apiKey": "'"'"$ZAI_API_KEY"'"'",
                     "models": {
-                        "glm-4.7-coding-plan": {
-                            "name": "GLM 4.7 Coding Plan (Z.AI)",
-                            "limit": {
-                                "context": 131072,
-                                "output": 65536
-                            },
-                            "modalities": {
-                                "input": ["text"],
-                                "output": ["text"]
-                            }
-                        },
-                        "glm-4.7": {
-                            "name": "GLM 4.7 (Z.AI)",
-                            "limit": {
-                                "context": 131072,
-                                "output": 65536
-                            },
-                            "modalities": {
-                                "input": ["text"],
-                                "output": ["text"]
-                            }
+                        "glm-4.7-coding": {
+                            "name": "glm-4.7-coding"
                         }
                     }
                 }
             ' "$OPENCODE_CONFIG" > "$OPENCODE_CONFIG.tmp"
             mv "$OPENCODE_CONFIG.tmp" "$OPENCODE_CONFIG"
-            echo "Proveedor Z.AI agregado a opencode.json"
+            echo "Proveedor Z.AI Coding Plan agregado a opencode.json"
         else
-            echo "Proveedor Z.AI ya existe en opencode.json"
+            echo "Proveedor Z.AI Coding Plan ya existe en opencode.json"
         fi
     else
         echo "ERROR: jq no está instalado. Por favor instala: brew install jq"
@@ -103,39 +87,39 @@ update_omo_config() {
 {
   "agents": {
     "Sisyphus": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.1
     },
     "OpenCode-Builder": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.3
     },
     "Planner-Sisyphus": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.2
     },
     "oracle": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.1
     },
     "librarian": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.1
     },
     "explore": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.2
     },
     "frontend-ui-ux-engineer": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.3
     },
     "document-writer": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.2
     },
     "multimodal-looker": {
-      "model": "zai/glm-4.7-coding-plan",
+      "model": "zai-coding-plan/glm-4.7-coding",
       "temperature": 0.2
     }
   },
@@ -161,7 +145,7 @@ echo "=============================================="
 echo ""
 echo "Próximos pasos:"
 echo "1. Exporta tu API key: export ZAI_API_KEY='tu_key_aqui'"
-echo "2. Si la URL es diferente a https://api.z.ai/v1, edítalo en opencode.json"
+echo "2. Si la URL es diferente a https://api.z.ai/api/coding/paas/v4, edítalo en opencode.json"
 echo "3. Reinicia OpenCode: opencode --restart"
 echo "4. Verifica configuración: opencode config show"
 echo ""

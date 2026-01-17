@@ -954,6 +954,246 @@ const testGitHubCreatePRHandlesNoToken = test('GitHub: Create PR handles missing
     } else {
         assert(true, 'Accepts valid request structure');
     }
+    });
+
+// ==================== TAGS TESTS ====================
+
+const testTagsList = test('Tags: List all tags', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/tags`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(data.success, 'Response should have success: true');
+    assert(Array.isArray(data.data?.tags), 'Tags should be an array');
+    assertGreater(data.data?.tags?.length || 0, 0, 'Should have predefined tags');
+});
+
+const testTagsByType = test('Tags: Filter tags by type', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/tags?type=feature`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(data.success, 'Response should have success: true');
+    const tags = data.data?.tags || [];
+    assert(tags.every(t => t.tag_type === 'feature'), 'All tags should be of type feature');
+});
+
+const testTagsPredefinedOnly = test('Tags: Filter only predefined tags', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/tags?predefined=true`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(data.success, 'Response should have success: true');
+    const tags = data.data?.tags || [];
+    assert(tags.every(t => t.is_system === true), 'All tags should be system tags');
+});
+
+const testTagsCreate = test('Tags: Create new tag', async () => {
+    const newTag = {
+        tag_name: 'test-security',
+        display_name: 'Security',
+        color: '#dc2626',
+        icon: 'shield',
+        description: 'Security-related tasks',
+        tag_type: 'bug'
+    };
+    const { status, data } = await fetchJson(`${API_BASE}/tags`, {
+        method: 'POST',
+        body: JSON.stringify(newTag)
+    });
+    assertEqual(status, 201, 'Status should be 201');
+    assert(data.success, 'Response should have success: true');
+    assert(data.data?.tag?.tag_name === 'test-security', 'Tag should be created with correct name');
+});
+
+const testTagsCreateDuplicate = test('Tags: Reject duplicate tag name', async () => {
+    const tag = {
+        tag_name: 'bug',
+        display_name: 'Duplicate Bug',
+        color: '#ef4444',
+        tag_type: 'bug'
+    };
+    const { status } = await fetchJson(`${API_BASE}/tags`, {
+        method: 'POST',
+        body: JSON.stringify(tag)
+    });
+    assertEqual(status, 409, 'Status should be 409 (conflict)');
+});
+
+const testTagsCreateInvalidColor = test('Tags: Reject invalid hex color', async () => {
+    const tag = {
+        tag_name: 'test-invalid',
+        display_name: 'Invalid Color',
+        color: 'not-a-hex-color',
+        tag_type: 'other'
+    };
+    const { status } = await fetchJson(`${API_BASE}/tags`, {
+        method: 'POST',
+        body: JSON.stringify(tag)
+    });
+    assertEqual(status, 400, 'Status should be 400 (bad request)');
+});
+
+const testTagsCreateInvalidType = test('Tags: Reject invalid tag type', async () => {
+    const tag = {
+        tag_name: 'test-type',
+        display_name: 'Invalid Type',
+        color: '#3b82f6',
+        tag_type: 'invalid-type'
+    };
+    const { status } = await fetchJson(`${API_BASE}/tags`, {
+        method: 'POST',
+        body: JSON.stringify(tag)
+    });
+    assertEqual(status, 400, 'Status should be 400 (bad request)');
+});
+
+const testTagsUpdate = test('Tags: Update existing tag', async () => {
+    const { status: data } = await fetchJson(`${API_BASE}/tags`);
+    const tagId = data.data?.tags?.[0]?.id;
+    if (!tagId) throw new Error('No tags available to update');
+    const updates = {
+        display_name: 'Updated Bug Fix',
+        color: '#f87171'
+    };
+    const { status: updateData } = await fetchJson(`${API_BASE}/tags/${tagId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates)
+    });
+    assertEqual(status, 200, 'Status should be 200');
+    assert(updateData.success, 'Response should have success: true');
+});
+
+const testTagsUpdateNotFound = test('Tags: Update non-existent tag', async () => {
+    const { status } = await fetchJson(`${API_BASE}/tags/999999`, {
+        method: 'PUT',
+        body: JSON.stringify({ display_name: 'Test' })
+    });
+    assertEqual(status, 404, 'Status should be 404');
+});
+
+const testTagsDeleteSystemTag = test('Tags: Reject deleting system tags', async () => {
+    const { status: data } = await fetchJson(`${API_BASE}/tags?predefined=true`);
+    const systemTagId = data.data?.tags?.[0]?.id;
+    if (!systemTagId) throw new Error('No system tags available');
+    const { status } = await fetchJson(`${API_BASE}/tags/${systemTagId}`, {
+        method: 'DELETE'
+    });
+    assertEqual(status, 403, 'Status should be 403 (forbidden)');
+});
+
+const testTagsDelete = test('Tags: Delete custom tag', async () => {
+    const createResult = await fetchJson(`${API_BASE}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({
+            tag_name: 'test-delete',
+            display_name: 'Test Delete',
+            color: '#3b82f6',
+            tag_type: 'other'
+        })
+    });
+    const tagId = createResult.data?.tag?.id;
+    if (!tagId) throw new Error('Failed to create test tag');
+    const { status } = await fetchJson(`${API_BASE}/tags/${tagId}`, {
+        method: 'DELETE'
+    });
+    assertEqual(status, 200, 'Status should be 200');
+});
+
+const testTaskTagsGet = test('Task Tags: Get task tags', async () => {
+    const { status: data } = await fetchJson(`${API_BASE}/tasks`);
+    const taskId = data?.[0]?.id;
+    if (!taskId) throw new Error('No tasks available');
+    const { status: tagStatus, data: tagData } = await fetchJson(`${API_BASE}/tasks/${taskId}/tags`);
+    assertEqual(tagStatus, 200, 'Status should be 200');
+    assert(tagData.success, 'Response should have success: true');
+    assert(Array.isArray(tagData.data?.tags), 'Tags should be an array');
+});
+
+const testTaskTagsAdd = test('Task Tags: Add tag to task', async () => {
+    const { status: data } = await fetchJson(`${API_BASE}/tags`);
+    const tagId = data.data?.tags?.[0]?.id;
+    if (!tagId) throw new Error('No tags available');
+    const { status: tasksData } = await fetchJson(`${API_BASE}/tasks`);
+    const taskId = tasksData?.[0]?.id;
+    if (!taskId) throw new Error('No tasks available');
+    const { status } = await fetchJson(`${API_BASE}/tasks/${taskId}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ tag_id: tagId })
+    });
+    assertEqual(status, 200, 'Status should be 200');
+});
+
+const testTaskTagsAddDuplicate = test('Task Tags: Reject duplicate tag assignment', async () => {
+    const { status: data } = await fetchJson(`${API_BASE}/tags`);
+    const tagId = data.data?.tags?.[0]?.id;
+    if (!tagId) throw new Error('No tags available');
+    const { status: tasksData } = await fetchJson(`${API_BASE}/tasks`);
+    const taskId = tasksData?.[0]?.id;
+    if (!taskId) throw new Error('No tasks available');
+    const addResult = await fetchJson(`${API_BASE}/tasks/${taskId}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ tag_id: tagId })
+    });
+    const { status: secondStatus } = await fetchJson(`${API_BASE}/tasks/${taskId}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ tag_id: tagId })
+    });
+    assertEqual(secondStatus, 409, 'Second add should return 409 (conflict)');
+});
+
+const testTaskTagsRemove = test('Task Tags: Remove tag from task', async () => {
+    const { status: data } = await fetchJson(`${API_BASE}/tasks`);
+    const taskId = data?.[0]?.id;
+    if (!taskId) throw new Error('No tasks available');
+    const { status: tagsData } = await fetchJson(`${API_BASE}/tasks/${taskId}/tags`);
+    const tagId = tagsData.data?.tags?.[0]?.id;
+    if (!tagId) throw new Error('No tags available for removal');
+    const { status } = await fetchJson(`${API_BASE}/tasks/${taskId}/tags/${tagId}`, {
+        method: 'DELETE'
+    });
+    assertEqual(status, 200, 'Status should be 200');
+});
+
+const testTaskTagsRemoveNotFound = test('Task Tags: Remove non-existent assignment', async () => {
+    const { status } = await fetchJson(`${API_BASE}/tasks/99999/tags/99999`, {
+        method: 'DELETE'
+    });
+    assertEqual(status, 404, 'Status should be 404');
+});
+
+const testTaskTagsReplace = test('Task Tags: Replace all task tags', async () => {
+    const { status: data } = await fetchJson(`${API_BASE}/tags`);
+    const tagIds = data.data?.tags?.slice(0, 2).map(t => t.id);
+    if (!tagIds || tagIds.length < 2) throw new Error('Not enough tags available');
+    const { status: tasksData } = await fetchJson(`${API_BASE}/tasks`);
+    const taskId = tasksData?.[0]?.id;
+    if (!taskId) throw new Error('No tasks available');
+    const { status: replaceData } = await fetchJson(`${API_BASE}/tasks/${taskId}/tags`, {
+        method: 'PUT',
+        body: JSON.stringify({ tag_ids: tagIds })
+    });
+    assertEqual(status, 200, 'Status should be 200');
+    assert(replaceData.success, 'Response should have success: true');
+});
+
+const testTaskTagsReplaceEmpty = test('Task Tags: Replace with empty array removes all tags', async () => {
+    const { status: tasksData } = await fetchJson(`${API_BASE}/tasks`);
+    const taskId = tasksData?.[0]?.id;
+    if (!taskId) throw new Error('No tasks available');
+    const { status } = await fetchJson(`${API_BASE}/tasks/${taskId}/tags`, {
+        method: 'PUT',
+        body: JSON.stringify({ tag_ids: [] })
+    });
+    assertEqual(status, 200, 'Status should be 200');
+});
+
+const testTasksByTag = test('Tasks: Get tasks by tag name', async () => {
+    const { status } = await fetchJson(`${API_BASE}/tasks/by-tag/bug`);
+    assertEqual(status, 200, 'Status should be 200');
+    assert(status, 'Response should have success: true');
+});
+
+const testTasksListIncludeTags = test('Tasks: List includes tags array', async () => {
+    const { status, data } = await fetchJson(`${API_BASE}/tasks?limit=1`);
+    assertEqual(status, 200, 'Status should be 200');
+    const task = data?.[0];
+    assert(task, 'Should return at least one task');
+    assert(Array.isArray(task.tags), 'Task should have tags array');
 });
 
 // ==================== RUN ALL TESTS ====================
@@ -1054,7 +1294,28 @@ async function runTests() {
         testGitHubCreateIssueHandlesNoToken,
         testGitHubCreatePRRequiresAuth,
         testGitHubCreatePRValidation,
-        testGitHubCreatePRHandlesNoToken
+        testGitHubCreatePRHandlesNoToken,
+        // Tags API
+        testTagsList,
+        testTagsByType,
+        testTagsPredefinedOnly,
+        testTagsCreate,
+        testTagsCreateDuplicate,
+        testTagsCreateInvalidColor,
+        testTagsCreateInvalidType,
+        testTagsUpdate,
+        testTagsUpdateNotFound,
+        testTagsDeleteSystemTag,
+        testTagsDelete,
+        testTaskTagsGet,
+        testTaskTagsAdd,
+        testTaskTagsAddDuplicate,
+        testTaskTagsRemove,
+        testTaskTagsRemoveNotFound,
+        testTaskTagsReplace,
+        testTaskTagsReplaceEmpty,
+        testTasksByTag,
+        testTasksListIncludeTags
     ];
 
     for (const runTest of tests) {

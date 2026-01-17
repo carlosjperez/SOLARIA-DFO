@@ -14,11 +14,14 @@ import {
     Loader2,
     ExternalLink,
     MessageSquare,
+    Plus,
+    X as XIcon,
 } from 'lucide-react';
 import { useTask, useUpdateTask } from '@/hooks/useApi';
 import { TaskItemsList } from './TaskItemsList';
 import { cn, formatRelativeTime, formatDate } from '@/lib/utils';
 import type { Task } from '@/types';
+import { api } from '@/lib/api';
 
 interface TaskDetailDrawerProps {
     taskId: number | null;
@@ -51,6 +54,15 @@ const typeConfig = {
     maintenance: { label: 'Mantenimiento', color: 'text-amber-500', bg: 'bg-amber-500/10' },
 };
 
+function isColorDark(hexColor: string): boolean {
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
+}
+
 export function TaskDetailDrawer({
     taskId,
     isOpen,
@@ -63,6 +75,26 @@ export function TaskDetailDrawer({
     const [isEditing, setIsEditing] = useState(false);
     const [editedNotes, setEditedNotes] = useState('');
     const [editedStatus, setEditedStatus] = useState<Task['status'] | ''>('');
+    const [availableTags, setAvailableTags] = useState<any[]>([]);
+    const [isLoadingTags, setIsLoadingTags] = useState(false);
+    const [isAddingTag, setIsAddingTag] = useState(false);
+
+    useState(() => {
+        const fetchTags = async () => {
+            if (isOpen && task) {
+                setIsLoadingTags(true);
+                try {
+                    const response = await api.get('/tags');
+                    setAvailableTags(response.data?.data?.tags || []);
+                } catch (error) {
+                    console.error('Error fetching tags:', error);
+                } finally {
+                    setIsLoadingTags(false);
+                }
+            }
+        };
+        fetchTags();
+    }, [isOpen, task?.id]);
 
     if (!isOpen) return null;
 
@@ -93,6 +125,29 @@ export function TaskDetailDrawer({
             id: task.id,
             data: { status: newStatus },
         });
+    };
+
+    const handleAddTag = async (tagId: number) => {
+        if (!task) return;
+        setIsAddingTag(true);
+        try {
+            await api.post(`/tasks/${task.id}/tags`, { tag_id: tagId });
+            window.location.reload();
+        } catch (error) {
+            console.error('Error adding tag:', error);
+        } finally {
+            setIsAddingTag(false);
+        }
+    };
+
+    const handleRemoveTag = async (tagId: number) => {
+        if (!task) return;
+        try {
+            await api.delete(`/tasks/${task.id}/tags/${tagId}`);
+            window.location.reload();
+        } catch (error) {
+            console.error('Error removing tag:', error);
+        }
     };
 
     const status = task ? statusConfig[task.status] : statusConfig.pending;
@@ -206,8 +261,69 @@ export function TaskDetailDrawer({
                                                         >
                                                             Aprobar
                                                         </button>
-                                                    )}
+                                )}
+
+                                {task?.tags && task.tags.length > 0 && (
+                                    <div className="task-detail-section">
+                                        <div className="task-detail-section-title">
+                                            <Tag className="h-4 w-4" />
+                                            Etiquetas
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                            {task.tags.map((tag: any) => {
+                                                const isDark = tag.color && isColorDark(tag.color);
+                                                return (
+                                                    <div
+                                                        key={tag.id}
+                                                        className="flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full"
+                                                        style={{
+                                                            backgroundColor: tag.color || '#3b82f6',
+                                                            color: isDark ? '#ffffff' : '#1f2937'
+                                                        }}
+                                                    >
+                                                        <span>{tag.display_name || tag.tag_name}</span>
+                                                        <button
+                                                            onClick={() => handleRemoveTag(tag.id)}
+                                                            className="hover:opacity-70 transition-opacity"
+                                                        >
+                                                            <XIcon className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        {!isLoadingTags && availableTags.length > 0 && (
+                                            <div>
+                                                <label className="text-xs text-muted-foreground mb-2 block">
+                                                    Agregar etiqueta:
+                                                </label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {availableTags
+                                                        .filter((tag: any) => !task?.tags?.some((t: any) => t.id === tag.id))
+                                                        .map((tag: any) => {
+                                                            const isDark = tag.color && isColorDark(tag.color);
+                                                            return (
+                                                                <button
+                                                                    key={tag.id}
+                                                                    onClick={() => handleAddTag(tag.id)}
+                                                                    disabled={isAddingTag}
+                                                                    className="text-xs font-medium px-3 py-1 rounded-full hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                    style={{
+                                                                        backgroundColor: tag.color || '#3b82f6',
+                                                                        color: isDark ? '#ffffff' : '#1f2937'
+                                                                    }}
+                                                                >
+                                                                    <Plus className="h-3 w-3 inline mr-1" />
+                                                                    {tag.display_name || tag.tag_name}
+                                                                </button>
+                                                            );
+                                                        })}
                                                 </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                                             </div>
                                         )}
                                     </div>

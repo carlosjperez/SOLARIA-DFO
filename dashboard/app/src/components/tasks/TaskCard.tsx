@@ -40,6 +40,15 @@ const typeConfig = {
     maintenance: { color: 'text-amber-500', bg: 'bg-amber-500/10', label: 'Maint.' },
 };
 
+function isColorDark(hexColor: string): boolean {
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
+}
+
 export function TaskCard({ task, onClick, showProject = false, compact = false }: TaskCardProps) {
     const priority = priorityConfig[task.priority] || priorityConfig.medium;
     const type = typeConfig[task.type] || typeConfig.feature;
@@ -111,6 +120,32 @@ export function TaskCard({ task, onClick, showProject = false, compact = false }
             {/* Description preview */}
             {task.description && (
                 <p className="task-card-description">{task.description}</p>
+            )}
+
+            {task.tags && task.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                    {task.tags.slice(0, 4).map((tag: any) => {
+                        const bgColor = tag.color || '#3b82f6';
+                        const isDark = isColorDark(bgColor);
+                        return (
+                            <span
+                                key={tag.id}
+                                className="text-xs font-medium px-2 py-0.5 rounded-full"
+                                style={{
+                                    backgroundColor: bgColor,
+                                    color: isDark ? '#ffffff' : '#1f2937'
+                                }}
+                            >
+                                {tag.display_name || tag.tag_name}
+                            </span>
+                        );
+                    })}
+                    {task.tags.length > 4 && (
+                        <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
+                            +{task.tags.length - 4} more
+                        </span>
+                    )}
+                </div>
             )}
 
             {/* Progress bar for items */}
